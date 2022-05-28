@@ -1,0 +1,81 @@
+name: build
+
+on: [push, pull_request]
+
+jobs:
+  build-windows-msvc:
+    runs-on: windows-2019
+    steps:
+      - uses: actions/checkout@v1
+        # this runs vcvarsall for us, so we get the MSVC toolchain in PATH.
+      - uses: seanmiddleditch/gha-setup-vsdevenv@master
+      - name: build yarnspin
+        run: |
+          cl source/yarnspin.c
+  build-windows-msvc-cpp:
+    runs-on: windows-2019
+    steps:
+      - uses: actions/checkout@v1
+        # this runs vcvarsall for us, so we get the MSVC toolchain in PATH.
+      - uses: seanmiddleditch/gha-setup-vsdevenv@master
+      - name: build yarnspin
+        run: |
+          cl /Tp source/yarnspin.c
+  build-windows-tcc:
+    runs-on: windows-2019
+    steps:
+      - uses: actions/checkout@v1
+      - uses: robinraju/release-downloader@v1.2
+        with:
+          repository: "mattiasgustavsson/tcc-build"
+          tag: "tcc64"
+          fileName: "tcc-0.9.27-win64-bin.zip"
+      - name: extract tcc
+        run: 7z x tcc-0.9.27-win64-bin.zip
+      - name: build yarnspin
+        run: |
+          tcc/tcc source/yarnspin.c
+  build-macos:
+    runs-on: macOS-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: install dependencies
+        run: brew install sdl2 glew
+      - name: build yarnspin
+        run: |
+          clang source/yarnspin.c `sdl2-config --libs --cflags` -lGLEW -framework OpenGL -lpthread
+  build-macos-cpp:
+    runs-on: macOS-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: install dependencies
+        run: brew install sdl2 glew
+      - name: build yarnspin
+        run: |
+          clang++ source/yarnspin.c `sdl2-config --libs --cflags` -lGLEW -framework OpenGL -lpthread
+  build-linux-gcc:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v1
+      - name: install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -qq libsdl2-dev
+          sudo apt-get install -qq libglew-dev
+      - name: build yarnspin
+        run: |
+          gcc source/yarnspin.c `sdl2-config --libs --cflags` -lGLEW -lGL -lm -lpthread
+  build-wasm:
+    runs-on: windows-2019
+    steps:
+      - uses: actions/checkout@v1
+      - uses: robinraju/release-downloader@v1.2
+        with:
+          repository: "mattiasgustavsson/dos-like"
+          tag: "wasm-env"
+          fileName: "dos-like-wasm-build-env-win.zip"
+      - name: install dependencies
+        run: 7z x dos-like-wasm-build-env-win.zip
+      - name: build sound
+        run: |          
+            wasm\node wasm\wajicup.js source/yarnspin.c yarnspin.html
