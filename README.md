@@ -1,7 +1,7 @@
 ![build](https://github.com/mattiasgustavsson/dos-like/workflows/build/badge.svg)
 
 # yarnspin
-![yarnspin](images/yarnspin.jpg)
+![yarnspin](images/yarnspin_logo.png)
 A simple story-telling game engine
 
 ## Building
