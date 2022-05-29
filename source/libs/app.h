@@ -767,6 +767,7 @@ details.
 
     #if defined( APP_WASM )
         #include <wajic_gl.h>
+        #define WA_CORO_IMPLEMENT_NANOSLEEP
         #include <wajic_coro.h>
     #else
         #include <GL/glew.h>

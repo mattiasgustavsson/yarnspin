@@ -6,6 +6,7 @@
 
 #include "libs/app.h"
 #include "libs/crtemu_pc.h"
+#include "libs/frametimer.h"
 
 
 int app_proc( app_t* app, void* user_data ) {
@@ -14,12 +15,15 @@ int app_proc( app_t* app, void* user_data ) {
     
     crtemu_pc_t* crtemu = crtemu_pc_create( NULL );
 
+    frametimer_t* frametimer = frametimer_create( NULL );
+    frametimer_lock_rate( frametimer, 60 );
 
     static APP_U32 canvas[ 320 * 200 ];
     memset( canvas, 0xC0, sizeof( canvas ) );
     app_screenmode( app, APP_SCREENMODE_WINDOW );
 
     while( app_yield( app ) != APP_STATE_EXIT_REQUESTED ) {
+        frametimer_update( frametimer );
         int x = rand() % 320;
         int y = rand() % 200;
         APP_U32 color = rand() | ( (APP_U32) rand() << 16 );
@@ -27,6 +31,7 @@ int app_proc( app_t* app, void* user_data ) {
         crtemu_pc_present( crtemu, 0, canvas, 320, 200, 0xffffff, 0x000000 );
         app_present( app, NULL, 1, 1, 0xffffff, 0x000000 );
     }
+    frametimer_destroy( frametimer );
     crtemu_pc_destroy( crtemu );
     return 0;
 }
@@ -52,7 +57,6 @@ int main( int argc, char** argv ) {
     #endif
 #endif
 
-
 #define APP_IMPLEMENTATION
 #ifdef _WIN32 
     #define APP_WINDOWS
@@ -66,3 +70,7 @@ int main( int argc, char** argv ) {
 
 #define CRTEMU_PC_IMPLEMENTATION
 #include "libs/crtemu_pc.h"
+
+#define FRAMETIMER_IMPLEMENTATION
+#include "libs/frametimer.h"
+
