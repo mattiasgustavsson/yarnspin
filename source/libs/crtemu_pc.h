@@ -513,7 +513,6 @@ crtemu_pc_t* crtemu_pc_create( void* memctx )
 	    "    vec2 fscale = vec2( -0.019, -0.018 );\n"
 		"	vec2 fuv=vec2( uv.x, 1.0 - uv.y)*((1.0)+2.0*fscale)-fscale-vec2(-0.0, 0.005);\n"
 	    "    vec4 f=texture2D(frametexture, fuv * vec2(0.925, 0.81) + vec2( 0.042, 0.09 ));\n"
-	    "    f.xyz = mix( f.xyz, vec3(0.5,0.5,0.5), 0.5 );\n"
 	    "    float fvig = clamp( -0.00+512.0*uv.x*uv.y*(1.0-uv.x)*(1.0-uv.y), 0.2, 0.85 );\n"
 		"	col *= fvig;\n"
         "    float expon = 1.4;\n"

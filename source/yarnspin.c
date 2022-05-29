@@ -7,6 +7,7 @@
 #include "libs/app.h"
 #include "libs/crtemu_pc.h"
 #include "libs/frametimer.h"
+#include "libs/stb_image.h"
 
 
 int app_proc( app_t* app, void* user_data ) {
@@ -14,6 +15,10 @@ int app_proc( app_t* app, void* user_data ) {
 
     
     crtemu_pc_t* crtemu = crtemu_pc_create( NULL );
+    int w, h, c;
+    stbi_uc* crtframe = stbi_load( "images/crtframe.png", &w, &h, &c, 4 );
+    crtemu_pc_frame( crtemu, (CRTEMU_PC_U32*) crtframe, w, h );
+    stbi_image_free( crtframe );
 
     frametimer_t* frametimer = frametimer_create( NULL );
     frametimer_lock_rate( frametimer, 60 );
@@ -74,3 +79,15 @@ int main( int argc, char** argv ) {
 #define FRAMETIMER_IMPLEMENTATION
 #include "libs/frametimer.h"
 
+#pragma warning( push )
+#pragma warning( disable: 4255 )
+#pragma warning( disable: 4296 )
+#pragma warning( disable: 4365 )
+#pragma warning( disable: 4668 )
+#define STB_IMAGE_IMPLEMENTATION
+#if defined( _WIN32 ) && ( defined( __clang__ ) || defined( __TINYC__ ) )
+    #define STBI_NO_SIMD
+#endif
+#include "libs/stb_image.h"
+#undef STB_IMAGE_IMPLEMENTATION
+#pragma warning( pop )
