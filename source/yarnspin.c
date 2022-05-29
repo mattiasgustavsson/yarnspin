@@ -5,10 +5,16 @@
 #include <string.h>
 
 #include "libs/app.h"
+#include "libs/crtemu_pc.h"
 
 
 int app_proc( app_t* app, void* user_data ) {
     (void) user_data;
+
+    
+    crtemu_pc_t* crtemu = crtemu_pc_create( NULL );
+
+
     static APP_U32 canvas[ 320 * 200 ];
     memset( canvas, 0xC0, sizeof( canvas ) );
     app_screenmode( app, APP_SCREENMODE_WINDOW );
@@ -18,8 +24,10 @@ int app_proc( app_t* app, void* user_data ) {
         int y = rand() % 200;
         APP_U32 color = rand() | ( (APP_U32) rand() << 16 );
         canvas[ x + y * 320 ] = color;
-        app_present( app, canvas, 320, 200, 0xffffff, 0x000000 );
+        crtemu_pc_present( crtemu, 0, canvas, 320, 200, 0xffffff, 0x000000 );
+        app_present( app, NULL, 1, 1, 0xffffff, 0x000000 );
     }
+    crtemu_pc_destroy( crtemu );
     return 0;
 }
 
@@ -31,8 +39,6 @@ int main( int argc, char** argv ) {
 
 
 // pass-through so the program will build with either /SUBSYSTEM:WINDOWS or /SUBSYSTEM:CONSOLE
-#pragma comment( lib, "user32")
-#pragma comment( lib, "gdi32")
 #if defined( _WIN32 ) && !defined( __TINYC__ )
     #ifdef __cplusplus 
         extern "C" int __stdcall WinMain( struct HINSTANCE__*, struct HINSTANCE__*, char*, int ) { 
@@ -57,3 +63,6 @@ int main( int argc, char** argv ) {
 #endif
 #define APP_LOG( ctx, level, message ) 
 #include "libs/app.h"
+
+#define CRTEMU_PC_IMPLEMENTATION
+#include "libs/crtemu_pc.h"
