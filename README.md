@@ -2,7 +2,7 @@
 
 ![yarnspin](images/yarnspin_logo.png)
 
-A simple story-telling game engine
+**Yarnspin** - A simple story-telling game engine
 
 
 ## Building
