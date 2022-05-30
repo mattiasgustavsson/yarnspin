@@ -1,13 +1,19 @@
 #define _CRT_NONSTDC_NO_DEPRECATE 
 #define _CRT_SECURE_NO_WARNINGS
-
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "libs/app.h"
+#include "libs/array.h"
 #include "libs/crtemu_pc.h"
+#include "libs/cstr.h"
+#include "libs/dir.h"
 #include "libs/frametimer.h"
 #include "libs/stb_image.h"
+
+typedef cstr_t string;
+#define array(type) struct array_t
 
 
 APP_U32 blend( APP_U32 x, APP_U32 y, APP_U32 a ) {
@@ -127,9 +133,23 @@ int main( int argc, char** argv ) {
 #define APP_LOG( ctx, level, message ) 
 #include "libs/app.h"
 
+#define ARRAY_IMPLEMENTATION
+#include "libs/array.h"
+
 #define CRTEMU_PC_IMPLEMENTATION
 #include "libs/crtemu_pc.h"
 
+#define CSTR_IMPLEMENTATION
+#include "libs/cstr.h"
+
+#define DIR_IMPLEMENTATION
+#ifdef _WIN32
+    #define DIR_WINDOWS
+#else
+    #define DIR_POSIX
+#endif
+#include "libs/dir.h"
+        
 #define FRAMETIMER_IMPLEMENTATION
 #include "libs/frametimer.h"
 
