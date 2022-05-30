@@ -12,7 +12,7 @@ struct array_t;
 
 struct array_t* array_create( int item_size, void* memctx );
 void array_destroy( struct array_t* array );
-void array_add( struct array_t* array, void* item );
+void* array_add( struct array_t* array, void* item );
 void array_remove( struct array_t* array, int index );
 void array_remove_ordered( struct array_t* array, int index );
 ARRAY_BOOL_T array_get( struct array_t* array, int index, void* item );
@@ -85,7 +85,7 @@ void array_destroy( struct array_t* array ) {
 }
 
 
-void array_add( struct array_t* array, void* item ) {
+void* array_add( struct array_t* array, void* item ) {
     if( array->count >= array->capacity ) {
         array->capacity *= 2;
         void* items = array->items;
@@ -95,6 +95,7 @@ void array_add( struct array_t* array, void* item ) {
     }
     ARRAY_MEMCPY( (void*)( ( (uintptr_t) array->items ) + array->count * array->item_size ), item, array->item_size );
     ++array->count;
+    return (void*)( ( (uintptr_t) array->items ) + ( array->count - 1 ) * array->item_size );
 }
 
 

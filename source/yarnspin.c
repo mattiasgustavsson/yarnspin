@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 
 #include "libs/app.h"
 #include "libs/array.h"
@@ -10,11 +11,13 @@
 #include "libs/cstr.h"
 #include "libs/dir.h"
 #include "libs/frametimer.h"
+#include "libs/file.h"
 #include "libs/stb_image.h"
 
 typedef cstr_t string;
 #define array(type) struct array_t
 
+#include "yarn.h"
 
 APP_U32 blend( APP_U32 x, APP_U32 y, APP_U32 a ) {
     APP_U32 xr = ( x ) & 0xff;
@@ -89,6 +92,8 @@ int app_proc( app_t* app, void* user_data ) {
     }
     stbi_image_free( logo );
 
+    yarn_compile( "." );
+
     // main loop
     while( app_yield( app ) != APP_STATE_EXIT_REQUESTED ) {
         frametimer_update( frametimer );
@@ -150,6 +155,9 @@ int main( int argc, char** argv ) {
 #endif
 #include "libs/dir.h"
         
+#define FILE_IMPLEMENTATION
+#include "libs/file.h"
+
 #define FRAMETIMER_IMPLEMENTATION
 #include "libs/frametimer.h"
 
