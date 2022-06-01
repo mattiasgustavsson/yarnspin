@@ -73,9 +73,8 @@ struct yarn_t* yarn_compile( char const* path ) {
             if( lexer_success ) {
                 //parser_success = parser_success && yarn_parser( &lexer, parser_globals, parser_sections );
             }
-            for( int i = 0; i < array_count( lexer.sections ); ++i ) {
-                struct lexer_section_t* section = (struct lexer_section_t*) array_item( lexer.sections, i );
-                array_destroy( section->lines );
+            for( int i = 0; i < lexer.sections->count; ++i ) {
+                array_destroy( lexer.sections->items[ i ].lines );
             }
             array_destroy( lexer.sections );
             array_destroy( lexer.globals );
