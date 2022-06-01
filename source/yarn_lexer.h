@@ -104,7 +104,7 @@ char const* lex_declaration( const char* yarn, struct line_t* line ) {
     }
     if( *str != ':' ) return lexer_error( line, str, "a declaration must be on the form keyword: string\n" );
 
-    string identifier = cstr_n( start, str - start );
+    string identifier = cstr_n( start, (size_t)( str - start ) );
     ++str;
     identifier = cstr_trim( identifier );
 
@@ -112,7 +112,7 @@ char const* lex_declaration( const char* yarn, struct line_t* line ) {
     while( !is_eol( *str ) ) {
         ++str;
     }
-    string data = cstr_n( start, str - start );
+    string data = cstr_n( start, (size_t)( str - start ) );
     data = cstr_trim( data );
 
     line->type = LINE_TYPE_DECLARATION;
@@ -129,7 +129,7 @@ char const* lex_conditional( const char* yarn, struct line_t* line ) {
         ++str;
     }
     line->type = LINE_TYPE_CONDITIONAL;
-    line->conditional = cstr_trim( cstr_n( yarn, str - yarn ) );
+    line->conditional = cstr_trim( cstr_n( yarn, (size_t)( str - yarn ) ) );
     if( cstr_len( line->conditional ) <= 0 ) return lexer_error( line, str, "invalid conditional declaration\n" );
     return str + 1;
 }
@@ -185,12 +185,17 @@ struct lexer_section_t {
     string filename;
     int line_number;
     string id;
-    array(lexer_declaration_t)* lines;
+    array(struct lexer_declaration_t)* lines;
 };
 
 
-bool yarn_lexer( string filename, string yarn, array(lexer_declaration_t)* globals, array(lexer_section_t)* sections ) {
-    array(struct line_t)* lexer_lines = array_create( sizeof( struct line_t ), NULL );
+struct yarn_lexer_output_t {
+    array(struct lexer_declaration_t)* globals;
+    array(struct lexer_section_t)* sections;
+};
+
+bool yarn_lexer( string filename, string yarn, struct yarn_lexer_output_t* output ) {
+    array(struct line_t)* lexer_lines = array_create( struct line_t );
     char const* str = yarn;
     bool lexer_errors = false;
     while( str && *str ) {
@@ -215,8 +220,8 @@ bool yarn_lexer( string filename, string yarn, array(lexer_declaration_t)* globa
                 sect.filename = filename;
                 sect.line_number = find_line_number( yarn, line->pos );
                 sect.id = line->identifier;
-                sect.lines = array_create( sizeof( struct lexer_declaration_t ), NULL );
-                section = (struct lexer_section_t*) array_add( sections, &sect );
+                sect.lines = array_create( sizeof( struct lexer_declaration_t ) );
+                section = (struct lexer_section_t*) array_add( output->sections, &sect );
             } else if( line->type == LINE_TYPE_DECLARATION ) {
                 struct lexer_declaration_t decl;
                 decl.filename = filename;
@@ -224,7 +229,7 @@ bool yarn_lexer( string filename, string yarn, array(lexer_declaration_t)* globa
                 decl.identifier = line->identifier;
                 decl.data = line->data;
                 decl.conditional = NULL;
-                array_add( section ? section->lines : globals, &decl );
+                array_add( section ? (void*)section->lines : (void*)output->globals, &decl );
             } else if( line->type == LINE_TYPE_CONDITIONAL ) {
                 struct lexer_declaration_t decl;
                 decl.filename = filename;
@@ -232,7 +237,7 @@ bool yarn_lexer( string filename, string yarn, array(lexer_declaration_t)* globa
                 decl.identifier = NULL;
                 decl.data = NULL;
                 decl.conditional = line->conditional;
-                array_add( section ? section->lines : globals, &decl );
+                array_add( section ? (void*)section->lines : (void*)output->globals, &decl );
                 }
             else {
                 printf( "%s(%d): invalid line", filename, find_line_number( yarn, line->pos ));

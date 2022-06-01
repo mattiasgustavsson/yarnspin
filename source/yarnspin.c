@@ -1,5 +1,11 @@
 #define _CRT_NONSTDC_NO_DEPRECATE 
 #define _CRT_SECURE_NO_WARNINGS
+
+#if defined( _WIN32 ) && defined( _DEBUG )
+    #define _CRTDBG_MAP_ALLOC
+    #include <crtdbg.h>
+#endif
+
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,7 +21,7 @@
 #include "libs/stb_image.h"
 
 typedef cstr_t string;
-#define array(type) struct array_t
+#define array(type) array_t(type)
 
 #include "yarn.h"
 
@@ -109,6 +115,15 @@ int app_proc( app_t* app, void* user_data ) {
 
 int main( int argc, char** argv ) {
     (void) argc, (void ) argv;
+
+	// Enable windows memory leak detection (will report leaks in the Output window)
+    #if defined( _WIN32 ) && defined( _DEBUG )
+		int flag = _CrtSetDbgFlag( _CRTDBG_REPORT_FLAG ); // Get current flag
+		flag |= _CRTDBG_LEAK_CHECK_DF; // Turn on leak-checking bit
+		_CrtSetDbgFlag( flag ); // Set flag to the new value
+//		_CrtSetBreakAlloc( 0 ); // Can be manually commented back in to break at a certain allocation
+	#endif
+
     return app_run( app_proc, NULL, NULL, NULL, NULL );
 }
 
