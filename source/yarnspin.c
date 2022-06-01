@@ -20,6 +20,12 @@
 #include "libs/file.h"
 #include "libs/stb_image.h"
 
+#include "memmgr.h"
+static struct memmgr_t g_memmgr = { 0 };
+void array_deleter( void* context, void* ptr ) { (void) context; internal_array_destroy( (struct internal_array_t*) ptr ); }
+#define managed_array( type ) ARRAY_CAST( memmgr_add( &g_memmgr, array_create( type ), NULL, array_deleter ) )
+
+
 typedef cstr_t string;
 #define array(type) array_t(type)
 
@@ -98,7 +104,10 @@ int app_proc( app_t* app, void* user_data ) {
     }
     stbi_image_free( logo );
 
+    // compile yarn
+    int restore = memmgr_restore_point( &g_memmgr );
     yarn_compile( "." );
+    memmgr_rollback( &g_memmgr, restore );
 
     // main loop
     while( app_yield( app ) != APP_STATE_EXIT_REQUESTED ) {
@@ -109,6 +118,7 @@ int app_proc( app_t* app, void* user_data ) {
 
     frametimer_destroy( frametimer );
     crtemu_pc_destroy( crtemu );
+    memmgr_clear( &g_memmgr );
     return 0;
 }
 

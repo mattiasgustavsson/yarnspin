@@ -38,11 +38,18 @@ struct parser_section_t {
 };
 
 
+struct parser_output_t {
+    array(struct parser_global_t)* globals;
+    array(struct parser_section_t)* sections;
+};
+
+
 struct yarn_t;
 
 struct yarn_t* yarn_compile( char const* path ) {
-    array(struct parser_global_t)* parser_globals = array_create( struct parser_global_t );
-    array(struct parser_section_t)* parser_sections = array_create( struct parser_section_t );
+    struct parser_output_t parser;
+    parser.globals = managed_array( struct parser_global_t );
+    parser.sections = managed_array( struct parser_section_t );
 
     bool parser_success = true;
 
@@ -67,21 +74,14 @@ struct yarn_t* yarn_compile( char const* path ) {
             file_destroy( file );
 
             struct yarn_lexer_output_t lexer;
-            lexer.globals = array_create( struct lexer_declaration_t );
-            lexer.sections = array_create( struct lexer_section_t );
+            lexer.globals = managed_array( struct lexer_declaration_t );
+            lexer.sections = managed_array( struct lexer_section_t );
             bool lexer_success = yarn_lexer( filename, source, &lexer );
             if( lexer_success ) {
-                //parser_success = parser_success && yarn_parser( &lexer, parser_globals, parser_sections );
+                //parser_success = parser_success && yarn_parser( &lexer, &parser );
             }
-            for( int i = 0; i < lexer.sections->count; ++i ) {
-                array_destroy( lexer.sections->items[ i ].lines );
-            }
-            array_destroy( lexer.sections );
-            array_destroy( lexer.globals );
             if( !lexer_success ) {
                 printf( "Lexer failed for file '%s'\n", filename );
-                array_destroy( parser_sections );
-                array_destroy( parser_globals);
                 return NULL;
             }
         }
@@ -90,21 +90,14 @@ struct yarn_t* yarn_compile( char const* path ) {
 
     if( files_count == 0 ) {
         printf( "No files found in 'scripts' folder\n" );
-        array_destroy( parser_sections );
-        array_destroy( parser_globals);
         return NULL;
     }
     if( !parser_success ) {
         printf( "Parser failed\n" );
-        array_destroy( parser_sections );
-        array_destroy( parser_globals);
         return NULL;
     }
 
     //yarn_t* yarn = yarn_compiler( parser_globals, parser_sections );
-
-    array_destroy( parser_sections );
-    array_destroy( parser_globals);
 
     // return compiled_yarn;
     return NULL;

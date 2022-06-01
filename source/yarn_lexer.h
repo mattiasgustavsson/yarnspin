@@ -220,7 +220,7 @@ bool yarn_lexer( string filename, string yarn, struct yarn_lexer_output_t* outpu
                 sect.filename = filename;
                 sect.line_number = find_line_number( yarn, line->pos );
                 sect.id = line->identifier;
-                sect.lines = array_create( sizeof( struct lexer_declaration_t ) );
+                sect.lines = managed_array( sizeof( struct lexer_declaration_t ) );
                 section = (struct lexer_section_t*) array_add( output->sections, &sect );
             } else if( line->type == LINE_TYPE_DECLARATION ) {
                 struct lexer_declaration_t decl;
