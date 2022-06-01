@@ -21,6 +21,7 @@ before you include this file in *one* C/C++ file to create the implementation.
 #endif
 
 #define array_t( type ) struct { int count; type* items; } 
+#define array_param_t( type ) void 
 #define array_create( type ) ARRAY_CAST( (void*)internal_array_create( sizeof( type ), NULL ) )
 #define array_create_memctx( type, memctx ) ARRAY_CAST( (void*)internal_array_create( sizeof( type ), (memctx) ) )
 #define array_destroy( array ) internal_array_destroy( (struct internal_array_t*) (array) )

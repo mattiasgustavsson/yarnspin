@@ -28,6 +28,8 @@ void array_deleter( void* context, void* ptr ) { (void) context; internal_array_
 
 typedef cstr_t string;
 #define array(type) array_t(type)
+#define array_param(type) array_param_t(type)
+#define ARRAY_COUNT( x ) ( sizeof( x ) / sizeof( *(x) ) )
 
 #include "yarn.h"
 
@@ -105,9 +107,11 @@ int app_proc( app_t* app, void* user_data ) {
     stbi_image_free( logo );
 
     // compile yarn
-    int restore = memmgr_restore_point( &g_memmgr );
+    struct cstr_restore_point_t* str_restore = cstr_restore_point();
+    int mem_restore = memmgr_restore_point( &g_memmgr );
     yarn_compile( "." );
-    memmgr_rollback( &g_memmgr, restore );
+    memmgr_rollback( &g_memmgr, mem_restore );
+    cstr_rollback( str_restore );
 
     // main loop
     while( app_yield( app ) != APP_STATE_EXIT_REQUESTED ) {

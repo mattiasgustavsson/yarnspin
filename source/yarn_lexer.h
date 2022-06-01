@@ -95,8 +95,8 @@ char const* lex_section( const char* line_string, struct line_t* line ) {
 }
 
 
-char const* lex_declaration( const char* yarn, struct line_t* line ) {
-    char const* str = yarn;
+char const* lex_declaration( const char* yarn_source, struct line_t* line ) {
+    char const* str = yarn_source;
     str = skip_whitespace_eol( str );
     char const* start = str;
     while( *str && is_keyword_char( *str ) ) {
@@ -123,21 +123,21 @@ char const* lex_declaration( const char* yarn, struct line_t* line ) {
 }
 
 
-char const* lex_conditional( const char* yarn, struct line_t* line ) {
-    char const* str = yarn;
+char const* lex_conditional( const char* yarn_source, struct line_t* line ) {
+    char const* str = yarn_source;
     while( *str && *str != '?') {
         ++str;
     }
     line->type = LINE_TYPE_CONDITIONAL;
-    line->conditional = cstr_trim( cstr_n( yarn, (size_t)( str - yarn ) ) );
+    line->conditional = cstr_trim( cstr_n( yarn_source, (size_t)( str - yarn_source ) ) );
     if( cstr_len( line->conditional ) <= 0 ) return lexer_error( line, str, "invalid conditional declaration\n" );
     return str + 1;
 }
 
 
-char const* lex_comment( const char* yarn, struct line_t* line ) {
+char const* lex_comment( const char* yarn_source, struct line_t* line ) {
     (void) line;
-    char const* str = yarn;
+    char const* str = yarn_source;
     while( *str ) {
         if( *str == '\n' ) return ++str;
         ++str;
@@ -146,13 +146,13 @@ char const* lex_comment( const char* yarn, struct line_t* line ) {
 }
 
 
-char const* lex_line( const char* yarn, struct line_t* line ) {
-    char const* str = yarn;
+char const* lex_line( const char* yarn_source, struct line_t* line ) {
+    char const* str = yarn_source;
     while( *str ) {
-        if( *str == '/' && str[ 1 ] == '/' ) return lex_comment( yarn, line );
-        if( *str == '=' ) return lex_section( yarn, line );
-        if( *str == '?' ) return lex_conditional( yarn, line );
-        if( *str == ':' ) return lex_declaration( yarn, line );
+        if( *str == '/' && str[ 1 ] == '/' ) return lex_comment( yarn_source, line );
+        if( *str == '=' ) return lex_section( yarn_source, line );
+        if( *str == '?' ) return lex_conditional( yarn_source, line );
+        if( *str == ':' ) return lex_declaration( yarn_source, line );
         if( *str == '\n' ) return ++str;
         ++str;
     }
@@ -160,9 +160,9 @@ char const* lex_line( const char* yarn, struct line_t* line ) {
 }
 
 
-int find_line_number( char const* yarn, char const* pos ) {
+int find_line_number( char const* yarn_source, char const* pos ) {
     int line = 1;
-    char const* str = yarn;
+    char const* str = yarn_source;
     while( *str && str < pos ) {
         if( *str == '\n' ) ++line;
         ++str;
@@ -189,14 +189,11 @@ struct lexer_section_t {
 };
 
 
-struct yarn_lexer_output_t {
-    array(struct lexer_declaration_t)* globals;
-    array(struct lexer_section_t)* sections;
-};
+bool yarn_lexer( string filename, string yarn_source, array_param(struct lexer_declaration_t)* globals, 
+    array_param(struct lexer_section_t)* sections ) {
 
-bool yarn_lexer( string filename, string yarn, struct yarn_lexer_output_t* output ) {
     array(struct line_t)* lexer_lines = array_create( struct line_t );
-    char const* str = yarn;
+    char const* str = yarn_source;
     bool lexer_errors = false;
     while( str && *str ) {
         struct line_t line = { LINE_TYPE_INVALID };
@@ -204,7 +201,7 @@ bool yarn_lexer( string filename, string yarn, struct yarn_lexer_output_t* outpu
         str = lex_line( str, &line );
         if( line.error_pos != 0 ) {
             lexer_errors = true;
-            printf( "%s(%d): %s", filename, find_line_number( yarn, line.error_pos ), line.error_msg );
+            printf( "%s(%d): %s", filename, find_line_number( yarn_source, line.error_pos ), line.error_msg );
             while( *str && *str != '\n' ) ++str;
         }
         if( line.type != LINE_TYPE_INVALID )
@@ -218,40 +215,40 @@ bool yarn_lexer( string filename, string yarn, struct yarn_lexer_output_t* outpu
             if( line->type == LINE_TYPE_SECTION ) {
                 struct lexer_section_t sect;
                 sect.filename = filename;
-                sect.line_number = find_line_number( yarn, line->pos );
+                sect.line_number = find_line_number( yarn_source, line->pos );
                 sect.id = line->identifier;
-                sect.lines = managed_array( sizeof( struct lexer_declaration_t ) );
-                section = (struct lexer_section_t*) array_add( output->sections, &sect );
+                sect.lines = managed_array( struct lexer_declaration_t );
+                section = (struct lexer_section_t*) array_add( sections, &sect );
             } else if( line->type == LINE_TYPE_DECLARATION ) {
                 struct lexer_declaration_t decl;
                 decl.filename = filename;
-                decl.line_number = find_line_number( yarn, line->pos );
+                decl.line_number = find_line_number( yarn_source, line->pos );
                 decl.identifier = line->identifier;
                 decl.data = line->data;
                 decl.conditional = NULL;
                 if( section ) {
                     array_add( section->lines, &decl );
                 } else {
-                    array_add( output->globals, &decl );
+                    array_add( globals, &decl );
                 }
             } else if( line->type == LINE_TYPE_CONDITIONAL ) {
                 struct lexer_declaration_t decl;
                 decl.filename = filename;
-                decl.line_number = find_line_number( yarn, line->pos );
+                decl.line_number = find_line_number( yarn_source, line->pos );
                 decl.identifier = NULL;
                 decl.data = NULL;
                 decl.conditional = line->conditional;
                 if( section ) {
                     array_add( section->lines, &decl );
                 } else {
-                    array_add( output->globals, &decl );
+                    array_add( globals, &decl );
                 }
             } else {
-                printf( "%s(%d): invalid line", filename, find_line_number( yarn, line->pos ));
+                printf( "%s(%d): invalid line", filename, find_line_number( yarn_source, line->pos ));
             }
         }
     }
-
+    
     array_destroy( lexer_lines );
     return !lexer_errors;
 }
