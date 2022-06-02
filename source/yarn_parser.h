@@ -1,36 +1,36 @@
 
-struct parser_global_t {
+typedef struct parser_global_t {
     string filename;
     int line_number;
     string keyword;
     array(string)* data;
-};
+} parser_global_t;   
 
 
-struct parser_declaration_t {
+typedef struct parser_declaration_t {
     string filename;
     int line_number;
     string keyword;
     string identifier;
     array(string)* data;
-};
+} parser_declaration_t;
 
 
-enum section_type_t {
+typedef enum section_type_t {
     SECTION_TYPE_UNKNOWN,
     SECTION_TYPE_LOCATION,
     SECTION_TYPE_DIALOG,
     SECTION_TYPE_CHARACTER,
-};
+} section_type_t;
 
 
-struct parser_section_t {
-    enum section_type_t type;
+typedef struct parser_section_t {
+    section_type_t type;
     string filename;
     int line_number;
     string id;
-    array(struct parser_declaration_t)* declarations;
-};
+    array(parser_declaration_t)* declarations;
+} parser_section_t;
 
 
 bool is_multi_item_keyword( string keyword ) {
@@ -76,7 +76,7 @@ bool is_section_keyword( string keyword ) {
 }
 
 
-bool parse_data( struct lexer_declaration_t const* line, array_param(string)* items ) {
+bool parse_data( lexer_declaration_t const* line, array_param(string)* items ) {
 	bool no_error = true;
 	char const* start = line->data;
 	char const* cur = start;
@@ -105,7 +105,7 @@ bool parse_data( struct lexer_declaration_t const* line, array_param(string)* it
 }
 
 
-bool parse_conditional( struct lexer_declaration_t const* line, array_param(string)* items ) {
+bool parse_conditional( lexer_declaration_t const* line, array_param(string)* items ) {
 	bool no_error = true;
 	char const* start = line->conditional;
 	char const* cur = start;
@@ -134,19 +134,18 @@ bool parse_conditional( struct lexer_declaration_t const* line, array_param(stri
 }
 
 
-bool parse_globals( array_param( struct lexer_declaration_t )* lexer_globals, 
-    array_param( struct parser_global_t)* parser_globals ) {
+bool parse_globals( array_param( lexer_declaration_t )* lexer_globals, array_param( parser_global_t)* parser_globals ) {
 
 	bool no_error = true;
 	for( int i = 0; i < array_count( lexer_globals ); ++i ) {
-		struct lexer_declaration_t* line = array_item( lexer_globals, i );
+		lexer_declaration_t* line = array_item( lexer_globals, i );
 		
 		if( !is_global_keyword( line->identifier ) ) {
 			printf( "%s(%d): invalid keyword '%s' in global section. \n", line->filename, line->line_number, 
                 line->identifier );
 			no_error = false;
 		} else {
-			struct parser_global_t decl;
+			parser_global_t decl;
 			decl.filename = line->filename;
 			decl.line_number = line->line_number;
 			decl.keyword = line->identifier;
@@ -164,7 +163,7 @@ bool parse_globals( array_param( struct lexer_declaration_t )* lexer_globals,
 }
 	
 
-enum section_type_t find_section_type( string identifier ) {
+section_type_t find_section_type( string identifier ) {
     char const* location_types[] = { "txt", "opt", "img", "chr" };
     for( int i = 0; i < ARRAY_COUNT( location_types ); ++i ) {
         if( cstr_compare_nocase( identifier, location_types[ i ] ) == 0 ) {
@@ -190,7 +189,7 @@ enum section_type_t find_section_type( string identifier ) {
 }
 	
 
-char const* find_section_type_name( enum section_type_t type ) {
+char const* find_section_type_name( section_type_t type ) {
 	switch( type ) {
 		case SECTION_TYPE_UNKNOWN: return "unknown";
 		case SECTION_TYPE_LOCATION: return "location";
@@ -201,28 +200,26 @@ char const* find_section_type_name( enum section_type_t type ) {
 }	
 
 
-bool parse_sections( array_param(struct lexer_section_t)* lexer_sections, 
-    array_param(struct parser_section_t)* parser_sections ) {
-
+bool parse_sections( array_param(lexer_section_t)* lexer_sections, array_param(parser_section_t)* parser_sections ) {
 	bool no_error = true;
 
 	for( int i = 0; i < array_count( lexer_sections ); ++i ) {
-		struct lexer_section_t* lexer_section = array_item( lexer_sections, i );
-		struct parser_section_t parser_section;
+		lexer_section_t* lexer_section = array_item( lexer_sections, i );
+		parser_section_t parser_section;
 		parser_section.type = SECTION_TYPE_UNKNOWN;
 		parser_section.filename = lexer_section->filename;
 		parser_section.line_number = lexer_section->line_number;
 		parser_section.id = lexer_section->id;
-		parser_section.declarations = managed_array(struct parser_declaration_t);
+		parser_section.declarations = managed_array(parser_declaration_t);
 		if( array_count( lexer_section->lines ) == 0 ) {
 			printf( "%s(%d): empty section '%s'\n", lexer_section->filename, 
                 lexer_section->line_number, lexer_section->id );
 			no_error = false;
 		} else {
-			enum section_type_t type = SECTION_TYPE_UNKNOWN;
+			section_type_t type = SECTION_TYPE_UNKNOWN;
 			for( int j = 0; j < array_count( lexer_section->lines ); ++j ) {
-				struct lexer_declaration_t* line = array_item( lexer_section->lines, j );
-				enum section_type_t current_type = find_section_type( line->identifier );
+				lexer_declaration_t* line = array_item( lexer_section->lines, j );
+				section_type_t current_type = find_section_type( line->identifier );
 				if( type == SECTION_TYPE_UNKNOWN ) {
 					type = current_type;
 					if( current_type == SECTION_TYPE_UNKNOWN && !is_section_keyword( line->identifier ) 
@@ -241,7 +238,7 @@ bool parse_sections( array_param(struct lexer_section_t)* lexer_sections,
 					no_error = false;
 				}				
 
-				struct parser_declaration_t decl;
+				parser_declaration_t decl;
 				decl.filename = line->filename;
 				decl.line_number = line->line_number;
                 decl.keyword = NULL;
@@ -286,11 +283,8 @@ bool parse_sections( array_param(struct lexer_section_t)* lexer_sections,
 }
 	
 
-bool yarn_parser( 
-    array_param(struct lexer_declaration_t)* lexer_globals, 
-    array_param(struct lexer_section_t)* lexer_sections,
-    array_param(struct parser_global_t)* parser_globals, 
-    array_param(struct parser_section_t)* parser_sections ) {
+bool yarn_parser( array_param(lexer_declaration_t)* lexer_globals, array_param(lexer_section_t)* lexer_sections,
+    array_param(parser_global_t)* parser_globals, array_param(parser_section_t)* parser_sections ) {
 	
     return parse_globals( lexer_globals, parser_globals ) && parse_sections( lexer_sections, parser_sections );
 }

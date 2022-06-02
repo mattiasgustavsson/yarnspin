@@ -3,11 +3,11 @@
 #include "yarn_parser.h"
 //#include "yarn_compiler.h"
 
-struct yarn_t;
+typedef struct yarn_t yarn_t;
 
-struct yarn_t* yarn_compile( char const* path ) {
-    array(struct parser_global_t)* parser_globals = managed_array( struct parser_global_t );
-    array(struct parser_section_t)* parser_sections = managed_array( struct parser_section_t );
+yarn_t* yarn_compile( char const* path ) {
+    array(parser_global_t)* parser_globals = managed_array( parser_global_t );
+    array(parser_section_t)* parser_sections = managed_array( parser_section_t );
 
     bool parser_success = true;
 
@@ -31,8 +31,8 @@ struct yarn_t* yarn_compile( char const* path ) {
             string source = cstr( (char const*) file->data );
             file_destroy( file );
 
-            array(struct lexer_declaration_t)* lexer_globals = managed_array( struct lexer_declaration_t );
-            array(struct lexer_section_t)* lexer_sections = managed_array( struct lexer_section_t );
+            array(lexer_declaration_t)* lexer_globals = managed_array( lexer_declaration_t );
+            array(lexer_section_t)* lexer_sections = managed_array( lexer_section_t );
             bool lexer_success = yarn_lexer( filename, source, lexer_globals, lexer_sections );
             if( lexer_success ) {
                 if( !yarn_parser( lexer_globals, lexer_sections, parser_globals, parser_sections ) ) {
@@ -57,7 +57,7 @@ struct yarn_t* yarn_compile( char const* path ) {
         return NULL;
     }
 
-    //yarn_t* yarn = yarn_compiler( parser_globals, parser_sections );
-    // return yarn;
+    //compiled_yarn_t* compiled_yarn = yarn_compiler( parser_globals, parser_sections );
+    //return yarn;
     return NULL;
 }

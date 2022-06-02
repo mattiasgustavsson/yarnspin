@@ -24,26 +24,26 @@ bool is_keyword_char( char c ) {
 }
 
 
-enum line_type_t {
+typedef enum line_type_t {
     LINE_TYPE_INVALID,
     LINE_TYPE_SECTION,
     LINE_TYPE_DECLARATION,
     LINE_TYPE_CONDITIONAL,
-};
+} line_type_t;
 
 
-struct line_t {
-    enum line_type_t type;
+typedef struct line_t {
+    line_type_t type;
     char const* pos;
     string conditional;
     string identifier;
     string data;
     char const* error_pos;
     string error_msg;
-};
+} line_t;
 
 
-char const* lexer_error( struct line_t* line, char const* pos, char const* msg, ...  ) {
+char const* lexer_error( line_t* line, char const* pos, char const* msg, ...  ) {
     line->error_pos = pos;
     va_list args;
     va_start( args, msg);
@@ -53,7 +53,7 @@ char const* lexer_error( struct line_t* line, char const* pos, char const* msg, 
 }
 
 
-char const* lex_section( const char* line_string, struct line_t* line ) {
+char const* lex_section( const char* line_string, line_t* line ) {
     char const* str = line_string;
 
     str = skip_whitespace_eol( str );
@@ -95,7 +95,7 @@ char const* lex_section( const char* line_string, struct line_t* line ) {
 }
 
 
-char const* lex_declaration( const char* yarn_source, struct line_t* line ) {
+char const* lex_declaration( const char* yarn_source, line_t* line ) {
     char const* str = yarn_source;
     str = skip_whitespace_eol( str );
     char const* start = str;
@@ -123,7 +123,7 @@ char const* lex_declaration( const char* yarn_source, struct line_t* line ) {
 }
 
 
-char const* lex_conditional( const char* yarn_source, struct line_t* line ) {
+char const* lex_conditional( const char* yarn_source, line_t* line ) {
     char const* str = yarn_source;
     while( *str && *str != '?') {
         ++str;
@@ -135,7 +135,7 @@ char const* lex_conditional( const char* yarn_source, struct line_t* line ) {
 }
 
 
-char const* lex_comment( const char* yarn_source, struct line_t* line ) {
+char const* lex_comment( const char* yarn_source, line_t* line ) {
     (void) line;
     char const* str = yarn_source;
     while( *str ) {
@@ -146,7 +146,7 @@ char const* lex_comment( const char* yarn_source, struct line_t* line ) {
 }
 
 
-char const* lex_line( const char* yarn_source, struct line_t* line ) {
+char const* lex_line( const char* yarn_source, line_t* line ) {
     char const* str = yarn_source;
     while( *str ) {
         if( *str == '/' && str[ 1 ] == '/' ) return lex_comment( yarn_source, line );
@@ -172,31 +172,31 @@ int find_line_number( char const* yarn_source, char const* pos ) {
 }
 
 
-struct lexer_declaration_t {
+typedef struct lexer_declaration_t {
     string filename;
     int line_number;
     string identifier;
     string data;
     string conditional;
-};
+} lexer_declaration_t;
 
 
-struct lexer_section_t {
+typedef struct lexer_section_t {
     string filename;
     int line_number;
     string id;
-    array(struct lexer_declaration_t)* lines;
-};
+    array(lexer_declaration_t)* lines;
+} lexer_section_t;
 
 
-bool yarn_lexer( string filename, string yarn_source, array_param(struct lexer_declaration_t)* globals, 
-    array_param(struct lexer_section_t)* sections ) {
+bool yarn_lexer( string filename, string yarn_source, array_param(lexer_declaration_t)* globals, 
+    array_param(lexer_section_t)* sections ) {
 
-    array(struct line_t)* lexer_lines = array_create( struct line_t );
+    array(line_t)* lexer_lines = array_create( line_t );
     char const* str = yarn_source;
     bool lexer_errors = false;
     while( str && *str ) {
-        struct line_t line = { LINE_TYPE_INVALID };
+        line_t line = { LINE_TYPE_INVALID };
         line.pos = str;
         str = lex_line( str, &line );
         if( line.error_pos != 0 ) {
@@ -209,18 +209,18 @@ bool yarn_lexer( string filename, string yarn_source, array_param(struct lexer_d
     }
 
     if( !lexer_errors ) {
-        struct lexer_section_t* section = 0;
+        lexer_section_t* section = 0;
         for( int i = 0; i < lexer_lines->count; ++i ) {
-            struct line_t* line = &lexer_lines->items[ i ];
+            line_t* line = &lexer_lines->items[ i ];
             if( line->type == LINE_TYPE_SECTION ) {
-                struct lexer_section_t sect;
+                lexer_section_t sect;
                 sect.filename = filename;
                 sect.line_number = find_line_number( yarn_source, line->pos );
                 sect.id = line->identifier;
-                sect.lines = managed_array( struct lexer_declaration_t );
-                section = (struct lexer_section_t*) array_add( sections, &sect );
+                sect.lines = managed_array( lexer_declaration_t );
+                section = (lexer_section_t*) array_add( sections, &sect );
             } else if( line->type == LINE_TYPE_DECLARATION ) {
-                struct lexer_declaration_t decl;
+                lexer_declaration_t decl;
                 decl.filename = filename;
                 decl.line_number = find_line_number( yarn_source, line->pos );
                 decl.identifier = line->identifier;
@@ -232,7 +232,7 @@ bool yarn_lexer( string filename, string yarn_source, array_param(struct lexer_d
                     array_add( globals, &decl );
                 }
             } else if( line->type == LINE_TYPE_CONDITIONAL ) {
-                struct lexer_declaration_t decl;
+                lexer_declaration_t decl;
                 decl.filename = filename;
                 decl.line_number = find_line_number( yarn_source, line->pos );
                 decl.identifier = NULL;
