@@ -116,7 +116,7 @@ string concat_data( array_param(string)* data_param ) {
 
 
 typedef struct compiled_cond_flag_t {
-	bool not;
+	bool is_not;
 	int flag_index;
 } compiled_cond_flag_t;
 
@@ -701,12 +701,12 @@ bool compile_cond( array_param(string)* data_param, compiled_cond_or_t* compiled
     array(string)* data = ARRAY_CAST( data_param );
 	for( int i = 0; i < data->count; ++i ) {
 		compiled_cond_flag_t flag;
-		flag.not = false;
+		flag.is_not = false;
 		flag.flag_index = -1;
 
 		string_id str = cstr_trim( data->items[ i ] );
 		if( skip_word_if_match( &str, "not" ) ) {
-            flag.not = true;
+            flag.is_not = true;
         }
 
 		int flag_index = find_flag_index( str, compiled_yarn );
