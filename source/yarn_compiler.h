@@ -1,13 +1,3 @@
-/*
-void add_unique( array_param(T)* arr, T* val ) {
-	bool found = false;
-	for( int i = 0; i < array_count( arr ); ++i ) {
-		if( (*arr)[ i ] == val ) { found = true; break; }
-	}
-
-	if( !found ) arr->add( val );
-}
-*/
 
 // strings of type string_id should be compared with case insensitive comparison
 typedef string string_id;
@@ -132,12 +122,12 @@ compiled_cond_or_t* empty_cond_or( void ) {
 }
 
 typedef struct compiled_cond_t {
-	array(compiled_cond_or_t)* and;
+	array(compiled_cond_or_t)* ands;
 } compiled_cond_t;
 
 compiled_cond_t* empty_cond( void ) {
     static compiled_cond_t cond;
-    cond.and = managed_array( compiled_cond_or_t );
+    cond.ands = managed_array( compiled_cond_or_t );
     return &cond;
 }
 
@@ -853,7 +843,7 @@ bool compile_location( parser_section_t* section, compiled_yarn_t* compiled_yarn
 				cond_inst = *empty_cond();
 				cond = &cond_inst;
 			}
-            no_error = no_error && compile_cond( decl->data, array_add( cond->and, empty_cond_or() ), decl->filename, decl->line_number, compiled_yarn );
+            no_error = no_error && compile_cond( decl->data, array_add( cond->ands, empty_cond_or() ), decl->filename, decl->line_number, compiled_yarn );
         } else {
         	printf( "%s(%d): unknown keyword '%s'\n", decl->filename, decl->line_number, decl->keyword );
             no_error = false;
@@ -964,7 +954,7 @@ bool compile_dialog( parser_section_t* section, compiled_yarn_t* compiled_yarn )
 				cond_inst = *empty_cond();
 				cond = &cond_inst;
 			}
-            no_error = no_error && compile_cond( decl->data, array_add( cond->and, empty_cond_or() ), decl->filename, decl->line_number, compiled_yarn );
+            no_error = no_error && compile_cond( decl->data, array_add( cond->ands, empty_cond_or() ), decl->filename, decl->line_number, compiled_yarn );
         } else {
         	printf( "%s(%d): unknown keyword '%s'\n", decl->filename, decl->line_number, decl->keyword );
             no_error = false;
