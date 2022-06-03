@@ -6,10 +6,11 @@
     #include <crtdbg.h>
 #endif
 
+#include <ctype.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdarg.h>
 
 #include "libs/app.h"
 #include "libs/array.h"

@@ -91,7 +91,7 @@ bool parse_data( lexer_declaration_t const* line, array_param(string)* items ) {
 				start = cur + ( *cur ? 1 : 0 );
 				data = cstr_trim( data );
 				if( cstr_len( data ) > 0 ) {
-					array_add( items, data );
+					array_add( items, &data );
 				} else {
 					printf( "%s(%d): invalid data list '%s' at position %d. empty list item\n", line->filename, 
                         line->line_number, line->data, (int)( cur - line->data ) );
@@ -120,7 +120,7 @@ bool parse_conditional( lexer_declaration_t const* line, array_param(string)* it
 				start = cur + ( *cur ? 1 : 0 );
 				data = cstr_trim( data );
 				if( cstr_len( data ) > 0 ) {
-					array_add( items, data );
+					array_add( items, &data );
 				} else {
 					printf( "%s(%d): invalid conditionals list '%s' at position %d. empty list item\n", 
                         line->filename, line->line_number, line->data, (int)( cur - line->data ) );
@@ -153,7 +153,7 @@ bool parse_globals( array_param( lexer_declaration_t )* lexer_globals, array_par
 			if( is_multi_item_keyword( line->identifier ) ) {
 				no_error = no_error && parse_data( line, decl.data );
             } else {
-				array_add( decl.data, line->data );
+				array_add( decl.data, &line->data );
             }
             array_add( parser_globals, &decl );
         }
@@ -270,7 +270,7 @@ bool parse_sections( array_param(lexer_section_t)* lexer_sections, array_param(p
 				if( is_multi_item_keyword( line->identifier ) ) {
 					no_error = no_error && parse_data( line, decl.data );
                 } else if( cstr_compare_nocase( decl.keyword, "?" ) != 0 ) {
-					array_add( decl.data, line->data );
+					array_add( decl.data, &line->data );
                 }
                 array_add( parser_section.declarations, &decl );
 			}	

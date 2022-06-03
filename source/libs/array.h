@@ -33,6 +33,7 @@ before you include this file in *one* C/C++ file to create the implementation.
 #define array_count( array ) internal_array_count( (struct internal_array_t*) (array) )
 #define array_sort( array, compare ) internal_array_sort( (struct internal_array_t*) (array), (compare) )
 #define array_bsearch( array, key, compare ) internal_array_bsearch( (struct internal_array_t*) (array), (void*) (key), (compare) )
+#define array_find( array, item ) internal_array_find( (struct internal_array_t*) (array), (void*) (item) )
 #define array_item( array, index ) ARRAY_CAST( internal_array_item( (struct internal_array_t*) (array), (index) ) )
 
 
@@ -78,6 +79,7 @@ ARRAY_BOOL_T internal_array_set( struct internal_array_t* array, int index, void
 int internal_array_count( struct internal_array_t* array );
 void internal_array_sort( struct internal_array_t* array, int (*compare)( void const*, void const* ) );
 int internal_array_bsearch( struct internal_array_t* array, void* key, int (*compare)( void const*, void const* ) );
+int internal_array_find( struct internal_array_t* array, void* item );
 void* internal_array_item( struct internal_array_t* array, int index );
 
 #endif /* array_h */
@@ -113,6 +115,13 @@ void* internal_array_item( struct internal_array_t* array, int index );
     #define _CRT_SECURE_NO_WARNINGS
     #include <string.h>
     #define ARRAY_MEMMOVE( dst, src, cnt ) ( memcpy( (dst), (src), (cnt) ) )
+#endif 
+
+#ifndef ARRAY_MEMCMP
+    #define _CRT_NONSTDC_NO_DEPRECATE 
+    #define _CRT_SECURE_NO_WARNINGS
+    #include <string.h>
+    #define ARRAY_MEMCMP( a, b, cnt ) ( memcmp( (a), (b), (cnt) ) )
 #endif 
 
 #ifndef ARRAY_QSORT
@@ -224,6 +233,18 @@ int internal_array_bsearch( struct internal_array_t* array, void* key, int (*com
         result = (int)( ( ((uintptr_t)item) - ((uintptr_t)array->items) ) / array->item_size );
     }       
     return result;
+}
+
+
+int internal_array_find( struct internal_array_t* array, void* item ) {
+    for( int i = 0; i < array->count; ++i ) {
+        if( ARRAY_MEMCMP( (void*)( ( (uintptr_t) array->items ) + i * array->item_size ), item, 
+            (size_t) array->item_size) == 0 ) {
+
+            return i;
+        }
+    }
+    return -1;
 }
 
 

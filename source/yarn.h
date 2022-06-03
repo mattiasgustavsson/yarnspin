@@ -1,7 +1,7 @@
 
 #include "yarn_lexer.h"
 #include "yarn_parser.h"
-//#include "yarn_compiler.h"
+#include "yarn_compiler.h"
 
 typedef struct yarn_t yarn_t;
 
@@ -57,7 +57,8 @@ yarn_t* yarn_compile( char const* path ) {
         return NULL;
     }
 
-    //compiled_yarn_t* compiled_yarn = yarn_compiler( parser_globals, parser_sections );
-    //return yarn;
+    compiled_yarn_t compiled_yarn;
+    yarn_compiler( parser_globals, parser_sections, &compiled_yarn );
+    
     return NULL;
 }

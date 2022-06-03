@@ -734,7 +734,7 @@ char const* cstri_mid( struct cstri_t* cstri, char const* str, size_t start, siz
     if( len <= start ) {
         return internal_cstr_insert( cstri, "", 0 );
     }
-    if( len - start <= n ) {
+    if( len - start <= n || n <= 0 ) {
         return internal_cstr_insert( cstri, str + start, len - start );
     }
     return internal_cstr_insert( cstri, str + start, n ); 
