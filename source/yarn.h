@@ -58,7 +58,17 @@ yarn_t* yarn_compile( char const* path ) {
     }
 
     compiled_yarn_t compiled_yarn;
-    yarn_compiler( parser_globals, parser_sections, &compiled_yarn );
+    if( !yarn_compiler( parser_globals, parser_sections, &compiled_yarn ) ) {
+        printf( "Compiler failed\n" );
+        return NULL;
+    }
+    
+    buffer_t* buffer = buffer_create();
+    save_compiled_yarn( buffer, &compiled_yarn );
+    buffer_save( buffer, "test.yarn" );
+    //yarn_t* yarn = yarn_load( buffer->data, buffer->size );
+    buffer_destroy( buffer );
     
     return NULL;
 }
+

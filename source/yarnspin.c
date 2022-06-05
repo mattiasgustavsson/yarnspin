@@ -14,6 +14,7 @@
 
 #include "libs/app.h"
 #include "libs/array.h"
+#include "libs/buffer.h"
 #include "libs/crtemu_pc.h"
 #include "libs/cstr.h"
 #include "libs/dir.h"
@@ -51,6 +52,17 @@ APP_U32 blend( APP_U32 x, APP_U32 y, APP_U32 a ) {
 
 int app_proc( app_t* app, void* user_data ) {
     (void) user_data;
+
+    // compile yarn
+    struct cstr_restore_point_t* str_restore = cstr_restore_point();
+    int mem_restore = memmgr_restore_point( &g_memmgr );   
+	yarn_t* yarn = yarn_compile( "." );
+    memmgr_rollback( &g_memmgr, mem_restore );
+    cstr_rollback( str_restore );
+	if( !yarn ) {
+		printf( "Failed to load game file\n" );
+		return EXIT_FAILURE;
+	}    
 
     // position window centered on main display
     app_displays_t displays = app_displays( app );
@@ -107,12 +119,6 @@ int app_proc( app_t* app, void* user_data ) {
     }
     stbi_image_free( logo );
 
-    // compile yarn
-    struct cstr_restore_point_t* str_restore = cstr_restore_point();
-    int mem_restore = memmgr_restore_point( &g_memmgr );
-    yarn_compile( "." );
-    memmgr_rollback( &g_memmgr, mem_restore );
-    cstr_rollback( str_restore );
 
     // main loop
     while( app_yield( app ) != APP_STATE_EXIT_REQUESTED ) {
@@ -170,6 +176,9 @@ int main( int argc, char** argv ) {
 
 #define ARRAY_IMPLEMENTATION
 #include "libs/array.h"
+
+#define BUFFER_IMPLEMENTATION
+#include "libs/buffer.h"
 
 #define CRTEMU_PC_IMPLEMENTATION
 #include "libs/crtemu_pc.h"

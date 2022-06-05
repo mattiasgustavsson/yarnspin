@@ -51,11 +51,15 @@ int memmgr_restore_point( struct memmgr_t* memmgr ) {
 }
 
 void memmgr_rollback( struct memmgr_t* memmgr, int restore_point ) {
-    if( memmgr->items && restore_point >= 0 && restore_point <= memmgr->count ) {
-        for( int i = restore_point; i < memmgr->count; ++i ) {
-            struct memmgr_item_t* item = &memmgr->items[ i ];
-            item->deleter( item->context, item->ptr );
+    if( restore_point == 0 ) {
+        memmgr_clear( memmgr );
+    } else {
+        if( memmgr->items && restore_point >= 0 && restore_point <= memmgr->count ) {
+            for( int i = restore_point; i < memmgr->count; ++i ) {
+                struct memmgr_item_t* item = &memmgr->items[ i ];
+                item->deleter( item->context, item->ptr );
+            }
+            memmgr->count = restore_point;
         }
-        memmgr->count = restore_point;
-    }    
+    }
 }

@@ -1,8 +1,24 @@
 
-// strings of type string_id should be compared with case insensitive comparison
-typedef string string_id;
+
+typedef string string_id; // strings of type string_id should be compared with case insensitive comparison
+
+
+int buffer_write_string( buffer_t* buffer, char const* const* value, int count ) {
+    for( int i = 0; i < count; ++i ) {
+        char const* str = value[ i ];
+        if( !str ) str = "";
+        int len = (int) strlen( str ) + 1;
+        buffer_write_i32( buffer, &len, 1 );
+        if( buffer_write_i8( buffer, str, len ) != len ) {
+            return i;
+        }
+    }
+    return count;
+}
+
 
 #define CMP(a, b) ( cstr_compare_nocase( (a), (b) ) == 0 )
+
 
 void add_unique_id( array_param(string_id)* arr_param, string_id val ) {
     array(string_id)* arr = ARRAY_CAST( arr_param );
@@ -115,21 +131,42 @@ typedef struct compiled_cond_or_t {
 	array(compiled_cond_flag_t)* flags;
 } compiled_cond_or_t ;
 	
+
 compiled_cond_or_t* empty_cond_or( void ) {
     static compiled_cond_or_t cond_or;
     cond_or.flags = managed_array( compiled_cond_flag_t );
     return &cond_or;
 }
 
+
+void save_compiled_cond_or( buffer_t* out, compiled_cond_or_t* cond_or ) {
+    buffer_write_i32( out, &cond_or->flags->count, 1 );
+    for( int i = 0; i < cond_or->flags->count; ++i ) {
+	    buffer_write_bool( out, &cond_or->flags->items[ i ].is_not, 1 );
+	    buffer_write_i32( out, &cond_or->flags->items[ i ].flag_index, 1 );
+    }
+}
+
+
 typedef struct compiled_cond_t {
 	array(compiled_cond_or_t)* ands;
 } compiled_cond_t;
+
 
 compiled_cond_t* empty_cond( void ) {
     static compiled_cond_t cond;
     cond.ands = managed_array( compiled_cond_or_t );
     return &cond;
 }
+
+
+void save_compiled_cond( buffer_t* out, compiled_cond_t* cond ) {
+    buffer_write_i32( out, &cond->ands->count, 1 );
+    for( int i = 0; i < cond->ands->count; ++i ) {
+	    save_compiled_cond_or( out, &cond->ands->items[ i ] );
+    }
+}
+
 
 typedef enum action_type_t {
 	ACTION_TYPE_NONE,
@@ -143,6 +180,7 @@ typedef enum action_type_t {
 	ACTION_TYPE_ITEM_DROP,
 } action_type_t;
 
+
 typedef struct compiled_act_t {
 	compiled_cond_t cond;
 	enum action_type_t type;
@@ -151,6 +189,7 @@ typedef struct compiled_act_t {
 	int param_flag_index;
 	int param_item_index;
 } compiled_act_t;
+
 
 compiled_act_t* empty_act( void ) {
     static compiled_act_t act;
@@ -164,12 +203,24 @@ compiled_act_t* empty_act( void ) {
 }
 
 
+void save_compiled_act( buffer_t* out, compiled_act_t* act ) {
+    save_compiled_cond( out, &act->cond );
+    int type = (int)act->type;
+	buffer_write_i32( out, &type, 1 );
+	buffer_write_i32( out, &act->param_location_index, 1 );
+	buffer_write_i32( out, &act->param_dialog_index, 1 );
+	buffer_write_i32( out, &act->param_flag_index, 1 );
+	buffer_write_i32( out, &act->param_item_index, 1 );
+}
+
+
 typedef struct compiled_opt_t {
 	compiled_cond_t cond;
 	string text;
 	array(compiled_act_t)* act;
 } compiled_opt_t;
 	
+
 compiled_opt_t* empty_opt( void ) {
     static compiled_opt_t opt;
     opt.cond = *empty_cond();
@@ -178,12 +229,24 @@ compiled_opt_t* empty_opt( void ) {
     return &opt;
 }
 
+
+void save_compiled_opt( buffer_t* out, compiled_opt_t* opt ) {
+    save_compiled_cond( out, &opt->cond );
+	buffer_write_string( out, &opt->text, 1 );
+    buffer_write_i32( out, &opt->act->count, 1 );
+    for( int i = 0; i < opt->act->count; ++i ) {
+        save_compiled_act( out, &opt->act->items[ i ] );
+    }
+}
+
+
 typedef struct compiled_use_t {
 	compiled_cond_t cond;
 	array(int)* item_indices;
 	array(compiled_act_t)* act;
 } compiled_use_t;
 	
+
 compiled_use_t* empty_use( void ) {
     static compiled_use_t use;
     use.cond = *empty_cond();
@@ -192,12 +255,27 @@ compiled_use_t* empty_use( void ) {
     return &use;
 }
 
+
+void save_compiled_use( buffer_t* out, compiled_use_t* use ) {
+    save_compiled_cond( out, &use->cond );
+
+    buffer_write_i32( out, &use->item_indices->count, 1 );
+    buffer_write_i32( out, use->item_indices->items, use->item_indices->count );
+
+    buffer_write_i32( out, &use->act->count, 1 );
+    for( int i = 0; i < use->act->count; ++i ) {
+        save_compiled_act( out, &use->act->items[ i ] );
+    }
+}
+
+
 typedef struct compiled_chr_t {
 	compiled_cond_t cond;
 	array(int)* chr_indices;
 	array(compiled_act_t)* act;
 } compiled_chr_t;
-	
+
+
 compiled_chr_t* empty_chr( void ) {
     static compiled_chr_t chr;
     chr.cond = *empty_cond();
@@ -206,10 +284,25 @@ compiled_chr_t* empty_chr( void ) {
     return &chr;
 }
 
+
+void save_compiled_chr( buffer_t* out, compiled_chr_t* chr ) {
+    save_compiled_cond( out, &chr->cond );
+
+    buffer_write_i32( out, &chr->chr_indices->count, 1 );
+    buffer_write_i32( out, chr->chr_indices->items, chr->chr_indices->count );
+
+    buffer_write_i32( out, &chr->act->count, 1 );
+    for( int i = 0; i < chr->act->count; ++i ) {
+        save_compiled_act( out, &chr->act->items[ i ] );
+    }
+}
+
+
 typedef struct compiled_img_t {
 	compiled_cond_t cond;
 	int image_index;	
 } compiled_img_t;
+
 
 compiled_img_t* empty_img( void ) {
     static compiled_img_t img;
@@ -218,10 +311,12 @@ compiled_img_t* empty_img( void ) {
     return &img;
 }
 
+
 typedef struct compiled_txt_t {
 	compiled_cond_t cond;
 	string text;	
 } compiled_txt_t;
+
 
 compiled_txt_t* empty_txt( void ) {
     static compiled_txt_t txt;
@@ -241,6 +336,7 @@ typedef struct compiled_location_t {
 	array(compiled_chr_t)* chr;
 } compiled_location_t;
 
+
 compiled_location_t* empty_location( void ) {
     static compiled_location_t location;
     location.id = NULL;
@@ -253,11 +349,50 @@ compiled_location_t* empty_location( void ) {
     return &location;
 }
 
+
+void save_compiled_location( buffer_t* out, compiled_location_t* location ) {
+	buffer_write_string( out, &location->id, 1 );
+    
+    buffer_write_i32( out, &location->img->count, 1 );
+    for( int i = 0; i < location->img->count; ++i ) {
+        save_compiled_cond( out, &location->img->items[ i ].cond );
+        buffer_write_i32( out, &location->img->items[ i ].image_index, 1 );
+    }
+
+    buffer_write_i32( out, &location->txt->count, 1 );
+    for( int i = 0; i < location->txt->count; ++i ) {
+        save_compiled_cond( out, &location->txt->items[ i ].cond );
+        buffer_write_string( out, &location->txt->items[ i ].text, 1 );
+    }
+
+    buffer_write_i32( out, &location->act->count, 1 );
+    for( int i = 0; i < location->act->count; ++i ) {
+        save_compiled_act( out, &location->act->items[ i ] );
+    }
+
+    buffer_write_i32( out, &location->opt->count, 1 );
+    for( int i = 0; i < location->opt->count; ++i ) {
+        save_compiled_opt( out, &location->opt->items[ i ] );
+    }
+
+    buffer_write_i32( out, &location->use->count, 1 );
+    for( int i = 0; i < location->use->count; ++i ) {
+        save_compiled_use( out, &location->use->items[ i ] );
+    }
+
+    buffer_write_i32( out, &location->chr->count, 1 );
+    for( int i = 0; i < location->chr->count; ++i ) {
+        save_compiled_chr( out, &location->chr->items[ i ] );
+    }
+}
+
+
 typedef struct compiled_phrase_t {
 	compiled_cond_t cond;
 	int character_index;
 	string text;	
 } compiled_phrase_t;
+
 
 compiled_phrase_t* empty_phrase( void ) {
     static compiled_phrase_t phrase;
@@ -267,11 +402,13 @@ compiled_phrase_t* empty_phrase( void ) {
     return &phrase;
 }
 
+
 typedef struct compiled_say_t {
 	compiled_cond_t cond;
 	string text;
 	array(compiled_act_t)* act;
 } compiled_say_t;
+
 
 compiled_say_t* empty_say( void ) {
     static compiled_say_t say;
@@ -281,6 +418,17 @@ compiled_say_t* empty_say( void ) {
     return &say;
 }
 
+
+void save_compiled_say( buffer_t* out, compiled_say_t* say ) {
+    save_compiled_cond( out, &say->cond );
+	buffer_write_string( out, &say->text, 1 );
+    buffer_write_i32( out, &say->act->count, 1 );
+    for( int i = 0; i < say->act->count; ++i ) {
+        save_compiled_act( out, &say->act->items[ i ] );
+    }
+}
+
+
 typedef struct compiled_dialog_t {
 	string_id id;
 	array(compiled_act_t)* act;
@@ -288,6 +436,7 @@ typedef struct compiled_dialog_t {
 	array(compiled_say_t)* say;	
 	array(compiled_use_t)* use;
 } compiled_dialog_t;
+
 
 compiled_dialog_t* empty_dialog( void ) {
     static compiled_dialog_t dialog;
@@ -300,12 +449,40 @@ compiled_dialog_t* empty_dialog( void ) {
 }
 
 
+void save_compiled_dialog( buffer_t* out, compiled_dialog_t* dialog ) {
+	buffer_write_string( out, &dialog->id, 1 );
+
+    buffer_write_i32( out, &dialog->act->count, 1 );
+    for( int i = 0; i < dialog->act->count; ++i ) {
+        save_compiled_act( out, &dialog->act->items[ i ] );
+    }
+
+    buffer_write_i32( out, &dialog->phrase->count, 1 );
+    for( int i = 0; i < dialog->phrase->count; ++i ) {
+        save_compiled_cond( out, &dialog->phrase->items[ i ].cond );
+        buffer_write_i32( out, &dialog->phrase->items[ i ].character_index, 1 );
+    	buffer_write_string( out, &dialog->phrase->items[ i ].text, 1 );
+    }
+
+    buffer_write_i32( out, &dialog->say->count, 1 );
+    for( int i = 0; i < dialog->say->count; ++i ) {
+        save_compiled_say( out, &dialog->say->items[ i ] );
+    }
+
+    buffer_write_i32( out, &dialog->use->count, 1 );
+    for( int i = 0; i < dialog->use->count; ++i ) {
+        save_compiled_use( out, &dialog->use->items[ i ] );
+    }
+}
+
+
 typedef struct compiled_character_t {
 	string name;	
 	string short_name;
 	int face_index;
 } compiled_character_t;
 	
+
 compiled_character_t* empty_character( void ) {
     static compiled_character_t character;
     character.name = NULL;
@@ -313,6 +490,14 @@ compiled_character_t* empty_character( void ) {
     character.face_index = -1;
 	return &character;
 }
+
+
+void save_compiled_character( buffer_t* out, compiled_character_t* character ) {
+	buffer_write_string( out, &character->name, 1 );
+    buffer_write_string( out, &character->short_name, 1 );
+    buffer_write_i32( out, &character->face_index, 1 );
+}
+
 
 typedef struct compiled_globals_t {
     string title;
@@ -343,6 +528,7 @@ typedef struct compiled_globals_t {
     array(string_id)* items;
 } compiled_globals_t;
 
+
 compiled_globals_t* empty_globals( void ) {
     static compiled_globals_t globals;
     globals.title = NULL;
@@ -372,6 +558,42 @@ compiled_globals_t* empty_globals( void ) {
 	return &globals;
 }
 
+
+void save_compiled_globals( buffer_t* out, compiled_globals_t* globals ) {
+	buffer_write_string( out, &globals->title, 1 );
+	buffer_write_string( out, &globals->author, 1 );
+	buffer_write_string( out, &globals->start, 1 );
+	buffer_write_string( out, &globals->palette, 1 );
+	buffer_write_string( out, &globals->font_description, 1 );
+	buffer_write_string( out, &globals->font_options, 1 );
+	buffer_write_string( out, &globals->font_characters, 1 );
+	buffer_write_string( out, &globals->font_items, 1 );
+	buffer_write_string( out, &globals->font_name, 1 );
+
+    buffer_write_i32( out, &globals->logo_indices->count, 1 );
+	buffer_write_i32( out, globals->logo_indices->items, globals->logo_indices->count );
+
+    buffer_write_i32( out, &globals->background_location, 1 );
+    buffer_write_i32( out, &globals->background_dialog, 1 );
+    buffer_write_i32( out, &globals->color_background, 1 );
+    buffer_write_i32( out, &globals->color_disabled, 1 );
+    buffer_write_i32( out, &globals->color_txt, 1 );
+    buffer_write_i32( out, &globals->color_opt, 1 );
+    buffer_write_i32( out, &globals->color_chr, 1 );
+    buffer_write_i32( out, &globals->color_use, 1 );
+    buffer_write_i32( out, &globals->color_name, 1 );
+    buffer_write_i32( out, &globals->color_facebg, 1 );
+    
+    buffer_write_bool( out, &globals->explicit_flags, 1 );
+    buffer_write_i32( out, &globals->flags->count, 1 );
+	buffer_write_string( out, globals->flags->items, globals->flags->count );
+
+    buffer_write_bool( out, &globals->explicit_items, 1 );
+    buffer_write_i32( out, &globals->items->count, 1 );
+	buffer_write_string( out, globals->items->items, globals->items->count );
+}
+
+
 typedef struct compiled_yarn_t {
 	compiled_globals_t globals;
     int start_location;
@@ -383,15 +605,14 @@ typedef struct compiled_yarn_t {
     array(string_id)* screen_names;
     array(string_id)* face_names;
 
-	array(string_id)* location_ids;	
 	array(compiled_location_t)* locations;
-	
-	array(string_id)* dialog_ids;
 	array(compiled_dialog_t)* dialogs;
-
-	array(string_id)* character_ids;
 	array(compiled_character_t)* characters;
 
+    // Used internally for error checking, does not need exporting
+	array(string_id)* location_ids;	
+	array(string_id)* dialog_ids;
+	array(string_id)* character_ids;
     array(flag_t)* flags_modified;
     array(flag_t)* flags_tested;
     array(item_t)* items_got;
@@ -400,22 +621,26 @@ typedef struct compiled_yarn_t {
 	array(char_t)* chars_referenced;
 } compiled_yarn_t;
 
+
 compiled_yarn_t* empty_yarn( void ) {
     static compiled_yarn_t yarn;
 	yarn.globals = *empty_globals();
     yarn.start_location = -1;
     yarn.start_dialog = -1;
+
 	yarn.flag_ids = managed_array(string_id);
 	yarn.item_ids = managed_array(string_id);
 	yarn.image_names = managed_array(string_id);
     yarn.screen_names = managed_array(string_id);
     yarn.face_names = managed_array(string_id);
-    yarn.location_ids = managed_array(string_id);
+
 	yarn.locations = managed_array(compiled_location_t);
-	yarn.dialog_ids = managed_array(string_id);
 	yarn.dialogs = managed_array(compiled_dialog_t);
-    yarn.character_ids = managed_array(string_id);
 	yarn.characters = managed_array(compiled_character_t);
+
+    yarn.location_ids = managed_array(string_id);
+	yarn.dialog_ids = managed_array(string_id);
+    yarn.character_ids = managed_array(string_id);
     yarn.flags_modified = managed_array(flag_t);
     yarn.flags_tested = managed_array(flag_t);
     yarn.items_got = managed_array(item_t);
@@ -424,6 +649,45 @@ compiled_yarn_t* empty_yarn( void ) {
 	yarn.chars_referenced = managed_array(char_t);
     return &yarn;
 }
+
+
+void save_compiled_yarn( buffer_t* out, compiled_yarn_t* yarn ) {
+    save_compiled_globals( out, &yarn->globals );
+
+    buffer_write_i32( out, &yarn->start_location, 1 );
+    buffer_write_i32( out, &yarn->start_dialog, 1 );
+	
+    buffer_write_i32( out, &yarn->flag_ids->count, 1 );
+	buffer_write_string( out, yarn->flag_ids->items, yarn->flag_ids->count );
+
+    buffer_write_i32( out, &yarn->item_ids->count, 1 );
+	buffer_write_string( out, yarn->item_ids->items, yarn->item_ids->count );
+
+    buffer_write_i32( out, &yarn->image_names->count, 1 );
+	buffer_write_string( out, yarn->image_names->items, yarn->image_names->count );
+
+    buffer_write_i32( out, &yarn->screen_names->count, 1 );
+	buffer_write_string( out, yarn->screen_names->items, yarn->screen_names->count );
+
+    buffer_write_i32( out, &yarn->face_names->count, 1 );
+	buffer_write_string( out, yarn->face_names->items, yarn->face_names->count );
+
+    buffer_write_i32( out, &yarn->locations->count, 1 );
+    for( int i = 0; i < yarn->locations->count; ++i ) {
+	    save_compiled_location( out, &yarn->locations->items[ i ] );
+    }
+
+    buffer_write_i32( out, &yarn->dialogs->count, 1 );
+    for( int i = 0; i < yarn->dialogs->count; ++i ) {
+	    save_compiled_dialog( out, &yarn->dialogs->items[ i ] );
+    }
+
+    buffer_write_i32( out, &yarn->characters->count, 1 );
+    for( int i = 0; i < yarn->characters->count; ++i ) {
+	    save_compiled_character( out, &yarn->characters->items[ i ] );
+    }
+}
+
 
 int find_item_index( string_id id, compiled_yarn_t* compiled_yarn ) {
     for( int i = 0; i < compiled_yarn->item_ids->count; ++i ) {
@@ -439,17 +703,20 @@ int find_flag_index( string_id id, compiled_yarn_t* compiled_yarn ) {
     return -1;
 }
 
+
 int find_image_index( string_id name, compiled_yarn_t* compiled_yarn ) {
     for( int i = 0; i < compiled_yarn->image_names->count; ++i )
         if( compiled_yarn->image_names->items[ i ] == name ) return i;
     return -1;
 }
 
+
 int find_screen_index( string_id name, compiled_yarn_t* compiled_yarn ) {
     for( int i = 0; i < compiled_yarn->screen_names->count; ++i )
         if( compiled_yarn->screen_names->items[ i ] == name ) return i;
     return -1;
 }
+
 
 int find_face_index( string_id name, compiled_yarn_t* compiled_yarn ) {
     for( int i = 0; i < compiled_yarn->face_names->count; ++i )
@@ -463,18 +730,21 @@ int find_location_index( string_id id, compiled_yarn_t* compiled_yarn ) {
         if( compiled_yarn->location_ids->items[ i ] == id ) return i;
     return -1;
 }
-    
+ 
+
 int find_dialog_index( string_id id, compiled_yarn_t* compiled_yarn ) {
     for( int i = 0; i < compiled_yarn->dialog_ids->count; ++i )
         if( compiled_yarn->dialog_ids->items[ i ] == id ) return i;
     return -1;
 }
 
+
 int find_character_index( string_id id, compiled_yarn_t* compiled_yarn ) {
     for( int i = 0; i < compiled_yarn->character_ids->count; ++i )
         if( compiled_yarn->character_ids->items[ i ] == id ) return i;
     return -1;
 }
+
 
 bool skip_word_if_match( string_id* str_param, string word ) {
     string_id str = *str_param;
@@ -599,6 +869,7 @@ bool verify_opt( compiled_opt_t* opt, parser_declaration_t* decl ) {
     return true;
 }
 
+
 bool verify_say( compiled_say_t* say, parser_declaration_t* decl ) {
     if( !say ) { 
         return true;
@@ -609,6 +880,7 @@ bool verify_say( compiled_say_t* say, parser_declaration_t* decl ) {
     }
     return true;
 }
+
 
 bool verify_use( compiled_use_t* use, parser_declaration_t* decl ) {
     if( !use ) {
