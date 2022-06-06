@@ -7,8 +7,10 @@
 #endif
 
 #include <ctype.h>
+#include <math.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -20,7 +22,10 @@
 #include "libs/dir.h"
 #include "libs/frametimer.h"
 #include "libs/file.h"
+#include "libs/img.h"
+#include "libs/paldither.h"
 #include "libs/stb_image.h"
+#include "libs/stb_truetype.h"
 
 #include "memmgr.h"
 static struct memmgr_t g_memmgr = { 0 };
@@ -33,6 +38,7 @@ typedef cstr_t string;
 #define array_param(type) array_param_t(type)
 #define ARRAY_COUNT( x ) ( sizeof( x ) / sizeof( *(x) ) )
 
+#include "gfxconv.h"
 #include "yarn.h"
 
 APP_U32 blend( APP_U32 x, APP_U32 y, APP_U32 a ) {
@@ -203,6 +209,12 @@ int main( int argc, char** argv ) {
 #define FRAMETIMER_IMPLEMENTATION
 #include "libs/frametimer.h"
 
+#define IMG_IMPLEMENTATION
+#include "libs/img.h"
+
+#define PALDITHER_IMPLEMENTATION
+#include "libs/paldither.h"
+
 #pragma warning( push )
 #pragma warning( disable: 4255 )
 #pragma warning( disable: 4296 )
@@ -215,3 +227,6 @@ int main( int argc, char** argv ) {
 #include "libs/stb_image.h"
 #undef STB_IMAGE_IMPLEMENTATION
 #pragma warning( pop )
+
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "libs/stb_truetype.h"

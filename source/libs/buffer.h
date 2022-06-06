@@ -96,12 +96,12 @@ static BUFFER_U32_T buffer_pow2ceil( BUFFER_U32_T v ) {
 }
 
 
-typedef struct buffer_t {
+struct buffer_t {
     size_t capacity;
     size_t size;
     size_t position;
     void* data;
-} buffer_t;
+};
 
 
 buffer_t* buffer_create( void ) {

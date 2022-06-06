@@ -84,7 +84,6 @@ Examples:
 #define _CRT_NONSTDC_NO_DEPRECATE 
 #define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
-#include <sys/stat.h>
 
 #ifndef FILE_MALLOC
 	#define _CRT_NONSTDC_NO_DEPRECATE 
@@ -117,23 +116,21 @@ file_t* file_create( size_t size, void* memctx )
 file_t* file_load( char const* filename, file_mode_t mode, void* memctx )
 	{
 	file_t* file = 0;
-	struct stat s;
-	if( stat( filename, &s ) == 0 )
+	FILE* const fp = fopen( filename, mode == FILE_MODE_BINARY ? "rb" : "r" );
+	if( fp )
 		{
-		FILE* const fp = fopen( filename, mode == FILE_MODE_BINARY ? "rb" : "r" );
-		if( fp )
+        fseek( fp, 0, SEEK_END );
+		size_t const file_size = (size_t) ftell( fp );
+        fseek( fp, 0, SEEK_SET );
+		file = file_create( file_size + ( mode == FILE_MODE_BINARY ? 0 : 1 ), memctx ); 
+		if( file )
 			{
-			size_t const file_size = (size_t) s.st_size;
-			file = file_create( file_size + ( mode == FILE_MODE_BINARY ? 0 : 1 ), memctx ); 
-			if( file )
-				{
-				size_t const count = fread( file->data, 1, file_size, fp );
-				if( mode == FILE_MODE_TEXT ) file->data[ count ] = 0;
-				file->memctx = memctx;
-				file->size = count;
-				}
-			fclose( fp );
+			size_t const count = fread( file->data, 1, file_size, fp );
+			if( mode == FILE_MODE_TEXT ) file->data[ count ] = 0;
+			file->memctx = memctx;
+			file->size = count;
 			}
+		fclose( fp );
 		}
 		
 	return file;
