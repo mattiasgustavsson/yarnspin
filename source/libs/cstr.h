@@ -101,6 +101,8 @@ struct cstr_tokenizer_t { void* internal; };
 struct cstr_tokenizer_t cstr_tokenizer( char const* str );
 char const* cstr_tokenize( struct cstr_tokenizer_t* tokenizer, char const* separators );
 
+char* cstr_temp_buffer( size_t capacity );
+
 #endif /* CSTR_NO_GLOBAL_API */
 
 
@@ -165,6 +167,8 @@ CSTR_U32 cstri_hash( struct cstri_t* cstri, char const* str );
 
 struct cstr_tokenizer_t cstri_tokenizer( struct cstri_t* cstri, char const* str );
 char const* cstri_tokenize( struct cstri_t* cstri, struct cstr_tokenizer_t* tokenizer, char const* separators );
+
+char* cstri_temp_buffer( struct cstri_t* cstri, size_t capacity );
 
 #endif /* CSTR_INSTANCE_API */
 
@@ -943,6 +947,10 @@ char const* cstri_tokenize( struct cstri_t* cstri, struct cstr_tokenizer_t* toke
 }
 
 
+char* cstri_temp_buffer( struct cstri_t* cstri, size_t capacity ) {
+    return internal_cstr_temp_buffer( cstri, capacity );
+}
+
 
 //// global api
 
@@ -1281,7 +1289,7 @@ int cstr_rfind( char const* str, char const* find, int start ) {
 CSTR_U32 cstr_hash( char const* str ) {
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    CSTR_U32  ret = cstri_hash( g_internal_cstr, str ); 
+    CSTR_U32 ret = cstri_hash( g_internal_cstr, str ); 
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
@@ -1300,6 +1308,15 @@ char const* cstr_tokenize( struct cstr_tokenizer_t* tokenizer, char const* separ
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
     char const* ret = cstri_tokenize( g_internal_cstr, tokenizer, separators ); 
+    CSTR_MUTEX_UNLOCK();
+    return ret;
+}
+
+
+char* cstr_temp_buffer( size_t capacity ) {
+    CSTR_MUTEX_LOCK();
+    if( !g_internal_cstr ) internal_cstr_instance();
+    char* ret = cstri_temp_buffer( g_internal_cstr, capacity ); 
     CSTR_MUTEX_UNLOCK();
     return ret;
 }

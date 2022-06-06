@@ -1,11 +1,879 @@
 
+
+typedef string string_id; // strings of type string_id should be compared with case insensitive comparison
+
+
+int buffer_write_string( buffer_t* buffer, char const* const* value, int count ) {
+    for( int i = 0; i < count; ++i ) {
+        char const* str = value[ i ];
+        if( !str ) str = "";
+        int len = (int) strlen( str ) + 1;
+        buffer_write_i32( buffer, &len, 1 );
+        if( buffer_write_i8( buffer, str, len ) != len ) {
+            return i;
+        }
+    }
+    return count;
+}
+
+string read_string( buffer_t* in ) {
+    int len = 0;
+    buffer_read_i32( in, &len, 1 );
+    char* temp = cstr_temp_buffer( (size_t) len );
+    buffer_read_i8( in, temp, len );
+    return cstr( temp );
+}
+
+
+int read_int( buffer_t* in ) {
+    int value = 0;
+    buffer_read_i32( in, &value, 1 );
+    return value;
+}
+
+
+bool read_bool( buffer_t* in ) {
+    bool value = 0;
+    buffer_read_bool( in, &value, 1 );
+    return value;
+}
+
+
+void read_string_array( buffer_t* in, array_param(string)* array ) {
+    int count = read_int( in );
+    for( int i = 0; i < count; ++i ) {
+        string_id value = read_string( in );
+        array_add( array, &value );
+    }
+}
+
+
+typedef struct yarn_cond_flag_t {
+	bool is_not;
+	int flag_index;
+} yarn_cond_flag_t;
+
+
+typedef struct yarn_cond_or_t {
+	array(yarn_cond_flag_t)* flags;
+} yarn_cond_or_t ;
+	
+
+yarn_cond_or_t* empty_cond_or( void ) {
+    static yarn_cond_or_t cond_or;
+    cond_or.flags = managed_array( yarn_cond_flag_t );
+    return &cond_or;
+}
+
+
+void save_cond_or( buffer_t* out, yarn_cond_or_t* cond_or ) {
+    buffer_write_i32( out, &cond_or->flags->count, 1 );
+    for( int i = 0; i < cond_or->flags->count; ++i ) {
+	    buffer_write_bool( out, &cond_or->flags->items[ i ].is_not, 1 );
+	    buffer_write_i32( out, &cond_or->flags->items[ i ].flag_index, 1 );
+    }
+}
+
+
+typedef struct yarn_cond_t {
+	array(yarn_cond_or_t)* ands;
+} yarn_cond_t;
+
+
+yarn_cond_t* empty_cond( void ) {
+    static yarn_cond_t cond;
+    cond.ands = managed_array( yarn_cond_or_t );
+    return &cond;
+}
+
+
+void save_cond( buffer_t* out, yarn_cond_t* cond ) {
+    buffer_write_i32( out, &cond->ands->count, 1 );
+    for( int i = 0; i < cond->ands->count; ++i ) {
+	    save_cond_or( out, &cond->ands->items[ i ] );
+    }
+}
+
+
+void load_cond( buffer_t* in, yarn_cond_t* cond ) {
+    cond->ands = managed_array( yarn_cond_or_t );
+    int ands_count = read_int( in );
+    for( int i = 0; i < ands_count; ++i ) {
+        yarn_cond_or_t cond_or;
+	    cond_or.flags = managed_array( yarn_cond_flag_t );
+        int flags_count = read_int( in );
+        for( int j = 0; j < flags_count; ++j ) {
+            yarn_cond_flag_t flag;
+            flag.is_not = read_bool( in );
+            flag.flag_index = read_int( in );
+            array_add( cond_or.flags, &flag);
+        }
+        array_add( cond->ands, &cond_or );
+    }
+}
+
+
+typedef enum yarn_action_type_t {
+	ACTION_TYPE_NONE,
+	ACTION_TYPE_GOTO_LOCATION,
+    ACTION_TYPE_GOTO_DIALOG,
+	ACTION_TYPE_EXIT,
+	ACTION_TYPE_FLAG_SET,
+	ACTION_TYPE_FLAG_CLEAR,
+	ACTION_TYPE_FLAG_TOGGLE,
+	ACTION_TYPE_ITEM_GET,
+	ACTION_TYPE_ITEM_DROP,
+} yarn_action_type_t;
+
+
+typedef struct yarn_act_t {
+	yarn_cond_t cond;
+	yarn_action_type_t type;
+	int param_location_index;
+	int param_dialog_index;
+	int param_flag_index;
+	int param_item_index;
+} yarn_act_t;
+
+
+yarn_act_t* empty_act( void ) {
+    static yarn_act_t act;
+    act.cond = *empty_cond();
+    act.type = ACTION_TYPE_NONE;
+	act.param_location_index = -1;
+	act.param_dialog_index = -1;
+	act.param_flag_index = -1;
+	act.param_item_index = -1;
+    return &act;
+}
+
+
+void save_act( buffer_t* out, yarn_act_t* act ) {
+    save_cond( out, &act->cond );
+    int type = (int)act->type;
+	buffer_write_i32( out, &type, 1 );
+	buffer_write_i32( out, &act->param_location_index, 1 );
+	buffer_write_i32( out, &act->param_dialog_index, 1 );
+	buffer_write_i32( out, &act->param_flag_index, 1 );
+	buffer_write_i32( out, &act->param_item_index, 1 );
+}
+
+
+void load_act( buffer_t* in, yarn_act_t* act ) {
+    load_cond( in, &act->cond );    
+    act->type = (yarn_action_type_t) read_int( in );
+    act->param_location_index = read_int( in );
+    act->param_dialog_index = read_int( in );
+    act->param_flag_index = read_int( in );
+    act->param_item_index = read_int( in );
+}
+
+
+typedef struct yarn_opt_t {
+	yarn_cond_t cond;
+	string text;
+	array(yarn_act_t)* act;
+} yarn_opt_t;
+	
+
+yarn_opt_t* empty_opt( void ) {
+    static yarn_opt_t opt;
+    opt.cond = *empty_cond();
+    opt.text = NULL;
+    opt.act = managed_array( yarn_act_t );
+    return &opt;
+}
+
+
+void save_opt( buffer_t* out, yarn_opt_t* opt ) {
+    save_cond( out, &opt->cond );
+	buffer_write_string( out, &opt->text, 1 );
+    buffer_write_i32( out, &opt->act->count, 1 );
+    for( int i = 0; i < opt->act->count; ++i ) {
+        save_act( out, &opt->act->items[ i ] );
+    }
+}
+
+
+typedef struct yarn_use_t {
+	yarn_cond_t cond;
+	array(int)* item_indices;
+	array(yarn_act_t)* act;
+} yarn_use_t;
+	
+
+yarn_use_t* empty_use( void ) {
+    static yarn_use_t use;
+    use.cond = *empty_cond();
+    use.item_indices = managed_array( int );
+    use.act = managed_array( yarn_act_t );
+    return &use;
+}
+
+
+void save_use( buffer_t* out, yarn_use_t* use ) {
+    save_cond( out, &use->cond );
+
+    buffer_write_i32( out, &use->item_indices->count, 1 );
+    buffer_write_i32( out, use->item_indices->items, use->item_indices->count );
+
+    buffer_write_i32( out, &use->act->count, 1 );
+    for( int i = 0; i < use->act->count; ++i ) {
+        save_act( out, &use->act->items[ i ] );
+    }
+}
+
+
+typedef struct yarn_chr_t {
+	yarn_cond_t cond;
+	array(int)* chr_indices;
+	array(yarn_act_t)* act;
+} yarn_chr_t;
+
+
+yarn_chr_t* empty_chr( void ) {
+    static yarn_chr_t chr;
+    chr.cond = *empty_cond();
+    chr.chr_indices = managed_array( int );
+    chr.act = managed_array( yarn_act_t );
+    return &chr;
+}
+
+
+void save_chr( buffer_t* out, yarn_chr_t* chr ) {
+    save_cond( out, &chr->cond );
+
+    buffer_write_i32( out, &chr->chr_indices->count, 1 );
+    buffer_write_i32( out, chr->chr_indices->items, chr->chr_indices->count );
+
+    buffer_write_i32( out, &chr->act->count, 1 );
+    for( int i = 0; i < chr->act->count; ++i ) {
+        save_act( out, &chr->act->items[ i ] );
+    }
+}
+
+
+typedef struct yarn_img_t {
+	yarn_cond_t cond;
+	int image_index;	
+} yarn_img_t;
+
+
+yarn_img_t* empty_img( void ) {
+    static yarn_img_t img;
+    img.cond = *empty_cond();
+    img.image_index = -1;
+    return &img;
+}
+
+
+typedef struct yarn_txt_t {
+	yarn_cond_t cond;
+	string text;	
+} yarn_txt_t;
+
+
+yarn_txt_t* empty_txt( void ) {
+    static yarn_txt_t txt;
+    txt.cond = *empty_cond();
+    txt.text = NULL;
+    return &txt;
+}
+
+
+typedef struct yarn_location_t {
+	string_id id;
+	array(yarn_img_t)* img;
+    array(yarn_txt_t)* txt;
+	array(yarn_act_t)* act;
+	array(yarn_opt_t)* opt;	
+	array(yarn_use_t)* use;
+	array(yarn_chr_t)* chr;
+} yarn_location_t;
+
+
+yarn_location_t* empty_location( void ) {
+    static yarn_location_t location;
+    location.id = NULL;
+	location.img = managed_array(yarn_img_t);
+    location.txt = managed_array(yarn_txt_t);
+	location.act = managed_array(yarn_act_t);
+	location.opt = managed_array(yarn_opt_t);	
+	location.use = managed_array(yarn_use_t);
+	location.chr = managed_array(yarn_chr_t);
+    return &location;
+}
+
+
+void save_location( buffer_t* out, yarn_location_t* location ) {
+	buffer_write_string( out, &location->id, 1 );
+    
+    buffer_write_i32( out, &location->img->count, 1 );
+    for( int i = 0; i < location->img->count; ++i ) {
+        save_cond( out, &location->img->items[ i ].cond );
+        buffer_write_i32( out, &location->img->items[ i ].image_index, 1 );
+    }
+
+    buffer_write_i32( out, &location->txt->count, 1 );
+    for( int i = 0; i < location->txt->count; ++i ) {
+        save_cond( out, &location->txt->items[ i ].cond );
+        buffer_write_string( out, &location->txt->items[ i ].text, 1 );
+    }
+
+    buffer_write_i32( out, &location->act->count, 1 );
+    for( int i = 0; i < location->act->count; ++i ) {
+        save_act( out, &location->act->items[ i ] );
+    }
+
+    buffer_write_i32( out, &location->opt->count, 1 );
+    for( int i = 0; i < location->opt->count; ++i ) {
+        save_opt( out, &location->opt->items[ i ] );
+    }
+
+    buffer_write_i32( out, &location->use->count, 1 );
+    for( int i = 0; i < location->use->count; ++i ) {
+        save_use( out, &location->use->items[ i ] );
+    }
+
+    buffer_write_i32( out, &location->chr->count, 1 );
+    for( int i = 0; i < location->chr->count; ++i ) {
+        save_chr( out, &location->chr->items[ i ] );
+    }
+}
+
+
+void load_location( buffer_t* in, yarn_location_t* location ) {
+    location->id = read_string( in );
+
+    location->img = managed_array(yarn_img_t);
+    int imgs_count = read_int( in );
+    for( int i = 0; i < imgs_count; ++i ) {
+        yarn_img_t img;
+        load_cond( in, &img.cond );
+	    img.image_index = read_int( in );	
+        array_add( location->img, &img );
+    }
+    
+    location->txt = managed_array(yarn_txt_t);
+    int txts_count = read_int( in );
+    for( int i = 0; i < txts_count; ++i ) {
+        yarn_txt_t txt;
+        load_cond( in, &txt.cond );
+        txt.text = read_string( in );
+        array_add( location->txt, &txt );
+    }
+
+    location->act = managed_array(yarn_act_t);
+    int acts_count = read_int( in );
+    for( int i = 0; i < acts_count; ++i ) {
+        yarn_act_t act;
+        load_act( in, &act );
+        array_add( location->act, &act );
+    }
+
+	location->opt = managed_array(yarn_opt_t);	
+    int opts_count = read_int( in );
+    for( int i = 0; i < opts_count; ++i ) {
+        yarn_opt_t opt;
+        load_cond( in, &opt.cond );
+        opt.text = read_string( in );       
+	    opt.act = managed_array(yarn_act_t);
+        int count = read_int( in );
+        for( int j = 0; j < count; ++j ) {
+            yarn_act_t act;
+            load_act( in, &act );
+            array_add( opt.act, &act);
+        }
+        array_add( location->opt, &opt );
+    }
+
+	location->use = managed_array(yarn_use_t);
+    int uses_count = read_int( in );
+    for( int i = 0; i < uses_count; ++i ) {
+        yarn_use_t use;
+        load_cond( in, &use.cond );
+        use.item_indices = managed_array(int);
+        int index_count = read_int( in );
+        for( int j = 0; j < index_count; ++j ) {
+            int value = read_int( in );
+            array_add( use.item_indices, &value );
+        }
+	    use.act = managed_array(yarn_act_t);
+        int count = read_int( in );
+        for( int j = 0; j < count; ++j ) {
+            yarn_act_t act;
+            load_act( in, &act );
+            array_add( use.act, &act);
+        }
+        array_add( location->use, &use );
+    }
+
+	location->chr = managed_array(yarn_chr_t);
+    int chrs_count = read_int( in );
+    for( int i = 0; i < chrs_count; ++i ) {
+        yarn_chr_t chr;
+        load_cond( in, &chr.cond );
+        chr.chr_indices = managed_array(int);
+        int index_count = read_int( in );
+        for( int j = 0; j < index_count; ++j ) {
+            int value = read_int( in );
+            array_add( chr.chr_indices, &value );
+        }
+	    chr.act = managed_array(yarn_act_t);
+        int count = read_int( in );
+        for( int j = 0; j < count; ++j ) {
+            yarn_act_t act;
+            load_act( in, &act );
+            array_add( chr.act, &act);
+        }
+        array_add( location->chr, &chr );
+    }
+
+}
+
+
+typedef struct yarn_phrase_t {
+	yarn_cond_t cond;
+	int character_index;
+	string text;	
+} yarn_phrase_t;
+
+
+yarn_phrase_t* empty_phrase( void ) {
+    static yarn_phrase_t phrase;
+    phrase.cond = *empty_cond();
+    phrase.character_index = -1;
+    phrase.text = NULL;
+    return &phrase;
+}
+
+
+typedef struct yarn_say_t {
+	yarn_cond_t cond;
+	string text;
+	array(yarn_act_t)* act;
+} yarn_say_t;
+
+
+yarn_say_t* empty_say( void ) {
+    static yarn_say_t say;
+    say.cond = *empty_cond();
+    say.text = NULL;
+    say.act = managed_array( yarn_act_t );
+    return &say;
+}
+
+
+void save_say( buffer_t* out, yarn_say_t* say ) {
+    save_cond( out, &say->cond );
+	buffer_write_string( out, &say->text, 1 );
+    buffer_write_i32( out, &say->act->count, 1 );
+    for( int i = 0; i < say->act->count; ++i ) {
+        save_act( out, &say->act->items[ i ] );
+    }
+}
+
+
+typedef struct yarn_dialog_t {
+	string_id id;
+	array(yarn_act_t)* act;
+	array(yarn_phrase_t)* phrase;
+	array(yarn_say_t)* say;	
+	array(yarn_use_t)* use;
+} yarn_dialog_t;
+
+
+yarn_dialog_t* empty_dialog( void ) {
+    static yarn_dialog_t dialog;
+    dialog.id = NULL;
+	dialog.act = managed_array(yarn_act_t);
+	dialog.phrase = managed_array(yarn_phrase_t);
+	dialog.say = managed_array(yarn_say_t);	
+	dialog.use = managed_array(yarn_use_t);
+    return &dialog;
+}
+
+
+void save_dialog( buffer_t* out, yarn_dialog_t* dialog ) {
+	buffer_write_string( out, &dialog->id, 1 );
+
+    buffer_write_i32( out, &dialog->act->count, 1 );
+    for( int i = 0; i < dialog->act->count; ++i ) {
+        save_act( out, &dialog->act->items[ i ] );
+    }
+
+    buffer_write_i32( out, &dialog->phrase->count, 1 );
+    for( int i = 0; i < dialog->phrase->count; ++i ) {
+        save_cond( out, &dialog->phrase->items[ i ].cond );
+        buffer_write_i32( out, &dialog->phrase->items[ i ].character_index, 1 );
+    	buffer_write_string( out, &dialog->phrase->items[ i ].text, 1 );
+    }
+
+    buffer_write_i32( out, &dialog->say->count, 1 );
+    for( int i = 0; i < dialog->say->count; ++i ) {
+        save_say( out, &dialog->say->items[ i ] );
+    }
+
+    buffer_write_i32( out, &dialog->use->count, 1 );
+    for( int i = 0; i < dialog->use->count; ++i ) {
+        save_use( out, &dialog->use->items[ i ] );
+    }
+}
+
+
+void load_dialog( buffer_t* in, yarn_dialog_t* dialog ) {
+    dialog->id = read_string( in );
+
+    dialog->act = managed_array(yarn_act_t);
+    int acts_count = read_int( in );
+    for( int i = 0; i < acts_count; ++i ) {
+        yarn_act_t act;
+        load_act( in, &act );
+        array_add( dialog->act, &act );
+    }
+
+    dialog->phrase = managed_array(yarn_phrase_t);
+    int phrases_count = read_int( in );
+    for( int i = 0; i < phrases_count; ++i ) {
+        yarn_phrase_t phrase;
+        load_cond( in, &phrase.cond );
+        phrase.character_index = read_int( in );
+        phrase.text = read_string( in );
+        array_add( dialog->phrase, &phrase );
+    }
+
+    dialog->say = managed_array(yarn_say_t);
+    int says_count = read_int( in );
+    for( int i = 0; i < says_count; ++i ) {
+        yarn_say_t say;
+        load_cond( in, &say.cond );
+        say.text = read_string( in );
+	    say.act = managed_array(yarn_act_t);
+        int count = read_int( in );
+        for( int j = 0; j < count; ++j ) {
+            yarn_act_t act;
+            load_act( in, &act );
+            array_add( say.act, &act);
+        }
+        array_add( dialog->say, &say );
+    }
+
+
+	dialog->use = managed_array(yarn_use_t);
+    int uses_count = read_int( in );
+    for( int i = 0; i < uses_count; ++i ) {
+        yarn_use_t use;
+        load_cond( in, &use.cond );
+        use.item_indices = managed_array(int);
+        int index_count = read_int( in );
+        for( int j = 0; j < index_count; ++j ) {
+            int value = read_int( in );
+            array_add( use.item_indices, &value );
+        }
+	    use.act = managed_array(yarn_act_t);
+        int count = read_int( in );
+        for( int j = 0; j < count; ++j ) {
+            yarn_act_t act;
+            load_act( in, &act );
+            array_add( use.act, &act);
+        }
+        array_add( dialog->use, &use );
+    }
+}    
+
+
+typedef struct yarn_character_t {
+	string name;	
+	string short_name;
+	int face_index;
+} yarn_character_t;
+	
+
+yarn_character_t* empty_character( void ) {
+    static yarn_character_t character;
+    character.name = NULL;
+    character.short_name = NULL;
+    character.face_index = -1;
+	return &character;
+}
+
+
+void save_character( buffer_t* out, yarn_character_t* character ) {
+	buffer_write_string( out, &character->name, 1 );
+    buffer_write_string( out, &character->short_name, 1 );
+    buffer_write_i32( out, &character->face_index, 1 );
+}
+
+
+void load_character( buffer_t* in, yarn_character_t* character ) {
+    character->name = read_string( in );
+    character->short_name = read_string( in );
+    character->face_index = read_int( in );
+}
+
+    
+typedef struct yarn_globals_t {
+    string title;
+    string author;
+    string start;
+    string palette;
+    string font_description;
+    string font_options;
+    string font_characters;
+    string font_items;
+    string font_name;
+    array(int)* logo_indices;
+    int background_location;
+    int background_dialog;
+	int color_background;
+	int color_disabled;
+	int color_txt;
+	int color_opt;
+	int color_chr;
+	int color_use;
+	int color_name;
+	int color_facebg;
+
+    bool explicit_flags;
+    array(string_id)* flags;
+
+    bool explicit_items;
+    array(string_id)* items;
+} yarn_globals_t;
+
+
+yarn_globals_t* empty_globals( void ) {
+    static yarn_globals_t globals;
+    globals.title = NULL;
+    globals.author = NULL;
+    globals.start = NULL;
+    globals.palette = NULL;
+    globals.font_description = NULL;
+    globals.font_options = NULL;
+    globals.font_characters = NULL;
+    globals.font_items = NULL;
+    globals.font_name = NULL;
+    globals.logo_indices = managed_array(int);
+    globals.background_location = -1;
+    globals.background_dialog = -1;
+	globals.color_background = -1;
+	globals.color_disabled = -1;
+	globals.color_txt = -1;
+	globals.color_opt = -1;
+	globals.color_chr = -1;
+	globals.color_use = -1;
+	globals.color_name = -1;
+	globals.color_facebg = -1;
+    globals.explicit_flags = false;
+    globals.flags = managed_array(string_id);
+    globals.explicit_items = false;
+    globals.items = managed_array(string_id);
+	return &globals;
+}
+
+
+void save_globals( buffer_t* out, yarn_globals_t* globals ) {
+	buffer_write_string( out, &globals->title, 1 );
+	buffer_write_string( out, &globals->author, 1 );
+	buffer_write_string( out, &globals->start, 1 );
+	buffer_write_string( out, &globals->palette, 1 );
+	buffer_write_string( out, &globals->font_description, 1 );
+	buffer_write_string( out, &globals->font_options, 1 );
+	buffer_write_string( out, &globals->font_characters, 1 );
+	buffer_write_string( out, &globals->font_items, 1 );
+	buffer_write_string( out, &globals->font_name, 1 );
+
+    buffer_write_i32( out, &globals->logo_indices->count, 1 );
+	buffer_write_i32( out, globals->logo_indices->items, globals->logo_indices->count );
+
+    buffer_write_i32( out, &globals->background_location, 1 );
+    buffer_write_i32( out, &globals->background_dialog, 1 );
+    buffer_write_i32( out, &globals->color_background, 1 );
+    buffer_write_i32( out, &globals->color_disabled, 1 );
+    buffer_write_i32( out, &globals->color_txt, 1 );
+    buffer_write_i32( out, &globals->color_opt, 1 );
+    buffer_write_i32( out, &globals->color_chr, 1 );
+    buffer_write_i32( out, &globals->color_use, 1 );
+    buffer_write_i32( out, &globals->color_name, 1 );
+    buffer_write_i32( out, &globals->color_facebg, 1 );
+    
+    buffer_write_bool( out, &globals->explicit_flags, 1 );
+    buffer_write_i32( out, &globals->flags->count, 1 );
+	buffer_write_string( out, globals->flags->items, globals->flags->count );
+
+    buffer_write_bool( out, &globals->explicit_items, 1 );
+    buffer_write_i32( out, &globals->items->count, 1 );
+	buffer_write_string( out, globals->items->items, globals->items->count );
+}
+
+
+void load_globals( buffer_t* in, yarn_globals_t* globals ) {
+	globals->title = read_string( in );
+	globals->author = read_string( in );
+	globals->start = read_string( in );
+	globals->palette = read_string( in );
+	globals->font_description = read_string( in );
+	globals->font_options = read_string( in );
+	globals->font_characters = read_string( in );
+	globals->font_items = read_string( in );
+	globals->font_name = read_string( in );
+
+    globals->logo_indices = managed_array(int);
+    int logo_indices_count = read_int( in );
+    for( int i = 0; i < logo_indices_count; ++i ) {
+        int value = read_int( in );
+        array_add( globals->logo_indices, &value );
+    }
+
+    globals->background_location = read_int( in );
+    globals->background_dialog = read_int( in );
+	globals->color_background = read_int( in );
+	globals->color_disabled = read_int( in );
+	globals->color_txt = read_int( in );
+	globals->color_opt = read_int( in );
+	globals->color_chr = read_int( in );
+	globals->color_use = read_int( in );
+	globals->color_name = read_int( in );
+	globals->color_facebg = read_int( in );
+
+    globals->explicit_flags = read_bool( in );
+    globals->flags = managed_array(string_id);
+    read_string_array( in, globals->flags );
+
+    globals->explicit_items = read_bool( in );
+    globals->items = managed_array(string_id);
+    read_string_array( in, globals->items );
+
+}
+
+
+typedef struct yarn_t {
+	yarn_globals_t globals;
+    int start_location;
+    int start_dialog;
+	
+	array(string_id)* flag_ids;
+	array(string_id)* item_ids;
+	array(string_id)* image_names;
+    array(string_id)* screen_names;
+    array(string_id)* face_names;
+
+	array(yarn_location_t)* locations;
+	array(yarn_dialog_t)* dialogs;
+	array(yarn_character_t)* characters;
+} yarn_t;
+
+
+yarn_t* empty_yarn( void ) {
+    static yarn_t yarn;
+	yarn.globals = *empty_globals();
+    yarn.start_location = -1;
+    yarn.start_dialog = -1;
+
+	yarn.flag_ids = managed_array(string_id);
+	yarn.item_ids = managed_array(string_id);
+	yarn.image_names = managed_array(string_id);
+    yarn.screen_names = managed_array(string_id);
+    yarn.face_names = managed_array(string_id);
+
+	yarn.locations = managed_array(yarn_location_t);
+	yarn.dialogs = managed_array(yarn_dialog_t);
+	yarn.characters = managed_array(yarn_character_t);
+
+    return &yarn;
+}
+
+
+void yarn_save( buffer_t* out, yarn_t* yarn ) {
+    save_globals( out, &yarn->globals );
+
+    buffer_write_i32( out, &yarn->start_location, 1 );
+    buffer_write_i32( out, &yarn->start_dialog, 1 );
+	
+    buffer_write_i32( out, &yarn->flag_ids->count, 1 );
+	buffer_write_string( out, yarn->flag_ids->items, yarn->flag_ids->count );
+
+    buffer_write_i32( out, &yarn->item_ids->count, 1 );
+	buffer_write_string( out, yarn->item_ids->items, yarn->item_ids->count );
+
+    buffer_write_i32( out, &yarn->image_names->count, 1 );
+	buffer_write_string( out, yarn->image_names->items, yarn->image_names->count );
+
+    buffer_write_i32( out, &yarn->screen_names->count, 1 );
+	buffer_write_string( out, yarn->screen_names->items, yarn->screen_names->count );
+
+    buffer_write_i32( out, &yarn->face_names->count, 1 );
+	buffer_write_string( out, yarn->face_names->items, yarn->face_names->count );
+
+    buffer_write_i32( out, &yarn->locations->count, 1 );
+    for( int i = 0; i < yarn->locations->count; ++i ) {
+	    save_location( out, &yarn->locations->items[ i ] );
+    }
+
+    buffer_write_i32( out, &yarn->dialogs->count, 1 );
+    for( int i = 0; i < yarn->dialogs->count; ++i ) {
+	    save_dialog( out, &yarn->dialogs->items[ i ] );
+    }
+
+    buffer_write_i32( out, &yarn->characters->count, 1 );
+    for( int i = 0; i < yarn->characters->count; ++i ) {
+	    save_character( out, &yarn->characters->items[ i ] );
+    }
+}
+
+
+void yarn_load( buffer_t* in, yarn_t* yarn ) {
+    load_globals( in, &yarn->globals );
+
+    yarn->start_location = read_int( in );
+    yarn->start_dialog = read_int( in );
+
+	yarn->flag_ids = managed_array(string_id);
+    read_string_array( in, yarn->flag_ids );
+	yarn->item_ids = managed_array(string_id);
+    read_string_array( in, yarn->item_ids );
+	yarn->image_names = managed_array(string_id);
+    read_string_array( in, yarn->image_names );
+    yarn->screen_names = managed_array(string_id);
+    read_string_array( in, yarn->screen_names  );
+    yarn->face_names = managed_array(string_id);
+    read_string_array( in, yarn->face_names );
+
+	yarn->locations = managed_array(yarn_location_t);
+    int locations_count = read_int( in );
+    for( int i = 0; i < locations_count; ++i ) {
+        yarn_location_t location;
+        load_location( in, &location );
+        array_add( yarn->locations, &location );
+    }
+
+    yarn->dialogs = managed_array(yarn_dialog_t);
+    int dialogs_count = read_int( in );
+    for( int i = 0; i < dialogs_count; ++i ) {
+        yarn_dialog_t dialog;
+        load_dialog( in, &dialog );
+        array_add( yarn->dialogs, &dialog );
+    }
+
+    yarn->characters = managed_array(yarn_character_t);
+    int characters_count = read_int( in );
+    for( int i = 0; i < characters_count; ++i ) {
+        yarn_character_t character;
+        load_character( in, &character );
+        array_add( yarn->characters, &character );
+    }
+}
+
+
 #include "yarn_lexer.h"
 #include "yarn_parser.h"
 #include "yarn_compiler.h"
 
-typedef struct yarn_t yarn_t;
 
-yarn_t* yarn_compile( char const* path ) {
+buffer_t* yarn_compile( char const* path ) {
+    struct cstr_restore_point_t* str_restore = cstr_restore_point();
+    int mem_restore = memmgr_restore_point( &g_memmgr );   
+
     array(parser_global_t)* parser_globals = managed_array( parser_global_t );
     array(parser_section_t)* parser_sections = managed_array( parser_section_t );
 
@@ -15,7 +883,10 @@ yarn_t* yarn_compile( char const* path ) {
     dir_t* dir = dir_open( scripts_path );
     if( !dir ) {
         printf( "Could not find 'scripts' folder\n" );
-        return 0;
+        memmgr_rollback( &g_memmgr, mem_restore );
+        cstr_rollback( str_restore );
+        dir_close( dir );
+        return NULL;
     }
 
     int files_count = 0;
@@ -25,7 +896,10 @@ yarn_t* yarn_compile( char const* path ) {
             file_t* file = file_load( filename, FILE_MODE_TEXT, 0 );
             if( !file )  {
                 printf( "Could not open file '%s'\n", filename );
-                return false;
+                memmgr_rollback( &g_memmgr, mem_restore );
+                cstr_rollback( str_restore );
+                dir_close( dir );
+                return NULL;
             }
             ++files_count;
             string source = cstr( (char const*) file->data );
@@ -42,6 +916,9 @@ yarn_t* yarn_compile( char const* path ) {
 
             if( !lexer_success ) {
                 printf( "Lexer failed for file '%s'\n", filename );
+                memmgr_rollback( &g_memmgr, mem_restore );
+                cstr_rollback( str_restore );
+                dir_close( dir );
                 return NULL;
             }
         }
@@ -50,25 +927,31 @@ yarn_t* yarn_compile( char const* path ) {
 
     if( files_count == 0 ) {
         printf( "No files found in 'scripts' folder\n" );
+        memmgr_rollback( &g_memmgr, mem_restore );
+        cstr_rollback( str_restore );
         return NULL;
     }
     if( !parser_success ) {
         printf( "Parser failed\n" );
+        memmgr_rollback( &g_memmgr, mem_restore );
+        cstr_rollback( str_restore );
         return NULL;
     }
 
-    compiled_yarn_t compiled_yarn;
+    yarn_t compiled_yarn;
     if( !yarn_compiler( parser_globals, parser_sections, &compiled_yarn ) ) {
         printf( "Compiler failed\n" );
+        memmgr_rollback( &g_memmgr, mem_restore );
+        cstr_rollback( str_restore );
         return NULL;
     }
     
     buffer_t* buffer = buffer_create();
-    save_compiled_yarn( buffer, &compiled_yarn );
-    buffer_save( buffer, "test.yarn" );
-    //yarn_t* yarn = yarn_load( buffer->data, buffer->size );
-    buffer_destroy( buffer );
-    
-    return NULL;
+    yarn_save( buffer, &compiled_yarn );
+    memmgr_rollback( &g_memmgr, mem_restore );
+    cstr_rollback( str_restore );
+    return buffer;
 }
+
+
 

@@ -54,15 +54,18 @@ int app_proc( app_t* app, void* user_data ) {
     (void) user_data;
 
     // compile yarn
-    struct cstr_restore_point_t* str_restore = cstr_restore_point();
-    int mem_restore = memmgr_restore_point( &g_memmgr );   
-	yarn_t* yarn = yarn_compile( "." );
-    memmgr_rollback( &g_memmgr, mem_restore );
-    cstr_rollback( str_restore );
-	if( !yarn ) {
-		printf( "Failed to load game file\n" );
+	buffer_t* compiled_yarn = yarn_compile( "." );
+	if( !compiled_yarn ) {
+		printf( "Failed to compile game file\n" );
 		return EXIT_FAILURE;
 	}    
+    buffer_save( compiled_yarn, "game.yarn" );
+
+    // load yarn
+    buffer_position_set( compiled_yarn, 0 );
+    yarn_t yarn;
+    yarn_load( compiled_yarn, &yarn );
+    buffer_destroy( compiled_yarn );    
 
     // position window centered on main display
     app_displays_t displays = app_displays( app );
