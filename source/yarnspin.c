@@ -105,6 +105,7 @@ int app_proc( app_t* app, void* user_data ) {
         app_window_size( app, w, h );
     }
     
+    app_interpolation( app, APP_INTERPOLATION_NONE );
     app_screenmode( app, APP_SCREENMODE_WINDOW );
     app_title( app, "Yarnspin" );
 

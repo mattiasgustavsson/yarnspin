@@ -103,7 +103,7 @@ img_t img_create( int width, int height ) {
     img.width = width;
     img.height = height;
     img.pixels = (img_rgba_t*) malloc( sizeof( img_rgba_t ) * width * height );
-    memset( img.pixels, 0, sizeof( sizeof( img_rgba_t ) * width * height ) );
+    memset( img.pixels, 0, sizeof( img_rgba_t ) * width * height );
     return img;
 }
 
@@ -172,18 +172,23 @@ img_rgba_t img_rgba_lerp( img_rgba_t a, img_rgba_t b, float s ) {
 
 
 img_rgba_t img_sample_clamp( img_t* img, float u, float v ) {
-	float maxw = (float) ( img->width - 1 );
-	float maxh = (float) ( img->height - 1 );
+	int maxw = ( img->width - 1 );
+	int maxh = ( img->height - 1 );
 
 	float fu = IMG_FLOOR( u );
 	float du = u - fu;
 	float fv = IMG_FLOOR( v );
 	float dv = v - fv;
 
-	int x1 = (int) img_clamp( fu, 0.0f, maxw );
-	int y1 = (int) img_clamp( fv, 0.0f, maxh );
-	int x2 = (int) img_clamp( fu + 1.0f, 0.0f, maxw );
-	int y2 = (int) img_clamp( fv + 1.0f, 0.0f, maxh );
+	int x1 = (int) ( fu );
+	int y1 = (int) ( fv );
+	int x2 = (int) ( fu + 1.0f );
+	int y2 = (int) ( fv + 1.0f );
+
+    x1 = x1 < 0 ? 0 : x1 > maxw ? maxw : x1;
+    x2 = x2 < 0 ? 0 : x2 > maxw ? maxw : x2;
+    y1 = y1 < 0 ? 0 : y1 > maxh ? maxh : y1;
+    y2 = y2 < 0 ? 0 : y2 > maxh ? maxh : y2;
 
 	img_rgba_t c1 = img->pixels[ x1 + y1 * img->width ];
 	img_rgba_t c2 = img->pixels[ x2 + y1 * img->width ];

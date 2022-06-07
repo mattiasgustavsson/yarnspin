@@ -231,7 +231,7 @@ void set_pixel( img_t* image, int x, int y, img_rgba_t pixel ) {
 
 
 img_rgba_t get_pixel( img_t* image, int x, int y ) {
-	if( x < image->width && y < image->height ) {
+	if( x >= 0 && x < image->width && y >= 0 && y < image->height ) {
         img_rgba_t rgb = image->pixels[ x + y * image->width ];
         return img_rgba( rgb.r, rgb.g, rgb.b, rgb.a );
 	}
@@ -337,7 +337,7 @@ img_t resize_image( img_t img, int new_width, int new_height ) {
 }
 
 
-img_rgba_t sample_border( img_t* image, float p_x, float p_y, img_rgba_t border ) {
+img_rgba_t sample_border( img_t* image, float p_x, float p_y ) {
     float f_x = (float)floor( (double) p_x );
     float f_y = (float)floor( (double) p_y );
     float d_x = p_x - f_x;
@@ -348,10 +348,10 @@ img_rgba_t sample_border( img_t* image, float p_x, float p_y, img_rgba_t border 
 	int x2 = (int) ( f_x + 1.0f );
 	int y2 = (int) ( f_y + 1.0f );
 
-	img_rgba_t c1 = border;
-	img_rgba_t c2 = border;
-	img_rgba_t c3 = border;
-	img_rgba_t c4 = border;
+	img_rgba_t c1 = img_rgba( 0.0f, 0.0f, 0.0f, 0.0f);
+	img_rgba_t c2 = img_rgba( 0.0f, 0.0f, 0.0f, 0.0f);
+	img_rgba_t c3 = img_rgba( 0.0f, 0.0f, 0.0f, 0.0f);
+	img_rgba_t c4 = img_rgba( 0.0f, 0.0f, 0.0f, 0.0f);
 
 	if( x1 >= 0 && x1 < (int) image->width && y1 >= 0 && y1 < (int) image->height )  { 
 		c1 = get_pixel( image, x1, y1 );
@@ -379,7 +379,7 @@ img_t crop( img_t img, int new_width, int new_height ) {
 	img_t temp = img_create( new_width, new_height );
 	for( int y = 0; y < temp.height; ++y ) {
 		for( int x = 0; x < temp.width; ++x ) {
-			img_rgba_t pixel = sample_border( &img, (float) x + xofs, (float) y + yofs, img_rgba( 0.0f, 0.0f, 0.0f, 0.0f ) );
+			img_rgba_t pixel = sample_border( &img, (float) x + xofs, (float) y + yofs );
 			set_pixel( &temp, x, y, pixel );
 		}
 	}
