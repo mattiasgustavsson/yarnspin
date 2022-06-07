@@ -22,9 +22,13 @@
 #include "libs/dir.h"
 #include "libs/frametimer.h"
 #include "libs/file.h"
+#include "libs/file_util.h"
 #include "libs/img.h"
 #include "libs/paldither.h"
+#include "libs/palrle.h"
+#include "libs/pixelfont.h"
 #include "libs/stb_image.h"
+#include "libs/stb_image_write.h"
 #include "libs/stb_truetype.h"
 
 #include "memmgr.h"
@@ -32,6 +36,14 @@ static struct memmgr_t g_memmgr = { 0 };
 void array_deleter( void* context, void* ptr ) { (void) context; internal_array_destroy( (struct internal_array_t*) ptr ); }
 #define managed_array( type ) ARRAY_CAST( memmgr_add( &g_memmgr, array_create( type ), NULL, array_deleter ) )
 
+void palrle_deleter( void* context, void* ptr ) { (void) context; palrle_free( (palrle_data_t*) ptr, NULL ); }
+#define manage_palrle( instance ) ARRAY_CAST( memmgr_add( &g_memmgr, instance, NULL, palrle_deleter ) )
+
+void paldither_deleter( void* context, void* ptr ) { (void) context; paldither_palette_destroy( (paldither_palette_t*) ptr ); }
+#define manage_paldither( instance ) ARRAY_CAST( memmgr_add( &g_memmgr, instance, NULL, paldither_deleter ) )
+
+void pixelfont_deleter( void* context, void* ptr ) { (void) context; free( ptr ); }
+#define manage_pixelfont( instance ) ARRAY_CAST( memmgr_add( &g_memmgr, instance, NULL, pixelfont_deleter ) )
 
 typedef cstr_t string;
 #define array(type) array_t(type)
@@ -41,37 +53,24 @@ typedef cstr_t string;
 #include "gfxconv.h"
 #include "yarn.h"
 
-APP_U32 blend( APP_U32 x, APP_U32 y, APP_U32 a ) {
-    APP_U32 xr = ( x ) & 0xff;
-    APP_U32 xg = ( x >> 8 ) & 0xff;
-    APP_U32 xb = ( x >> 16 ) & 0xff;
-    APP_U32 yr = ( y ) & 0xff;
-    APP_U32 yg = ( y >> 8 ) & 0xff;
-    APP_U32 yb = ( y >> 16 ) & 0xff;
-    APP_U32 ia = 255 - ( a & 0xff );
-    APP_U32 r = ( xr * ia + yr * a ) >> 8;
-    APP_U32 g = ( xg * ia + yg * a ) >> 8;
-    APP_U32 b = ( xb * ia + yb * a ) >> 8;
-    return r | ( g << 8 ) | ( b << 16 );
-}
-
-
 int app_proc( app_t* app, void* user_data ) {
     (void) user_data;
 
-    // compile yarn
-	buffer_t* compiled_yarn = yarn_compile( "." );
-	if( !compiled_yarn ) {
-		printf( "Failed to compile game file\n" );
-		return EXIT_FAILURE;
-	}    
-    buffer_save( compiled_yarn, "game.yarn" );
+    #ifndef __wasm__
+        // compile yarn
+	    buffer_t* compiled_yarn = yarn_compile( "." );
+	    if( !compiled_yarn ) {
+		    printf( "Failed to compile game file\n" );
+		    return EXIT_FAILURE;
+	    }    
+        buffer_save( compiled_yarn, "game.yarn" );
+    #endif
 
     // load yarn
-    buffer_position_set( compiled_yarn, 0 );
+    buffer_t* loaded_yarn = buffer_load( "game.yarn" );
     yarn_t yarn;
-    yarn_load( compiled_yarn, &yarn );
-    buffer_destroy( compiled_yarn );    
+    yarn_load( loaded_yarn, &yarn );
+    buffer_destroy( loaded_yarn );    
 
     // position window centered on main display
     app_displays_t displays = app_displays( app );
@@ -118,21 +117,20 @@ int app_proc( app_t* app, void* user_data ) {
     frametimer_t* frametimer = frametimer_create( NULL );
     frametimer_lock_rate( frametimer, 60 );
 
-    static APP_U32 canvas[ 320 * 200 ];
+    static uint8_t canvas[ 320 * 200 ];
     memset( canvas, 0, sizeof( canvas) );
 
-    // display yarnspin logo
-    APP_U32* logo = (APP_U32*) stbi_load( "images/yarnspin_logo.png", &w, &h, &c, 4 );
-    for( int i = 0; i < 320 * 200; ++i ) {
-        canvas[ i ] = blend( canvas[ i ], logo[ i ], logo[ i ] >> 24 );
-    }
-    stbi_image_free( logo );
-
+    palrle_blit( yarn.assets.screens->items[ 0 ], 0, 0, canvas, 320, 200 );
 
     // main loop
     while( app_yield( app ) != APP_STATE_EXIT_REQUESTED ) {
         frametimer_update( frametimer );
-        crtemu_pc_present( crtemu, 0, canvas, 320, 200, 0xffffff, 0x000000 );
+
+        static uint32_t screen[ 320 * 200 ];
+        for( int i = 0; i < 320 * 200; ++i) {
+            screen[ i ] = yarn.assets.palette[ canvas[ i ] ];
+        }
+        crtemu_pc_present( crtemu, 0, screen, 320, 200, 0xffffff, 0x000000 );
         app_present( app, NULL, 1, 1, 0xffffff, 0x000000 );
     }
 
@@ -206,6 +204,9 @@ int main( int argc, char** argv ) {
 #define FILE_IMPLEMENTATION
 #include "libs/file.h"
 
+#define FILE_UTIL_IMPLEMENTATION
+#include "libs/file_util.h"
+
 #define FRAMETIMER_IMPLEMENTATION
 #include "libs/frametimer.h"
 
@@ -214,6 +215,13 @@ int main( int argc, char** argv ) {
 
 #define PALDITHER_IMPLEMENTATION
 #include "libs/paldither.h"
+
+#define PALRLE_IMPLEMENTATION
+#include "libs/palrle.h"
+
+#define PIXELFONT_IMPLEMENTATION
+#define PIXELFONT_BUILDER_IMPLEMENTATION
+#include "libs/pixelfont.h"
 
 #pragma warning( push )
 #pragma warning( disable: 4255 )
@@ -226,6 +234,14 @@ int main( int argc, char** argv ) {
 #endif
 #include "libs/stb_image.h"
 #undef STB_IMAGE_IMPLEMENTATION
+#pragma warning( pop )
+
+#pragma warning( push )
+#pragma warning( disable: 4204 )
+#pragma warning( disable: 4244 ) // conversion from 'int' to 'short', possible loss of data
+#pragma warning( disable: 4365 ) 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "libs/stb_image_write.h"
 #pragma warning( pop )
 
 #define STB_TRUETYPE_IMPLEMENTATION

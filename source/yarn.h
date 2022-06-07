@@ -648,11 +648,11 @@ yarn_globals_t* empty_globals( void ) {
     globals.author = NULL;
     globals.start = NULL;
     globals.palette = NULL;
-    globals.font_description = NULL;
-    globals.font_options = NULL;
-    globals.font_characters = NULL;
-    globals.font_items = NULL;
-    globals.font_name = NULL;
+    globals.font_description = cstr( "fonts/Berkelium64.ttf" );
+    globals.font_options = cstr( "fonts/Sierra-SCI-Menu-Font.ttf" );
+    globals.font_characters =  cstr( "fonts/Berkelium64.ttf" );
+    globals.font_items = cstr( "fonts/Berkelium64.ttf" );
+    globals.font_name = cstr( "fonts/Sierra-SCI-Menu-Font.ttf" );
     globals.logo_indices = managed_array(int);
     globals.background_location = -1;
     globals.background_dialog = -1;
@@ -746,6 +746,141 @@ void load_globals( buffer_t* in, yarn_globals_t* globals ) {
 
 }
 
+typedef struct yarn_assets_t {
+    int palette_count;
+    uint32_t palette[ 256 ];
+
+	pixelfont_t* font_description;
+	pixelfont_t* font_options;
+	pixelfont_t* font_characters;
+	pixelfont_t* font_items;
+	pixelfont_t* font_name;
+
+    array(palrle_data_t*)* screens;
+    array(palrle_data_t*)* images;
+    array(palrle_data_t*)* faces;
+} yarn_assets_t;
+
+
+yarn_assets_t* empty_assets( void ) {
+    static yarn_assets_t assets;
+
+    assets.palette_count = 0;
+    memset( assets.palette, 0, sizeof( assets.palette ) );
+
+	assets.font_description = NULL;
+	assets.font_options = NULL;
+	assets.font_characters = NULL;
+	assets.font_items = NULL;
+	assets.font_name = NULL;
+
+    assets.screens = managed_array(palrle_data_t*);
+    assets.images = managed_array(palrle_data_t*);
+    assets.faces = managed_array(palrle_data_t*);
+
+    return &assets;
+}
+
+
+void save_assets( buffer_t* out, yarn_assets_t* assets ) {
+    buffer_write_i32( out, &assets->palette_count, 1 );
+    buffer_write_u32( out, assets->palette, assets->palette_count );
+
+    buffer_write_u32( out, &assets->font_description->size_in_bytes, 1 );
+    buffer_write_u8( out, (uint8_t*) assets->font_description, assets->font_description->size_in_bytes );
+
+    buffer_write_u32( out, &assets->font_options->size_in_bytes, 1 );
+    buffer_write_u8( out, (uint8_t*) assets->font_options, assets->font_options->size_in_bytes );
+
+    buffer_write_u32( out, &assets->font_characters->size_in_bytes, 1 );
+    buffer_write_u8( out, (uint8_t*) assets->font_characters, assets->font_characters->size_in_bytes );
+
+    buffer_write_u32( out, &assets->font_items->size_in_bytes, 1 );
+    buffer_write_u8( out, (uint8_t*) assets->font_items, assets->font_items->size_in_bytes );
+
+    buffer_write_u32( out, &assets->font_name->size_in_bytes, 1 );
+    buffer_write_u8( out, (uint8_t*) assets->font_name, assets->font_name->size_in_bytes );
+
+    buffer_write_i32( out, &assets->screens->count, 1 );
+    for( int i = 0; i < assets->screens->count; ++i ) {
+        buffer_write_u32( out, &assets->screens->items[ i ]->size, 1 );
+        buffer_write_u8( out, (uint8_t*) assets->screens->items[ i ], assets->screens->items[ i ]->size );
+    }
+
+    buffer_write_i32( out, &assets->images->count, 1 );
+    for( int i = 0; i < assets->images->count; ++i ) {
+        buffer_write_u32( out, &assets->images->items[ i ]->size, 1 );
+        buffer_write_u8( out, (uint8_t*) assets->images->items[ i ], assets->images->items[ i ]->size );
+    }
+
+    buffer_write_i32( out, &assets->faces->count, 1 );
+    for( int i = 0; i < assets->faces->count; ++i ) {
+        buffer_write_u32( out, &assets->faces->items[ i ]->size, 1 );
+        buffer_write_u8( out, (uint8_t*) assets->faces->items[ i ], assets->faces->items[ i ]->size );
+    }
+}
+
+
+void load_assets( buffer_t* in, yarn_assets_t* assets ) {
+    assets->palette_count = read_int( in );
+    buffer_read_u32( in, assets->palette, assets->palette_count );
+
+    uint32_t font_description_size;
+    buffer_read_u32( in, &font_description_size, 1 );
+    assets->font_description = manage_pixelfont( malloc( font_description_size ) );
+    buffer_read_u8( in, (uint8_t*) assets->font_description, font_description_size );
+
+    uint32_t font_options_size;
+    buffer_read_u32( in, &font_options_size, 1 );
+    assets->font_options = manage_pixelfont( malloc( font_options_size ) );
+    buffer_read_u8( in, (uint8_t*) assets->font_options, font_options_size );
+
+    uint32_t font_characters_size;
+    buffer_read_u32( in, &font_characters_size, 1 );
+    assets->font_characters = manage_pixelfont( malloc( font_characters_size ) );
+    buffer_read_u8( in, (uint8_t*) assets->font_characters, font_characters_size );
+
+    uint32_t font_items_size;
+    buffer_read_u32( in, &font_items_size, 1 );
+    assets->font_items = manage_pixelfont( malloc( font_items_size ) );
+    buffer_read_u8( in, (uint8_t*) assets->font_items, font_items_size );
+
+    uint32_t font_name_size;
+    buffer_read_u32( in, &font_name_size, 1 );
+    assets->font_name = manage_pixelfont( malloc( font_name_size ) );
+    buffer_read_u8( in, (uint8_t*) assets->font_name, font_name_size );
+
+    assets->screens = managed_array(palrle_data_t*);
+    int screens_count = read_int( in );
+    for( int i = 0; i < screens_count; ++i ) {
+        uint32_t size;
+        buffer_read_u32( in, &size, 1 );
+        palrle_data_t* rle = manage_palrle( malloc( size ) );
+        buffer_read_u8( in, (uint8_t*) rle, size );
+        array_add( assets->screens, &rle );
+    }
+
+    assets->images = managed_array(palrle_data_t*);
+    int images_count = read_int( in );
+    for( int i = 0; i < images_count; ++i ) {
+        uint32_t size;
+        buffer_read_u32( in, &size, 1 );
+        palrle_data_t* rle = manage_palrle( malloc( size ) );
+        buffer_read_u8( in, (uint8_t*) rle, size );
+        array_add( assets->images, &rle );
+    }
+
+    assets->faces = managed_array(palrle_data_t*);
+    int faces_count = read_int( in );
+    for( int i = 0; i < faces_count; ++i ) {
+        uint32_t size;
+        buffer_read_u32( in, &size, 1 );
+        palrle_data_t* rle = manage_palrle( malloc( size ) );
+        buffer_read_u8( in, (uint8_t*) rle, size );
+        array_add( assets->faces, &rle );
+    }
+}
+
 
 typedef struct yarn_t {
 	yarn_globals_t globals;
@@ -761,6 +896,8 @@ typedef struct yarn_t {
 	array(yarn_location_t)* locations;
 	array(yarn_dialog_t)* dialogs;
 	array(yarn_character_t)* characters;
+    
+    yarn_assets_t assets;
 } yarn_t;
 
 
@@ -780,6 +917,7 @@ yarn_t* empty_yarn( void ) {
 	yarn.dialogs = managed_array(yarn_dialog_t);
 	yarn.characters = managed_array(yarn_character_t);
 
+	yarn.assets = *empty_assets();
     return &yarn;
 }
 
@@ -819,6 +957,8 @@ void yarn_save( buffer_t* out, yarn_t* yarn ) {
     for( int i = 0; i < yarn->characters->count; ++i ) {
 	    save_character( out, &yarn->characters->items[ i ] );
     }
+
+    save_assets( out, &yarn->assets );
 }
 
 
@@ -862,6 +1002,8 @@ void yarn_load( buffer_t* in, yarn_t* yarn ) {
         load_character( in, &character );
         array_add( yarn->characters, &character );
     }
+
+    load_assets( in, &yarn->assets );
 }
 
 
@@ -938,16 +1080,63 @@ buffer_t* yarn_compile( char const* path ) {
         return NULL;
     }
 
-    yarn_t compiled_yarn;
-    if( !yarn_compiler( parser_globals, parser_sections, &compiled_yarn ) ) {
+    yarn_t yarn;
+    if( !yarn_compiler( parser_globals, parser_sections, &yarn ) ) {
         printf( "Compiler failed\n" );
         memmgr_rollback( &g_memmgr, mem_restore );
         cstr_rollback( str_restore );
         return NULL;
     }
-    
+
+    bool no_error = true;
+    paldither_palette_t* palette = manage_paldither( convert_palette( yarn.globals.palette ) ); 
+	if( !palette ) {
+		printf( "Failed to load palette file '%s'\n", yarn.globals.palette );
+		no_error = false;
+	}
+    yarn.assets.palette_count = palette->color_count;
+    memcpy( yarn.assets.palette, palette->colortable, palette->color_count * sizeof( *palette->colortable ) );
+
+	yarn.assets.font_description = manage_pixelfont( convert_font( yarn.globals.font_description ) );
+	yarn.assets.font_options = manage_pixelfont( convert_font( yarn.globals.font_options ) );
+	yarn.assets.font_characters = manage_pixelfont( convert_font( yarn.globals.font_characters ) );
+	yarn.assets.font_items = manage_pixelfont( convert_font( yarn.globals.font_items ) );
+	yarn.assets.font_name = manage_pixelfont( convert_font( yarn.globals.font_name ) );
+
+    for( int i = 0; i < yarn.screen_names->count; ++i ) {
+        string_id screen_name = yarn.screen_names->items[ i ];
+        palrle_data_t* bitmap = manage_palrle( convert_bitmap( screen_name, 320, 200, yarn.globals.palette, palette ) );
+        array_add( yarn.assets.screens, &bitmap );
+        if( !bitmap ) {
+			printf( "Failed to load image: %s\n", screen_name );
+			no_error = false;
+		}
+
+    }
+    for( int i = 0; i < yarn.image_names->count; ++i ) {
+        string_id image_name = yarn.image_names->items[ i ];
+        palrle_data_t* bitmap = manage_palrle( convert_bitmap( image_name, 192, 108, yarn.globals.palette, palette ) );
+        array_add( yarn.assets.images, &bitmap );
+        if( !bitmap ) {
+			printf( "Failed to load image: %s\n", image_name );
+			no_error = false;
+		}
+
+    }
+
+    for( int i = 0; i < yarn.face_names->count; ++i ) {
+        string_id face_name = yarn.face_names->items[ i ];
+        palrle_data_t* bitmap = manage_palrle( convert_bitmap( face_name, 90, 90, yarn.globals.palette, palette ) );
+        array_add( yarn.assets.faces, &bitmap );
+        if( !bitmap ) {
+			printf( "Failed to load image: %s\n", face_name );
+			no_error = false;
+		}
+
+    }
+
     buffer_t* buffer = buffer_create();
-    yarn_save( buffer, &compiled_yarn );
+    yarn_save( buffer, &yarn );
     memmgr_rollback( &g_memmgr, mem_restore );
     cstr_rollback( str_restore );
     return buffer;

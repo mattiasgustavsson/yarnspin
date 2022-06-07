@@ -74,119 +74,110 @@ img_rgba_t img_rgba_saturate( img_rgba_t a ) {
 }
 
 
-typedef struct gen_pixelfont_t {
-    uint32_t size_in_bytes;
-	uint8_t height;
-	uint8_t line_spacing;
-	uint8_t baseline;
-	uint16_t offsets[ 256 ];
-	uint8_t glyphs[ 1 ]; // "open" array
-} gen_pixelfont_t;
-
-gen_pixelfont_t* generate_pixel_font( uint8_t* ttf_data ) {
-    stbtt_fontinfo font;
+pixelfont_t* generate_pixel_font( uint8_t* ttf_data ) {
+	stbtt_fontinfo font;
     stbtt_InitFont( &font, ttf_data, stbtt_GetFontOffsetForIndex( ttf_data, 0) );
-
-	// find first non-aliased size    
+    
     int size = 0;
     for( int i = 1; i < 32; ++i ) {
         float scale = stbtt_ScaleForPixelHeight( &font, (float) i );
         int w, h;
-        uint8_t* bitmap = stbtt_GetGlyphBitmap( &font, scale, scale, 'A', &w, &h, 0, 0 );
-        bool empty = true;
-        bool antialiased = false;
+        PIXELFONT_U8* bitmap = stbtt_GetGlyphBitmap( &font, scale, scale, 'A', &w, &h, 0, 0 );
+        int empty = 1;
+        int antialiased = 0;
         for( int j = 0; j < w * h; ++j ) {
             if( bitmap[ j ] > 0 ) {
-                empty = false;
-                if( bitmap[ j ] < 255 ) { antialiased = true; break; }
+                empty = 0;
+                if( bitmap[ j ] < 255 ) { antialiased = 1; break; }
             }
         }
         stbtt_FreeBitmap( bitmap, 0 );
         if( !empty && !antialiased ) { size = i; break; }
     }
-    if( !size ) return 0;
-    
+
+    if( !size ) {
+		printf( "Not a pixel font (size detection failed)\n" );
+		return NULL;
+	}
     
     float scale = stbtt_ScaleForPixelHeight( &font, (float) size );
 
-    int ascent, descent, line_gap;
-    stbtt_GetFontVMetrics(&font, &ascent, &descent, &line_gap );
-    ascent = fround( scale * ascent );
-    descent = fround( scale * descent );
-    line_gap = fround( scale * line_gap );
+    int ascent, descent;
+    stbtt_GetFontVMetrics(&font, &ascent, &descent, 0 );
+    ascent = (int)( scale * ascent );
+    descent = (int)( scale * descent );
 
     int x0, y0, x1, y1;
     stbtt_GetFontBoundingBox( &font, &x0, &y0, &x1, &y1 );
-    x0 = fround( scale * x0 );
-    x1 = fround( scale * x1 );
-    y0 = fround( scale * y0 );
-    y1 = fround( scale * y1 );
+    x0 = (int)( scale * x0 );
+    x1 = (int)( scale * x1 );
+    y0 = (int)( scale * y0 );
+    y1 = (int)( scale * y1 );
 
-    uint16_t offsets[ 256 ];
-    uint8_t glyphs[ 65536 + 1024 ];
-    int glyphofs = 0;
+	int line_spacing = ascent - descent + 1; // TODO: verify this
 
-    for( int c = 0; c < 256; ++c ) {
-        if( glyphofs >= 65536 ) return 0;
-        offsets[ c ] = (uint16_t) glyphofs;
+	for( int c = 0; c < 256; ++c ) {
+		int gi = stbtt_FindGlyphIndex( &font, c );
+		if( gi > 0 && gi < font.numGlyphs ) {
+            if( !stbtt_IsGlyphEmpty( &font, gi ) ) {
+                int ix0, iy0, ix1, iy1;
+                stbtt_GetGlyphBitmapBox(&font, gi, scale, scale, &ix0, &iy0, &ix1, &iy1);
+				iy0 += ascent;
+				iy1 += ascent;
+				if( ix0 < x0 ) x0 = ix0;
+				if( iy0 < y0 ) y0 = iy0;
+				if( ix1 > x1 ) x1 = ix1;
+				if( iy1 > y1 ) y1 = iy1;
+			}
+		}
+	}
+
+    pixelfont_builder_t* builder = pixelfont_builder_create( y1 - y0 + 1, ascent, line_spacing, 0 );
+
+	PIXELFONT_U8 dummy;
+	pixelfont_builder_glyph( builder, 0, 0, &dummy, 0, 0 );
+	for( int c = 1; c < 256; ++c ) {
         int gi = stbtt_FindGlyphIndex( &font, c );
-        if (gi > 0 && gi < font.numGlyphs) {
+        if( gi > 0 && gi < font.numGlyphs ) {
             int advance;
             int left;
             stbtt_GetGlyphHMetrics( &font, gi, &advance, &left );
-            advance = fround( scale * advance );
-            left = fround( scale * left );
+            advance = (int)( scale * advance );
+            left = (int)( scale * left );
             advance -= left;
-            glyphs[ glyphofs++ ] = (int8_t) left; // pre-advance
 
             if( !stbtt_IsGlyphEmpty( &font, gi ) ) {
                 int ix0, iy0, ix1, iy1;
                 stbtt_GetGlyphBitmapBox(&font, gi, scale, scale, &ix0, &iy0, &ix1, &iy1);
-                int w, h;
-                uint8_t* bitmap = stbtt_GetGlyphBitmap( &font, scale, scale, gi, &w, &h, 0, 0 );
-                glyphs[ glyphofs++ ] = (uint8_t) w; // width
-                int top = iy0 + ascent;
-                int bottom = ( y1 - y0 + 1 ) - h - top;
-                for( int j = 0; j < w * top; ++j ) glyphs[ glyphofs++ ] = 0; // blank
-                for( int j = 0; j < w * h; ++j ) glyphs[ glyphofs++ ] = bitmap[ j ]; // font pixel
-                for (int j = 0; j < w * bottom; ++j) glyphs[ glyphofs++ ] = 0; // blank
-	            stbtt_FreeBitmap( bitmap, 0 );
-		    } else {
-                glyphs[ glyphofs++ ] = 0; // width
-            }
-	
-            glyphs[ glyphofs++ ] = (int8_t) advance; // advance
+                int w, h, xo, yo;
+                PIXELFONT_U8* bitmap = stbtt_GetGlyphBitmap( &font, scale, scale, gi, &w, &h, &xo, &yo );
+				PIXELFONT_U8* temp_bmp = (PIXELFONT_U8*) malloc( (size_t) ( y1 - y0 + 1 ) * w  );
+				memset( temp_bmp, 0, (size_t) ( y1 - y0 + 1 ) * w );
+				int top = ascent + yo;
+				top = top < 0 ? 0 : top;
+				PIXELFONT_U8* out = temp_bmp + top * w;
+                for( int y = 0; y < h; ++y ) 
+					for( int x = 0; x < w; ++x ) 
+						*out++ = bitmap[ x + y * w ] ? 1U : 0U; // font pixel
+				pixelfont_builder_glyph( builder, c, w, temp_bmp, left, advance );
+                if( bitmap ) stbtt_FreeBitmap( bitmap, NULL );
+				if( temp_bmp ) free( temp_bmp );
+            } else if( advance || left ) {
+				pixelfont_builder_glyph( builder, c, 0, &dummy, left, advance );
+			}
 
-            uint8_t* kerning_count = &glyphs[ glyphofs++ ];
-            *kerning_count = 0;
             for( int k = 0; k < 256; ++k ) {
-                if( glyphofs > 65535 ) return 0;
                 int kern = stbtt_GetCodepointKernAdvance( &font, c, k );
-                kern = fround( scale * kern );
-                if( kern ) {
-                    glyphs[ glyphofs++ ] = (uint8_t)k;
-                    glyphs[ glyphofs++ ] = (int8_t) kern;
-                    ++(*kerning_count);
-                }
+                kern = (int)( scale * kern );
+                if( kern ) pixelfont_builder_kerning( builder, c, k, kern );
             }
-        } else {
-            glyphs[ glyphofs++ ] = 0; // width
-            glyphs[ glyphofs++ ] = 0; // advance
         }
     }
 
-    if( glyphofs > 65535 ) return 0;
-
-    int size_in_bytes = (int)( sizeof( gen_pixelfont_t ) + glyphofs - 1 );
-    gen_pixelfont_t* pixelfont = (gen_pixelfont_t*) malloc( size_in_bytes );
-    pixelfont->size_in_bytes = size_in_bytes;
-    pixelfont->height = (uint8_t)( y1 - y0 + 1 );
-    pixelfont->line_spacing = (uint8_t)( ascent - descent + line_gap );
-    pixelfont->baseline = (int8_t) ascent;
-    stbtt_GetFontVMetrics(&font, &ascent, &descent, &line_gap );
-    pixelfont->line_spacing = (uint8_t)( fround( scale * ( ascent - descent + line_gap ) ) );
-    memcpy( pixelfont->offsets, offsets, sizeof( pixelfont->offsets ) );
-    memcpy( pixelfont->glyphs, glyphs, glyphofs );
+	pixelfont_t* builtfont = pixelfont_builder_font( builder );
+    pixelfont_t* pixelfont = (pixelfont_t*) malloc( (size_t) builtfont->size_in_bytes );
+    memcpy( pixelfont, builtfont, builtfont->size_in_bytes );
+    pixelfont_builder_destroy( builder );
     return pixelfont;
 }
 
@@ -882,4 +873,120 @@ bool process_face( uint32_t* image, int width, int height, uint8_t* output, int 
 	}
 
     return true;
+}
+
+
+paldither_palette_t* convert_palette( string palette_filename ) {
+	uint32_t colortable[ 256 ];
+	int colortable_count = palette_from_file( palette_filename, colortable );
+	if( colortable_count <= 0 ) return NULL;
+
+    string palette_lookup_file = cstr_cat( cstr_cat( ".cache/palettes/", basename( palette_filename, extname( palette_filename ) ) ), ".plut" );
+	
+	paldither_palette_t* ditherpal = NULL;
+	if( file_exists( palette_lookup_file ) && !file_more_recent( palette_filename, palette_lookup_file ) ) {
+		file_t* file = file_load( palette_lookup_file, FILE_MODE_BINARY, NULL );
+		if( file ) {
+			ditherpal = paldither_palette_create_from_data( file->data, file->size, NULL );
+			file_destroy( file );
+		}
+	}
+		
+	if( !ditherpal ) {
+		size_t pal_size;
+		ditherpal = paldither_palette_create( colortable, colortable_count, &pal_size, NULL );	
+	
+		create_path( cdirname( palette_lookup_file ) );
+		file_save_data( &ditherpal->color_count, pal_size, palette_lookup_file, FILE_MODE_BINARY );
+	}
+
+	return ditherpal;
+}
+
+
+typedef struct bitmap_t {
+    uint32_t size_in_bytes;
+    uint16_t width;
+	uint16_t height;
+	uint8_t pixels[ 1 ]; // "open" array
+} bitmap_t;
+
+
+palrle_data_t* convert_bitmap( string image_filename, int width, int height, string palette_filename, paldither_palette_t* palette ) {
+    bool is_face = false;
+    if( cstr_starts( image_filename, "faces/" ) ) {
+        is_face = true;
+        image_filename = cstr_mid( image_filename,  6, 0 );
+    } else if( cstr_starts( image_filename, "images/" ) ) {
+        is_face = false;
+        image_filename = cstr_mid( image_filename,  7, 0 );
+    } else {
+        NULL;
+    }
+
+    string processed_filename_no_ext = cstr_format( ".cache/processed/%s/%s/%dx%d/%s_%s", is_face ? "faces" : "images", 
+        cstr( basename( palette_filename, extname( palette_filename ) ) ), width, height, 
+        cstr( basename( image_filename, extname( image_filename ) ) ), cstr_mid( extname( image_filename ), 1, 0 ) ) ;
+        
+    string processed_filename = cstr_cat( processed_filename_no_ext, ".bitmap" );
+    string intermediate_processed_filename = cstr_cat( processed_filename_no_ext, ".png" );
+
+    if( !file_exists( processed_filename ) || !file_exists( intermediate_processed_filename ) || 
+        file_more_recent( cstr_cat( is_face ? "faces/" : "images/", image_filename ), processed_filename ) || 
+        file_more_recent( cstr_cat( is_face ? "faces/" : "images/", image_filename ), intermediate_processed_filename ) ) {
+	    
+        int w, h, c;
+	    stbi_uc* img = stbi_load( cstr_cat( is_face ? "faces/" : "images/", image_filename ), &w, &h, &c, 4 );
+	    if( !img ) {
+		    return NULL;
+		}
+		if( w * h < width * height ) 
+			img = (stbi_uc*) realloc( img, width * height * 4 );
+
+        int outw = width;
+        int outh = height;
+
+        uint32_t size = 2 * outw * outh + sizeof( bitmap_t ) - 1;
+        bitmap_t* bitmap = (bitmap_t*) malloc( size );
+        bitmap->size_in_bytes = size;
+        bitmap->width = (uint16_t) outw;
+        bitmap->height = (uint16_t) outh;
+
+        if( is_face )
+            process_face( (uint32_t*) img, w, h, bitmap->pixels, outw, outh, palette );
+        else
+            process_image( (uint32_t*) img, w, h, bitmap->pixels, outw, outh, palette );
+            
+        uint8_t* mask = &bitmap->pixels[0] + outw * outh;
+        for( int y = 0; y < outh; ++y )
+			for( int x = 0; x < outw; ++x )
+				mask[ x + outw * y ] = ( ( (uint32_t*) img )[ x + outw * y ] & 0xff000000 ) ? 0xff : 0x00;
+        
+		create_path( cdirname( processed_filename ) );
+
+        stbi_write_png( intermediate_processed_filename, outw, outh, 4, (stbi_uc*)img, 4 * outw ); 
+
+        stbi_image_free( img );
+
+        palrle_data_t* rle = palrle_encode_mask( bitmap->pixels, mask, bitmap->width, bitmap->height, palette->colortable, palette->color_count, NULL );
+        free( bitmap );
+        file_save_data( rle, rle->size, processed_filename, FILE_MODE_BINARY );
+	    return rle;
+    }
+
+    file_t* file = file_load( processed_filename, FILE_MODE_BINARY, 0 );
+    palrle_data_t* rle = (palrle_data_t*) malloc( file->size );
+    memcpy( rle, file->data, file->size );
+    file_destroy( file );
+
+	return rle;
+}
+
+
+pixelfont_t* convert_font( string font_filename ) {
+    // TODO: Save converted font to cache and don't regenerate if it already exists
+    file_t* ttf = file_load( font_filename, FILE_MODE_BINARY, 0 );
+    pixelfont_t* font = generate_pixel_font( (uint8_t*) ttf->data );
+    file_destroy( ttf );
+    return font;
 }

@@ -124,10 +124,6 @@ img_t img_from_abgr32( IMG_U32* abgr, int width, int height ) {
         f->g = ( (float) g ) / 255.0f;
         f->b = ( (float) b ) / 255.0f;
         f->a = ( (float) a ) / 255.0f;
-		float const GAMMA_TO_LINEAR = 2.2f;
-		f->r = IMG_POW( f->r, GAMMA_TO_LINEAR );
-		f->g = IMG_POW( f->g, GAMMA_TO_LINEAR );
-		f->b = IMG_POW( f->b, GAMMA_TO_LINEAR );
     }
     return img;
 }
@@ -147,10 +143,9 @@ float img_clamp( float x, float low, float high ) {
 void img_to_argb32( img_t* img, IMG_U32* abgr ) {
     for( int i = 0; i < img->width * img->height; ++i ) {
         img_rgba_t p = img->pixels[ i ];
-		float const LINEAR_TO_GAMMA = 1.0f / 2.2f;
-		p.r = IMG_POW( img_clamp( p.r, 0.0f, 1.0f ), LINEAR_TO_GAMMA );
-		p.g = IMG_POW( img_clamp( p.g, 0.0f, 1.0f ), LINEAR_TO_GAMMA );
-		p.b = IMG_POW( img_clamp( p.b, 0.0f, 1.0f ), LINEAR_TO_GAMMA );
+		p.r = img_clamp( p.r, 0.0f, 1.0f );
+		p.g = img_clamp( p.g, 0.0f, 1.0f );
+		p.b = img_clamp( p.b, 0.0f, 1.0f );
         p.a = img_clamp( p.a, 0.0f, 1.0f );
         IMG_U32 r = (IMG_U32)( p.r * 256.0f ); 
         IMG_U32 g = (IMG_U32)( p.g * 256.0f ); 
