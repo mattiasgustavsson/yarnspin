@@ -756,9 +756,7 @@ typedef struct yarn_assets_t {
 	pixelfont_t* font_items;
 	pixelfont_t* font_name;
 
-    array(palrle_data_t*)* screens;
-    array(palrle_data_t*)* images;
-    array(palrle_data_t*)* faces;
+    array(palrle_data_t*)* bitmaps;
 } yarn_assets_t;
 
 
@@ -774,9 +772,7 @@ yarn_assets_t* empty_assets( void ) {
 	assets.font_items = NULL;
 	assets.font_name = NULL;
 
-    assets.screens = managed_array(palrle_data_t*);
-    assets.images = managed_array(palrle_data_t*);
-    assets.faces = managed_array(palrle_data_t*);
+    assets.bitmaps = managed_array(palrle_data_t*);
 
     return &assets;
 }
@@ -801,22 +797,10 @@ void save_assets( buffer_t* out, yarn_assets_t* assets ) {
     buffer_write_u32( out, &assets->font_name->size_in_bytes, 1 );
     buffer_write_u8( out, (uint8_t*) assets->font_name, assets->font_name->size_in_bytes );
 
-    buffer_write_i32( out, &assets->screens->count, 1 );
-    for( int i = 0; i < assets->screens->count; ++i ) {
-        buffer_write_u32( out, &assets->screens->items[ i ]->size, 1 );
-        buffer_write_u8( out, (uint8_t*) assets->screens->items[ i ], assets->screens->items[ i ]->size );
-    }
-
-    buffer_write_i32( out, &assets->images->count, 1 );
-    for( int i = 0; i < assets->images->count; ++i ) {
-        buffer_write_u32( out, &assets->images->items[ i ]->size, 1 );
-        buffer_write_u8( out, (uint8_t*) assets->images->items[ i ], assets->images->items[ i ]->size );
-    }
-
-    buffer_write_i32( out, &assets->faces->count, 1 );
-    for( int i = 0; i < assets->faces->count; ++i ) {
-        buffer_write_u32( out, &assets->faces->items[ i ]->size, 1 );
-        buffer_write_u8( out, (uint8_t*) assets->faces->items[ i ], assets->faces->items[ i ]->size );
+    buffer_write_i32( out, &assets->bitmaps->count, 1 );
+    for( int i = 0; i < assets->bitmaps->count; ++i ) {
+        buffer_write_u32( out, &assets->bitmaps->items[ i ]->size, 1 );
+        buffer_write_u8( out, (uint8_t*) assets->bitmaps->items[ i ], assets->bitmaps->items[ i ]->size );
     }
 }
 
@@ -850,34 +834,14 @@ void load_assets( buffer_t* in, yarn_assets_t* assets ) {
     assets->font_name = manage_pixelfont( malloc( font_name_size ) );
     buffer_read_u8( in, (uint8_t*) assets->font_name, font_name_size );
 
-    assets->screens = managed_array(palrle_data_t*);
-    int screens_count = read_int( in );
-    for( int i = 0; i < screens_count; ++i ) {
+    assets->bitmaps = managed_array(palrle_data_t*);
+    int bitmaps_count = read_int( in );
+    for( int i = 0; i < bitmaps_count; ++i ) {
         uint32_t size;
         buffer_read_u32( in, &size, 1 );
         palrle_data_t* rle = manage_palrle( malloc( size ) );
         buffer_read_u8( in, (uint8_t*) rle, size );
-        array_add( assets->screens, &rle );
-    }
-
-    assets->images = managed_array(palrle_data_t*);
-    int images_count = read_int( in );
-    for( int i = 0; i < images_count; ++i ) {
-        uint32_t size;
-        buffer_read_u32( in, &size, 1 );
-        palrle_data_t* rle = manage_palrle( malloc( size ) );
-        buffer_read_u8( in, (uint8_t*) rle, size );
-        array_add( assets->images, &rle );
-    }
-
-    assets->faces = managed_array(palrle_data_t*);
-    int faces_count = read_int( in );
-    for( int i = 0; i < faces_count; ++i ) {
-        uint32_t size;
-        buffer_read_u32( in, &size, 1 );
-        palrle_data_t* rle = manage_palrle( malloc( size ) );
-        buffer_read_u8( in, (uint8_t*) rle, size );
-        array_add( assets->faces, &rle );
+        array_add( assets->bitmaps, &rle );
     }
 }
 
@@ -1106,7 +1070,7 @@ buffer_t* yarn_compile( char const* path ) {
     for( int i = 0; i < yarn.screen_names->count; ++i ) {
         string_id screen_name = yarn.screen_names->items[ i ];
         palrle_data_t* bitmap = manage_palrle( convert_bitmap( screen_name, 320, 200, yarn.globals.palette, palette ) );
-        array_add( yarn.assets.screens, &bitmap );
+        array_add( yarn.assets.bitmaps, &bitmap );
         if( !bitmap ) {
 			printf( "Failed to load image: %s\n", screen_name );
 			no_error = false;
@@ -1116,7 +1080,7 @@ buffer_t* yarn_compile( char const* path ) {
     for( int i = 0; i < yarn.image_names->count; ++i ) {
         string_id image_name = yarn.image_names->items[ i ];
         palrle_data_t* bitmap = manage_palrle( convert_bitmap( image_name, 192, 108, yarn.globals.palette, palette ) );
-        array_add( yarn.assets.images, &bitmap );
+        array_add( yarn.assets.bitmaps, &bitmap );
         if( !bitmap ) {
 			printf( "Failed to load image: %s\n", image_name );
 			no_error = false;
@@ -1127,7 +1091,7 @@ buffer_t* yarn_compile( char const* path ) {
     for( int i = 0; i < yarn.face_names->count; ++i ) {
         string_id face_name = yarn.face_names->items[ i ];
         palrle_data_t* bitmap = manage_palrle( convert_bitmap( face_name, 90, 90, yarn.globals.palette, palette ) );
-        array_add( yarn.assets.faces, &bitmap );
+        array_add( yarn.assets.bitmaps, &bitmap );
         if( !bitmap ) {
 			printf( "Failed to load image: %s\n", face_name );
 			no_error = false;

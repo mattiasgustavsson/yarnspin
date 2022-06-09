@@ -32,6 +32,7 @@
 #include "libs/stb_truetype.h"
 
 #include "memmgr.h"
+
 static struct memmgr_t g_memmgr = { 0 };
 void array_deleter( void* context, void* ptr ) { (void) context; internal_array_destroy( (struct internal_array_t*) ptr ); }
 #define managed_array( type ) ARRAY_CAST( memmgr_add( &g_memmgr, array_create( type ), NULL, array_deleter ) )
@@ -53,24 +54,12 @@ typedef cstr_t string;
 #include "gfxconv.h"
 #include "yarn.h"
 
+#include "input.h"
+#include "game.h"
+
+
 int app_proc( app_t* app, void* user_data ) {
-    (void) user_data;
-
-    #ifndef __wasm__
-        // compile yarn
-	    buffer_t* compiled_yarn = yarn_compile( "." );
-	    if( !compiled_yarn ) {
-		    printf( "Failed to compile game file\n" );
-		    return EXIT_FAILURE;
-	    }    
-        buffer_save( compiled_yarn, "game.yarn" );
-    #endif
-
-    // load yarn
-    buffer_t* loaded_yarn = buffer_load( "game.yarn" );
-    yarn_t yarn;
-    yarn_load( loaded_yarn, &yarn );
-    buffer_destroy( loaded_yarn );    
+    yarn_t* yarn = (yarn_t*) user_data;
 
     // position window centered on main display
     app_displays_t displays = app_displays( app );
@@ -105,8 +94,13 @@ int app_proc( app_t* app, void* user_data ) {
         app_window_size( app, w, h );
     }
     
+    #ifndef __wasm__
+        bool fullscreen = true;
+    #else
+        bool fullscreen = false;
+    #endif    
     app_interpolation( app, APP_INTERPOLATION_NONE );
-    app_screenmode( app, APP_SCREENMODE_WINDOW );
+    app_screenmode( app, fullscreen ? APP_SCREENMODE_FULLSCREEN : APP_SCREENMODE_WINDOW );
     app_title( app, "Yarnspin" );
 
     crtemu_pc_t* crtemu = crtemu_pc_create( NULL );
@@ -121,15 +115,29 @@ int app_proc( app_t* app, void* user_data ) {
     static uint8_t canvas[ 320 * 200 ];
     memset( canvas, 0, sizeof( canvas) );
 
-    palrle_blit( yarn.assets.screens->items[ 0 ], 0, 0, canvas, 320, 200 );
+    // run game
+    input_t input;
+    input_init( &input, app );
+    game_state_t game_state;
+    game_state_init( &game_state );
+    game_t game;
+    game_init( &game, &game_state, yarn, &input, canvas, 320, 200 );
 
     // main loop
-    while( app_yield( app ) != APP_STATE_EXIT_REQUESTED ) {
+    bool exit_flag = false;
+    while( app_yield( app ) != APP_STATE_EXIT_REQUESTED && !exit_flag) {
         frametimer_update( frametimer );
+        input_update( &input, crtemu );
+        exit_flag = game_update( &game );
+
+        if( input_was_key_pressed( &input, APP_KEY_F11 ) ) {
+            fullscreen = !fullscreen;
+            app_screenmode( app, fullscreen ? APP_SCREENMODE_FULLSCREEN : APP_SCREENMODE_WINDOW );
+        }
 
         static uint32_t screen[ 320 * 200 ];
         for( int i = 0; i < 320 * 200; ++i) {
-            screen[ i ] = yarn.assets.palette[ canvas[ i ] ];
+            screen[ i ] = yarn->assets.palette[ canvas[ i ] ];
         }
         crtemu_pc_present( crtemu, 0, screen, 320, 200, 0xffffff, 0x000000 );
         app_present( app, NULL, 1, 1, 0xffffff, 0x000000 );
@@ -150,10 +158,27 @@ int main( int argc, char** argv ) {
 		int flag = _CrtSetDbgFlag( _CRTDBG_REPORT_FLAG ); // Get current flag
 		flag |= _CRTDBG_LEAK_CHECK_DF; // Turn on leak-checking bit
 		_CrtSetDbgFlag( flag ); // Set flag to the new value
-//		_CrtSetBreakAlloc( 0 ); // Can be manually commented back in to break at a certain allocation
+		//_CrtSetBreakAlloc( 0 ); // Can be manually commented back in to break at a certain allocation
 	#endif
 
-    return app_run( app_proc, NULL, NULL, NULL, NULL );
+    #ifndef __wasm__
+        // compile yarn
+	    buffer_t* compiled_yarn = yarn_compile( "." );
+	    if( !compiled_yarn ) {
+		    printf( "Failed to compile game file\n" );
+		    return EXIT_FAILURE;
+	    }    
+        buffer_save( compiled_yarn, "game.yarn" );
+        buffer_destroy( compiled_yarn );   
+    #endif
+
+    // load yarn
+    buffer_t* loaded_yarn = buffer_load( "game.yarn" );
+    yarn_t yarn;
+    yarn_load( loaded_yarn, &yarn );
+    buffer_destroy( loaded_yarn );    
+
+    return app_run( app_proc, &yarn, NULL, NULL, NULL );
 }
 
 
