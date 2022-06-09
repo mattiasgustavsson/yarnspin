@@ -150,6 +150,7 @@ void game_init( game_t* game, game_state_t* game_state, yarn_t* yarn, input_t* i
 	if( game->color_facebg < 0 ) game->color_facebg = (uint8_t)facebg_index;		
 }
 
+
 gamestate_t boot_init( game_t* ctx );
 gamestate_t boot_update( game_t* ctx );
 gamestate_t title_init( game_t* ctx );
@@ -162,6 +163,7 @@ gamestate_t exit_init( game_t* ctx );
 gamestate_t exit_update( game_t* ctx );
 gamestate_t terminate_init( game_t* ctx );
 gamestate_t terminate_update( game_t* ctx );
+
 
 bool game_update( game_t* game ) {
     if( game->new_state != GAMESTATE_NO_CHANGE ) {
@@ -234,6 +236,7 @@ void cls( game_t* ctx ) {
     memset( ctx->screen, ctx->color_background, (size_t) ctx->screen_width * ctx->screen_height ); 
 }
 
+
 void draw( game_t* ctx, palrle_data_t* bmp, int x, int y ) {
     palrle_blit( bmp, x, y, ctx->screen, ctx->screen_width, ctx->screen_height );
 }
@@ -258,6 +261,17 @@ pixelfont_bounds_t center( game_t* ctx, pixelfont_t* font, string str, int x, in
         PIXELFONT_ALIGN_CENTER, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, &bounds );
     return bounds; 
 }
+
+
+pixelfont_bounds_t center_wrap( game_t* ctx, pixelfont_t* font, string str, int x, int y, int color, int wrap_width ) { 
+    pixelfont_bounds_t bounds;
+    x -= wrap_width / 2;
+    pixelfont_blit( font, x, y, str, (uint8_t)color, ctx->screen, ctx->screen_width, ctx->screen_height, 
+        PIXELFONT_ALIGN_CENTER, wrap_width, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, 
+        &bounds );
+    return bounds; 
+}
+
 
 pixelfont_bounds_t text( game_t* ctx, pixelfont_t* font, string str, int x, int y, int color ) { 
     pixelfont_bounds_t bounds;
@@ -591,8 +605,7 @@ gamestate_t location_update( game_t* ctx ) {
         ++c;
     }
     if( c == 0 ) {
-		center( ctx,  ctx->font_chr, "You are", 32, 40, ctx->color_disabled );
-		center( ctx,  ctx->font_chr, "alone.", 32, 40 + ctx->font_chr->height, ctx->color_disabled );
+		center_wrap( ctx,  ctx->font_chr, yarn->globals.alone_text, 32, 40, ctx->color_disabled, 56 );
     }
 
 

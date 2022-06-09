@@ -617,6 +617,7 @@ typedef struct yarn_globals_t {
     string author;
     string start;
     string palette;
+    string alone_text;
     string font_description;
     string font_options;
     string font_characters;
@@ -648,6 +649,7 @@ yarn_globals_t* empty_globals( void ) {
     globals.author = NULL;
     globals.start = NULL;
     globals.palette = NULL;
+    globals.alone_text = cstr( "You are alone." );
     globals.font_description = cstr( "fonts/Berkelium64.ttf" );
     globals.font_options = cstr( "fonts/Sierra-SCI-Menu-Font.ttf" );
     globals.font_characters =  cstr( "fonts/Berkelium64.ttf" );
@@ -677,6 +679,7 @@ void save_globals( buffer_t* out, yarn_globals_t* globals ) {
 	buffer_write_string( out, &globals->author, 1 );
 	buffer_write_string( out, &globals->start, 1 );
 	buffer_write_string( out, &globals->palette, 1 );
+    buffer_write_string( out, &globals->alone_text, 1 );
 	buffer_write_string( out, &globals->font_description, 1 );
 	buffer_write_string( out, &globals->font_options, 1 );
 	buffer_write_string( out, &globals->font_characters, 1 );
@@ -712,6 +715,7 @@ void load_globals( buffer_t* in, yarn_globals_t* globals ) {
 	globals->author = read_string( in );
 	globals->start = read_string( in );
 	globals->palette = read_string( in );
+	globals->alone_text = read_string( in );
 	globals->font_description = read_string( in );
 	globals->font_options = read_string( in );
 	globals->font_characters = read_string( in );
@@ -1105,6 +1109,3 @@ buffer_t* yarn_compile( char const* path ) {
     cstr_rollback( str_restore );
     return buffer;
 }
-
-
-
