@@ -86,7 +86,7 @@ void game_init( game_t* game, game_state_t* game_state, yarn_t* yarn, input_t* i
 	int disabled_luma = 65536;
 	
 	int facebg_lumaref = 54 * 0x28 + 182 * 0x28 + 19 * 0x28;
-	int disabled_lumaref = 54 * 0x60 + 182 * 0x60 + 19 * 0x60;
+	int disabled_lumaref = 54 * 0x70 + 182 * 0x70 + 19 * 0x70;
 	for( int i = 0; i < yarn->assets.palette_count; ++i ) {
 		int c = (int)( yarn->assets.palette[ i ] & 0x00ffffff );
 		int r = c & 0xff;
@@ -117,7 +117,7 @@ void game_init( game_t* game, game_state_t* game_state, yarn_t* yarn, input_t* i
     game->current_state = GAMESTATE_NO_CHANGE;
     game->new_state = GAMESTATE_BOOT;
     game->disable_transition = false;
-    game->transition_counter = 15;
+    game->transition_counter = 10;
 	game->screen = screen;
 	game->screen_width = width;
 	game->screen_height = height;
@@ -165,6 +165,10 @@ gamestate_t terminate_update( game_t* ctx );
 
 bool game_update( game_t* game ) {
     if( game->new_state != GAMESTATE_NO_CHANGE ) {
+        if( !game->disable_transition ) {
+            game->transition_counter = -10;
+        }
+        game->disable_transition = false;
         game->current_state = game->new_state;
         gamestate_t new_state = GAMESTATE_NO_CHANGE;
         switch( game->current_state ) {
@@ -192,7 +196,12 @@ bool game_update( game_t* game ) {
         game->new_state = new_state;
         return game->exit_flag;
     }
-
+    if( game->transition_counter < 10 ) {
+        game->transition_counter++;
+    }
+    if( game->transition_counter < 0 ) {
+        return game->exit_flag;
+    }
     gamestate_t new_state = GAMESTATE_NO_CHANGE;
     switch( game->current_state ) {
         case GAMESTATE_NO_CHANGE:
@@ -220,9 +229,6 @@ bool game_update( game_t* game ) {
     return game->exit_flag;
 }
 
-
-
-// helper funcs
 
 void cls( game_t* ctx ) { 
     memset( ctx->screen, ctx->color_background, (size_t) ctx->screen_width * ctx->screen_height ); 
@@ -278,14 +284,6 @@ void wrap_limit( game_t* ctx, pixelfont_t* font, string str, int x, int y, int c
 bool was_key_pressed( game_t* ctx, int key ) { 
     return input_was_key_pressed( ctx->input, key ); 
 }
-
-/*
-bool was_key_released( int key ) { return input_was_key_released( input, key ); }
-bool is_key_down( int key ) { return input_is_key_down( input, key ); }
-int get_character_count() { return input_get_character_count(input); }
-char get_character( int index ) { return input_get_character( input, index ); }
-		
-*/
 
 
 yarn_location_t* find_location( yarn_t* yarn, string location_id ) {

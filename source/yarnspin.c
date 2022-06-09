@@ -135,11 +135,20 @@ int app_proc( app_t* app, void* user_data ) {
             app_screenmode( app, fullscreen ? APP_SCREENMODE_FULLSCREEN : APP_SCREENMODE_WINDOW );
         }
 
+		APP_U32 transition = (APP_U32)( ( 255 * abs( game.transition_counter ) / 10 ) );
+		APP_U32 fade = transition << 16 | transition << 8 | transition;
+		uint32_t bg = yarn->assets.palette[ game.color_background ];
+		#define RGBMUL32( a, b) \
+			( ( ( ( ( ( (a) >> 16U ) & 0xffU ) * ( ( (b) >> 16U ) & 0xffU ) ) >> 8U ) << 16U ) | \
+				( ( ( ( ( (a) >> 8U  ) & 0xffU ) * ( ( (b) >> 8U  ) & 0xffU ) ) >> 8U ) << 8U  ) | \
+				( ( ( ( ( (a)        ) & 0xffU ) * ( ( (b)        ) & 0xffU ) ) >> 8U )        ) )
+		bg = RGBMUL32( fade, bg );		
+
         static uint32_t screen[ 320 * 200 ];
         for( int i = 0; i < 320 * 200; ++i) {
             screen[ i ] = yarn->assets.palette[ canvas[ i ] ];
         }
-        crtemu_pc_present( crtemu, 0, screen, 320, 200, 0xffffff, 0x000000 );
+        crtemu_pc_present( crtemu, 0, screen, 320, 200, fade, bg );
         app_present( app, NULL, 1, 1, 0xffffff, 0x000000 );
     }
 
