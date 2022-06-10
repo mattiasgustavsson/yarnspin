@@ -75,8 +75,8 @@ int app_proc( app_t* app, void* user_data ) {
         // calculate aspect locked width/height
         int scrwidth = displays.displays[ disp ].width - 80;
         int scrheight = displays.displays[ disp ].height - 80;
-        int aspect_width = (int)( ( scrheight * 4.25f ) / 3 );
-        int aspect_height = (int)( ( scrwidth * 3 ) / 4.25f );
+        int aspect_width = (int)( ( scrheight * 17 ) / 10 );
+        int aspect_height = (int)( ( scrwidth * 10 ) / 17 );
         int target_width, target_height;
         if( aspect_height <= scrheight ) {
             target_width = scrwidth;
@@ -118,17 +118,14 @@ int app_proc( app_t* app, void* user_data ) {
     // run game
     input_t input;
     input_init( &input, app );
-    game_state_t game_state;
-    game_state_init( &game_state );
     game_t game;
-    game_init( &game, &game_state, yarn, &input, canvas, 320, 200 );
+    game_init( &game, yarn, &input, canvas, 320, 200 );
 
     // main loop
-    bool exit_flag = false;
-    while( app_yield( app ) != APP_STATE_EXIT_REQUESTED && !exit_flag) {
+    while( app_yield( app ) != APP_STATE_EXIT_REQUESTED && !game.exit_flag ) {
         frametimer_update( frametimer );
         input_update( &input, crtemu );
-        exit_flag = game_update( &game );
+        game_update( &game );
 
         if( input_was_key_pressed( &input, APP_KEY_F11 ) ) {
             fullscreen = !fullscreen;

@@ -770,7 +770,7 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
                 no_error = false;
             }
         } else if( CMP( global->keyword, "alone_text" ) ) {
-            if( global->data->count == 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) >= 0 ) {
+            if( global->data->count == 1 ) {
                 yarn->globals.alone_text = cstr_trim( global->data->items[ 0 ] );
             } else {
 				printf( "%s(%d): invalid alone_text declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );

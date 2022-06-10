@@ -1,23 +1,4 @@
 
-typedef struct game_state_t {
-	int current_location;
-    int current_dialog;
-    int current_image;
-    int logo_index;
-    array(bool)* flags;
-    array(int)* items;
-} game_state_t;	
-
-
-void game_state_init( game_state_t* game_state ) {
-	game_state->current_location = -1;
-    game_state->current_dialog = -1;
-    game_state->current_image = -1;
-    game_state->logo_index = 0;
-    game_state->flags = managed_array( bool );
-    game_state->items = managed_array( int );
-}
-
 
 typedef enum gamestate_t {
     GAMESTATE_NO_CHANGE,
@@ -32,6 +13,7 @@ typedef enum gamestate_t {
 
 typedef struct game_t {
 	bool exit_flag;
+    bool exit_requested;
     gamestate_t current_state;
     gamestate_t new_state;
     bool disable_transition;
@@ -51,7 +33,6 @@ typedef struct game_t {
 	int color_name;
 	int color_facebg;
 	yarn_t* yarn;
-	game_state_t* game_state;
     int queued_location;
     int queued_dialog;
 	pixelfont_t* font_txt;
@@ -66,15 +47,29 @@ typedef struct game_t {
 	    int chr_index;
 	    int enable_options;
     } dialog;
+    struct {
+	    int current_location;
+        int current_dialog;
+        int current_image;
+        int logo_index;
+        array(bool)* flags;
+        array(int)* items;
+    } state;
 } game_t;
 
 
-void game_init( game_t* game, game_state_t* game_state, yarn_t* yarn, input_t* input, uint8_t* screen, int width, int height ) {
-	game_state->current_location = yarn->start_location;
-	game_state->current_dialog = yarn->start_dialog;
+void game_init( game_t* game, yarn_t* yarn, input_t* input, uint8_t* screen, int width, int height ) {
+	game->state.current_location = -1;
+    game->state.current_dialog = -1;
+    game->state.current_image = -1;
+    game->state.logo_index = 0;
+    game->state.flags = managed_array( bool );
+    game->state.items = managed_array( int );
+	game->state.current_location = yarn->start_location;
+	game->state.current_dialog = yarn->start_dialog;
 	for( int i = 0; i < yarn->flag_ids->count; ++i ) {
         bool value = false;
-		array_add( game_state->flags, &value );
+		array_add( game->state.flags, &value );
     }
 	int darkest_index = 0;
 	int darkest_luma = 65536;
@@ -114,6 +109,7 @@ void game_init( game_t* game, game_state_t* game_state, yarn_t* yarn, input_t* i
 	}
 		
 	game->exit_flag = false;
+    game->exit_requested = false;
     game->current_state = GAMESTATE_NO_CHANGE;
     game->new_state = GAMESTATE_BOOT;
     game->disable_transition = false;
@@ -123,7 +119,6 @@ void game_init( game_t* game, game_state_t* game_state, yarn_t* yarn, input_t* i
 	game->screen_height = height;
 	game->input = input;
 	game->yarn = yarn;
-	game->game_state = game_state;
     game->queued_location = -1;
     game->queued_dialog = -1;
 	game->font_txt = yarn->assets.font_description;
@@ -151,21 +146,21 @@ void game_init( game_t* game, game_state_t* game_state, yarn_t* yarn, input_t* i
 }
 
 
-gamestate_t boot_init( game_t* ctx );
-gamestate_t boot_update( game_t* ctx );
-gamestate_t title_init( game_t* ctx );
-gamestate_t title_update( game_t* ctx );
-gamestate_t location_init( game_t* ctx );
-gamestate_t location_update( game_t* ctx );
-gamestate_t dialog_init( game_t* ctx );
-gamestate_t dialog_update( game_t* ctx );
-gamestate_t exit_init( game_t* ctx );
-gamestate_t exit_update( game_t* ctx );
-gamestate_t terminate_init( game_t* ctx );
-gamestate_t terminate_update( game_t* ctx );
+gamestate_t boot_init( game_t* game );
+gamestate_t boot_update( game_t* game );
+gamestate_t title_init( game_t* game );
+gamestate_t title_update( game_t* game );
+gamestate_t location_init( game_t* game );
+gamestate_t location_update( game_t* game );
+gamestate_t dialog_init( game_t* game );
+gamestate_t dialog_update( game_t* game );
+gamestate_t exit_init( game_t* game );
+gamestate_t exit_update( game_t* game );
+gamestate_t terminate_init( game_t* game );
+gamestate_t terminate_update( game_t* game );
 
 
-bool game_update( game_t* game ) {
+void game_update( game_t* game ) {
     if( game->new_state != GAMESTATE_NO_CHANGE ) {
         if( !game->disable_transition ) {
             game->transition_counter = -10;
@@ -196,14 +191,16 @@ bool game_update( game_t* game ) {
                 break;
         }
         game->new_state = new_state;
-        return game->exit_flag;
+        return;
     }
+
     if( game->transition_counter < 10 ) {
         game->transition_counter++;
     }
     if( game->transition_counter < 0 ) {
-        return game->exit_flag;
+        return;
     }
+
     gamestate_t new_state = GAMESTATE_NO_CHANGE;
     switch( game->current_state ) {
         case GAMESTATE_NO_CHANGE:
@@ -228,75 +225,79 @@ bool game_update( game_t* game ) {
             break;
     }
     game->new_state = new_state;
-    return game->exit_flag;
+    if( game->exit_requested ) {
+        game->new_state = GAMESTATE_EXIT;
+        game->disable_transition = true;
+        game->exit_requested = false;
+    }
 }
 
 
-void cls( game_t* ctx ) { 
-    memset( ctx->screen, ctx->color_background, (size_t) ctx->screen_width * ctx->screen_height ); 
+void cls( game_t* game ) { 
+    memset( game->screen, game->color_background, (size_t) game->screen_width * game->screen_height ); 
 }
 
 
-void draw( game_t* ctx, palrle_data_t* bmp, int x, int y ) {
-    palrle_blit( bmp, x, y, ctx->screen, ctx->screen_width, ctx->screen_height );
+void draw( game_t* game, palrle_data_t* bmp, int x, int y ) {
+    palrle_blit( bmp, x, y, game->screen, game->screen_width, game->screen_height );
 }
 
 	
-void box( game_t* ctx, int x, int y, int w, int h, int c ) { 
+void box( game_t* game, int x, int y, int w, int h, int c ) { 
 	for( int iy = 0; iy < h; ++iy ) {
 		for( int ix = 0; ix < w; ++ix ) {
 			int xp = x + ix;
 			int yp = y + iy;
-			if( xp >= 0 && xp < ctx->screen_width && yp >= 0 && yp < ctx->screen_height ) {
-				ctx->screen[ xp + yp * ctx->screen_width ] = (uint8_t) c;
+			if( xp >= 0 && xp < game->screen_width && yp >= 0 && yp < game->screen_height ) {
+				game->screen[ xp + yp * game->screen_width ] = (uint8_t) c;
             }
 		}
 	}
 }
 
 
-pixelfont_bounds_t center( game_t* ctx, pixelfont_t* font, string str, int x, int y, int color ) { 
+pixelfont_bounds_t center( game_t* game, pixelfont_t* font, string str, int x, int y, int color ) { 
     pixelfont_bounds_t bounds;
-    pixelfont_blit( font, x, y, str, (uint8_t)color, ctx->screen, ctx->screen_width, ctx->screen_height, 
+    pixelfont_blit( font, x, y, str, (uint8_t)color, game->screen, game->screen_width, game->screen_height, 
         PIXELFONT_ALIGN_CENTER, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, &bounds );
     return bounds; 
 }
 
 
-pixelfont_bounds_t center_wrap( game_t* ctx, pixelfont_t* font, string str, int x, int y, int color, int wrap_width ) { 
+pixelfont_bounds_t center_wrap( game_t* game, pixelfont_t* font, string str, int x, int y, int color, int wrap_width ) { 
     pixelfont_bounds_t bounds;
     x -= wrap_width / 2;
-    pixelfont_blit( font, x, y, str, (uint8_t)color, ctx->screen, ctx->screen_width, ctx->screen_height, 
+    pixelfont_blit( font, x, y, str, (uint8_t)color, game->screen, game->screen_width, game->screen_height, 
         PIXELFONT_ALIGN_CENTER, wrap_width, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, 
         &bounds );
     return bounds; 
 }
 
 
-pixelfont_bounds_t text( game_t* ctx, pixelfont_t* font, string str, int x, int y, int color ) { 
+pixelfont_bounds_t text( game_t* game, pixelfont_t* font, string str, int x, int y, int color ) { 
     pixelfont_bounds_t bounds;
-    pixelfont_blit( font, x, y, str, (uint8_t)color, ctx->screen, ctx->screen_width, ctx->screen_height, 
+    pixelfont_blit( font, x, y, str, (uint8_t)color, game->screen, game->screen_width, game->screen_height, 
         PIXELFONT_ALIGN_LEFT, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, &bounds );
     return bounds; 
 }
 
 
-void wrap( game_t* ctx, pixelfont_t* font, string str, int x, int y, int color, int wrap_width ) { 
-    pixelfont_blit( font, x, y, str, (uint8_t)color, ctx->screen, ctx->screen_width, ctx->screen_height, 
+void wrap( game_t* game, pixelfont_t* font, string str, int x, int y, int color, int wrap_width ) { 
+    pixelfont_blit( font, x, y, str, (uint8_t)color, game->screen, game->screen_width, game->screen_height, 
         PIXELFONT_ALIGN_LEFT, wrap_width, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, 
         NULL );
 }
 
 
-void wrap_limit( game_t* ctx, pixelfont_t* font, string str, int x, int y, int color, int wrap_width, int limit ) { 
-    pixelfont_blit( font, x, y, str, (uint8_t)color, ctx->screen, ctx->screen_width, ctx->screen_height, 
+void wrap_limit( game_t* game, pixelfont_t* font, string str, int x, int y, int color, int wrap_width, int limit ) { 
+    pixelfont_blit( font, x, y, str, (uint8_t)color, game->screen, game->screen_width, game->screen_height, 
         PIXELFONT_ALIGN_LEFT, wrap_width, 0, 0, limit, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, 
         PIXELFONT_UNDERLINE_OFF, NULL );
 }
 
 
-bool was_key_pressed( game_t* ctx, int key ) { 
-    return input_was_key_pressed( ctx->input, key ); 
+bool was_key_pressed( game_t* game, int key ) { 
+    return input_was_key_pressed( game->input, key ); 
 }
 
 
@@ -322,7 +323,7 @@ yarn_dialog_t* find_dialog( yarn_t* yarn, string dialog_id ) {
 }
 
 
-bool test_cond( game_t* ctx, yarn_cond_t* cond ) {		
+bool test_cond( game_t* game, yarn_cond_t* cond ) {		
 	bool result = true;
 	for( int i = 0; i < cond->ands->count; ++i )		
 		{
@@ -330,7 +331,7 @@ bool test_cond( game_t* ctx, yarn_cond_t* cond ) {
 		yarn_cond_or_t* ors = &cond->ands->items[ i ];
 		for( int j = 0; j < ors->flags->count; ++j ) {
 			yarn_cond_flag_t* flag = &ors->flags->items[ j ];
-			bool flag_val = ctx->game_state->flags->items[ flag->flag_index ];
+			bool flag_val = game->state.flags->items[ flag->flag_index ];
 			if( flag->is_not ) {
                 flag_val = !flag_val;
             }
@@ -342,51 +343,50 @@ bool test_cond( game_t* ctx, yarn_cond_t* cond ) {
 }		
 	
 
-bool do_actions( game_t* ctx, array_param(yarn_act_t)* act_param ) {
+void do_actions( game_t* game, array_param(yarn_act_t)* act_param ) {
     array(yarn_act_t)* act = ARRAY_CAST( act_param );
 	for( int i = 0; i < act->count; ++i ) {
 		yarn_act_t* action = &act->items[ i ];
-		if( !test_cond( ctx, &action->cond ) ) {
+		if( !test_cond( game, &action->cond ) ) {
             continue;
         }
-		game_state_t* state= ctx->game_state;
 		switch( action->type ) {
 			case ACTION_TYPE_GOTO_LOCATION: {
-				ctx->queued_dialog = -1;
-			    ctx->queued_location = action->param_location_index;
+				game->queued_dialog = -1;
+			    game->queued_location = action->param_location_index;
             } break;
 			case ACTION_TYPE_GOTO_DIALOG: {
-				ctx->queued_location = -1;
-				ctx->queued_dialog = action->param_dialog_index;
+				game->queued_location = -1;
+				game->queued_dialog = action->param_dialog_index;
             } break;
 			case ACTION_TYPE_EXIT: {
-				return false;
+				game->exit_requested = true;
             } break;
 			case ACTION_TYPE_FLAG_SET: {
-				state->flags->items[ action->param_flag_index ] = true;
+				game->state.flags->items[ action->param_flag_index ] = true;
             } break;
 			case ACTION_TYPE_FLAG_CLEAR: {
-				state->flags->items[ action->param_flag_index ] = false;
+				game->state.flags->items[ action->param_flag_index ] = false;
             } break;
 			case ACTION_TYPE_FLAG_TOGGLE: {
-				state->flags->items[ action->param_flag_index ] = !state->flags->items[ action->param_flag_index ];
+				game->state.flags->items[ action->param_flag_index ] = !game->state.flags->items[ action->param_flag_index ];
             } break;
 			case ACTION_TYPE_ITEM_GET: {
 				bool found = false;
-				for( int j = 0;  j < state->items->count; ++j ) {
-					if( state->items->items[ j ] == action->param_item_index ) {
+				for( int j = 0;  j < game->state.items->count; ++j ) {
+					if( game->state.items->items[ j ] == action->param_item_index ) {
                         found = true;
                         break;
                     }
 				}
 				if( !found ) {
-                    array_add( state->items, &action->param_item_index );
+                    array_add( game->state.items, &action->param_item_index );
                 }
 			} break;
 			case ACTION_TYPE_ITEM_DROP: {
-				for( int j = 0;  j < state->items->count; ++j ) {
-					if( state->items->items[ j ] == action->param_item_index ) {
-						array_remove( state->items, j );
+				for( int j = 0;  j < game->state.items->count; ++j ) {
+					if( game->state.items->items[ j ] == action->param_item_index ) {
+						array_remove( game->state.items, j );
 						break;
 					}
 				}
@@ -396,19 +396,18 @@ bool do_actions( game_t* ctx, array_param(yarn_act_t)* act_param ) {
             }
 		}		
 	}		
-    return true;
 }
 
 
 // boot
-gamestate_t boot_init( game_t* ctx ) {
-	cls( ctx );
-	ctx->game_state->logo_index = -1;
-	if( ctx->yarn->screen_names->count > 0 ) {
+gamestate_t boot_init( game_t* game ) {
+	cls( game );
+	game->state.logo_index = -1;
+	if( game->yarn->screen_names->count > 0 ) {
 		return GAMESTATE_TITLE;
-    } else if( ctx->game_state->current_location >= 0 ) {
+    } else if( game->state.current_location >= 0 ) {
 		return GAMESTATE_LOCATION;
-    } else if( ctx->game_state->current_dialog >= 0 ) {
+    } else if( game->state.current_dialog >= 0 ) {
 		return GAMESTATE_DIALOG;
     } else {
 		return GAMESTATE_EXIT;
@@ -416,27 +415,27 @@ gamestate_t boot_init( game_t* ctx ) {
 }
 
 
-gamestate_t boot_update( game_t* ctx ) {
-    (void) ctx;
+gamestate_t boot_update( game_t* game ) {
+    (void) game;
     return GAMESTATE_NO_CHANGE;
 }
 
 
 // title
-gamestate_t title_init( game_t* ctx ) {
-	++ctx->game_state->logo_index;
+gamestate_t title_init( game_t* game ) {
+	++game->state.logo_index;
     return GAMESTATE_NO_CHANGE;
 }
 
-gamestate_t title_update( game_t* ctx ) {
-	if( ctx->game_state->logo_index < ctx->yarn->globals.logo_indices->count ) {
-		cls( ctx );
-		palrle_data_t* img = ctx->yarn->assets.bitmaps->items[ ctx->yarn->globals.logo_indices->items[ ctx->game_state->logo_index ] ];
-		draw( ctx, img, 0, 0 );
+gamestate_t title_update( game_t* game ) {
+	if( game->state.logo_index < game->yarn->globals.logo_indices->count ) {
+		cls( game );
+		palrle_data_t* img = game->yarn->assets.bitmaps->items[ game->yarn->globals.logo_indices->items[ game->state.logo_index ] ];
+		draw( game, img, 0, 0 );
 	}
 
-    if( was_key_pressed( ctx, APP_KEY_LBUTTON ) || was_key_pressed( ctx, APP_KEY_SPACE ) || was_key_pressed( ctx, APP_KEY_ESCAPE ) ) {
-		if( ctx->game_state->logo_index < ctx->yarn->globals.logo_indices->count - 1 ) {
+    if( was_key_pressed( game, APP_KEY_LBUTTON ) || was_key_pressed( game, APP_KEY_SPACE ) || was_key_pressed( game, APP_KEY_ESCAPE ) ) {
+		if( game->state.logo_index < game->yarn->globals.logo_indices->count - 1 ) {
 			return GAMESTATE_TITLE;
         } else {
 			return GAMESTATE_LOCATION;
@@ -447,99 +446,97 @@ gamestate_t title_update( game_t* ctx ) {
 
 
 // location
-gamestate_t location_init( game_t* ctx ) {
-    ctx->queued_location = -1;
-    ctx->queued_dialog = -1;
+gamestate_t location_init( game_t* game ) {
+    game->queued_location = -1;
+    game->queued_dialog = -1;
 
-  	yarn_t* yarn = ctx->yarn;		
-	game_state_t* state= ctx->game_state;
-	yarn_location_t* location = &yarn->locations->items[ state->current_location ];
+  	yarn_t* yarn = game->yarn;		
+	yarn_location_t* location = &yarn->locations->items[ game->state.current_location ];
 	
     // act:
-	do_actions( ctx, location->act );
+	do_actions( game, location->act );
     return GAMESTATE_NO_CHANGE;
 }
 				
 
-gamestate_t location_update( game_t* ctx ) {
-    cls( ctx );
+gamestate_t location_update( game_t* game ) {
+    cls( game );
     	
-	yarn_t* yarn = ctx->yarn;		
-	game_state_t* state= ctx->game_state;
+	yarn_t* yarn = game->yarn;		
 		
-	if( state->current_location < 0 && state->current_dialog >= 0 ) {
+	if( game->state.current_location < 0 && game->state.current_dialog >= 0 ) {
 		return GAMESTATE_DIALOG;
 	}
 			
-	if( ctx->game_state->current_location < 0  ) return GAMESTATE_TERMINATE;
+	if( game->state.current_location < 0  ) return GAMESTATE_TERMINATE;
 
-    yarn_location_t* location = &yarn->locations->items[ state->current_location ];
+    yarn_location_t* location = &yarn->locations->items[ game->state.current_location ];
 		
-	int mouse_x = input_get_mouse_x( ctx->input );
-	int mouse_y = input_get_mouse_y( ctx->input );
+	int mouse_x = input_get_mouse_x( game->input );
+	int mouse_y = input_get_mouse_y( game->input );
 
-    if( ctx->queued_dialog >= 0 && ( was_key_pressed( ctx, APP_KEY_LBUTTON ) || was_key_pressed( ctx, APP_KEY_SPACE ) ) ) {
-        state->current_location = -1;
-		if( state->current_dialog >= 0 ) {
-            state->current_dialog = ctx->queued_dialog;
-            ctx->disable_transition = true;
+    if( game->queued_dialog >= 0 && ( was_key_pressed( game, APP_KEY_LBUTTON ) || was_key_pressed( game, APP_KEY_SPACE ) ) ) {
+        game->state.current_location = -1;
+		if( game->state.current_dialog >= 0 ) {
+            game->state.current_dialog = game->queued_dialog;
+            game->disable_transition = true;
 			return GAMESTATE_DIALOG;
         } else {
-            state->current_dialog = ctx->queued_dialog;
+            game->state.current_dialog = game->queued_dialog;
 			return GAMESTATE_DIALOG;
         }
-    } else if( ctx->queued_location >= 0 && ( was_key_pressed( ctx, APP_KEY_LBUTTON ) || was_key_pressed( ctx, APP_KEY_SPACE ) ) ) {
-        state->current_location = ctx->queued_location;
-        state->current_dialog = -1;
+    } else if( game->queued_location >= 0 && ( was_key_pressed( game, APP_KEY_LBUTTON ) || was_key_pressed( game, APP_KEY_SPACE ) ) ) {
+        game->state.current_location = game->queued_location;
+        game->state.current_dialog = -1;
 		return GAMESTATE_LOCATION;
     }
 		
 
     // background_location:
 	if( yarn->globals.background_location >= 0 ) {
-		draw( ctx, yarn->assets.bitmaps->items[ yarn->globals.background_location ], 0, 0 );
+		draw( game, yarn->assets.bitmaps->items[ yarn->globals.background_location ], 0, 0 );
     }
 
 	// img:
     for( int i = 0; i < location->img->count; ++i ) {
-    	if( test_cond( ctx, &location->img->items[ i ].cond ) )  {
-    		ctx->game_state->current_image = location->img->items[ i ].image_index;
+    	if( test_cond( game, &location->img->items[ i ].cond ) )  {
+    		game->state.current_image = location->img->items[ i ].image_index;
         }
     }
-    if( ctx->game_state->current_image >= 0 ) {
-        draw( ctx, yarn->assets.bitmaps->items[ ctx->game_state->current_image ], 64, 4 );
+    if( game->state.current_image >= 0 ) {
+        draw( game, yarn->assets.bitmaps->items[ game->state.current_image ], 64, 4 );
     }
 
 
 	// txt:
 	string txt = "";
     for( int i = 0; i < location->txt->count; ++i ) {
-    	if( !test_cond( ctx, &location->txt->items[ i ].cond ) ) {
+    	if( !test_cond( game, &location->txt->items[ i ].cond ) ) {
             continue;
         }
     	txt = cstr_cat( txt, cstr_cat( location->txt->items[ i ].text, "\n" ) );
     }
-	wrap( ctx, ctx->font_txt, txt, 5, 116, ctx->color_txt, 310 );
+	wrap( game, game->font_txt, txt, 5, 116, game->color_txt, 310 );
 		
 	// opt:
 	int opt = -1;
-	if( ctx->queued_dialog < 0 && ctx->queued_location < 0 ) {
-		if( was_key_pressed( ctx, APP_KEY_1 ) ) opt = 0;
-		if( was_key_pressed( ctx, APP_KEY_2 ) ) opt = 1;
-		if( was_key_pressed( ctx, APP_KEY_3 ) ) opt = 2;
-		if( was_key_pressed( ctx, APP_KEY_4 ) ) opt = 3;
+	if( game->queued_dialog < 0 && game->queued_location < 0 ) {
+		if( was_key_pressed( game, APP_KEY_1 ) ) opt = 0;
+		if( was_key_pressed( game, APP_KEY_2 ) ) opt = 1;
+		if( was_key_pressed( game, APP_KEY_3 ) ) opt = 2;
+		if( was_key_pressed( game, APP_KEY_4 ) ) opt = 3;
 
 		int c = 0;
 		for( int i = 0; i < location->opt->count; ++i ) {
-			if( !test_cond( ctx, &location->opt->items[ i ].cond ) ) {
+			if( !test_cond( game, &location->opt->items[ i ].cond ) ) {
                 continue;
             }
-			int ypos = 161 + ctx->font_opt->height * c;
-			pixelfont_bounds_t b = text( ctx, ctx->font_opt, location->opt->items[ i ].text, 5, ypos, ctx->color_opt );
+			int ypos = 161 + game->font_opt->height * c;
+			pixelfont_bounds_t b = text( game, game->font_opt, location->opt->items[ i ].text, 5, ypos, game->color_opt );
 			if( mouse_y >= ypos && mouse_y < ypos + b.height && mouse_x < 277 ) {
-				box( ctx, 4, ypos, 315, b.height, ctx->color_opt );
-				text( ctx, ctx->font_opt, location->opt->items[ i ].text, 5, ypos, ctx->color_background );
-				if( was_key_pressed( ctx, APP_KEY_LBUTTON ) ) {
+				box( game, 4, ypos, 315, b.height, game->color_opt );
+				text( game, game->font_opt, location->opt->items[ i ].text, 5, ypos, game->color_background );
+				if( was_key_pressed( game, APP_KEY_LBUTTON ) ) {
 					opt = c;
                 }
 			}
@@ -550,29 +547,29 @@ gamestate_t location_update( game_t* ctx ) {
 	// use:
 	int use = -1;
 	int c = 0;
-    for( int i = 0; i < state->items->count; ++i ) {
-    	string usetxt = ctx->yarn->item_ids->items[ state->items->items[ i ] ];
-    	uint8_t color = (uint8_t) ctx->color_disabled;
+    for( int i = 0; i < game->state.items->count; ++i ) {
+    	string usetxt = game->yarn->item_ids->items[ game->state.items->items[ i ] ];
+    	uint8_t color = (uint8_t) game->color_disabled;
     	bool enabled = false;
     	for( int j = 0; j < location->use->count; ++j ) {
-    		if( !test_cond( ctx, &location->use->items[ j ].cond ) ) {
+    		if( !test_cond( game, &location->use->items[ j ].cond ) ) {
                 continue;
             }
     		for( int k = 0; k < location->use->items[ j ].item_indices->count; ++k ) {
-    			if( state->items->items[ i ] == location->use->items[ j ].item_indices->items[ k ] ) {
-		            if( ctx->queued_dialog < 0 && ctx->queued_location < 0 ) {
-    					color = (uint8_t) ctx->color_use;
+    			if( game->state.items->items[ i ] == location->use->items[ j ].item_indices->items[ k ] ) {
+		            if( game->queued_dialog < 0 && game->queued_location < 0 ) {
+    					color = (uint8_t) game->color_use;
     					enabled = true;
     				}
                 }
             }
         }
-    	int ypos = 40 + c * ctx->font_use->height;
-		pixelfont_bounds_t b = center( ctx, ctx->font_use, usetxt, 287, ypos, color );
+    	int ypos = 40 + c * game->font_use->height;
+		pixelfont_bounds_t b = center( game, game->font_use, usetxt, 287, ypos, color );
 		if( enabled && mouse_y >= ypos && mouse_y < ypos + b.height && mouse_x > 259 ) {
-			box( ctx, 260, ypos, 56, b.height, ctx->color_use );
-			center( ctx, ctx->font_use, usetxt, 287, ypos, ctx->color_background );
-			if( was_key_pressed( ctx, APP_KEY_LBUTTON ) ) {
+			box( game, 260, ypos, 56, b.height, game->color_use );
+			center( game, game->font_use, usetxt, 287, ypos, game->color_background );
+			if( was_key_pressed( game, APP_KEY_LBUTTON ) ) {
 				use = c;
             }
 		}
@@ -583,21 +580,21 @@ gamestate_t location_update( game_t* ctx ) {
 	int chr = -1;
 	c = 0;
     for( int i = 0; i < location->chr->count; ++i ) {
-    	if( !test_cond( ctx, &location->chr->items[ i ].cond ) ) {
+    	if( !test_cond( game, &location->chr->items[ i ].cond ) ) {
             continue;
         }
-    	int ypos = 40 + c * ctx->font_chr->height;
-        int color = ctx->color_chr;
-        if( ctx->queued_dialog >= 0 || ctx->queued_location >= 0 ) {
-            color = ctx->color_disabled;
+    	int ypos = 40 + c * game->font_chr->height;
+        int color = game->color_chr;
+        if( game->queued_dialog >= 0 || game->queued_location >= 0 ) {
+            color = game->color_disabled;
         }
 
-		pixelfont_bounds_t b = center( ctx,  ctx->font_chr, ctx->yarn->characters->items[ location->chr->items[ i ].chr_indices->items[ 0 ] ].short_name, 32, ypos, color );
-    	if( ctx->queued_dialog < 0 && ctx->queued_location < 0 ) {
+		pixelfont_bounds_t b = center( game,  game->font_chr, game->yarn->characters->items[ location->chr->items[ i ].chr_indices->items[ 0 ] ].short_name, 32, ypos, color );
+    	if( game->queued_dialog < 0 && game->queued_location < 0 ) {
 			if( mouse_y >= ypos && mouse_y < ypos + b.height && mouse_x < 60 ) {
-				box( ctx, 4, ypos, 56, b.height, ctx->color_chr );
-				center( ctx,  ctx->font_chr, ctx->yarn->characters->items[ location->chr->items[ i ].chr_indices->items[ 0 ] ].short_name, 32, ypos, ctx->color_background );
-				if( was_key_pressed( ctx, APP_KEY_LBUTTON ) ) {
+				box( game, 4, ypos, 56, b.height, game->color_chr );
+				center( game,  game->font_chr, game->yarn->characters->items[ location->chr->items[ i ].chr_indices->items[ 0 ] ].short_name, 32, ypos, game->color_background );
+				if( was_key_pressed( game, APP_KEY_LBUTTON ) ) {
 					chr = c;
                 }
 			}
@@ -605,65 +602,65 @@ gamestate_t location_update( game_t* ctx ) {
         ++c;
     }
     if( c == 0 ) {
-		center_wrap( ctx,  ctx->font_chr, yarn->globals.alone_text, 32, 40, ctx->color_disabled, 56 );
+		center_wrap( game,  game->font_chr, yarn->globals.alone_text, 32, 40, game->color_disabled, 56 );
     }
 
 
-    if( was_key_pressed( ctx, APP_KEY_ESCAPE ) ) {
+    if( was_key_pressed( game, APP_KEY_ESCAPE ) ) {
         return GAMESTATE_TERMINATE;
     }
 
-	if( ctx->queued_dialog < 0 && ctx->queued_location < 0 ) {
+	if( game->queued_dialog < 0 && game->queued_location < 0 ) {
 		c = 0;
 		for( int i = 0; i < location->opt->count; ++i ) {
-			if( !test_cond( ctx, &location->opt->items[ i ].cond ) ) {
+			if( !test_cond( game, &location->opt->items[ i ].cond ) ) {
                 continue;
             }
 			if( c == opt ) {
-                do_actions( ctx, location->opt->items[ i ].act );
+                do_actions( game, location->opt->items[ i ].act );
             }
 			++c;
 		}
 			
 		c = 0;
 		for( int i = 0; i < location->chr->count; ++i ) {
-			if( !test_cond( ctx, &location->chr->items[ i ].cond ) ) {
+			if( !test_cond( game, &location->chr->items[ i ].cond ) ) {
                 continue;
             }
 			if( c == chr ) {
-                do_actions( ctx, location->chr->items[ i ].act );
+                do_actions( game, location->chr->items[ i ].act );
             }
 			++c;
 		}
 
-    	for( int i = 0; i < state->items->count; ++i ) {
+    	for( int i = 0; i < game->state.items->count; ++i ) {
     		for( int j = 0; j < location->use->count; ++j ) {
-    			if( !test_cond( ctx, &location->use->items[ j ].cond ) ) {
+    			if( !test_cond( game, &location->use->items[ j ].cond ) ) {
                     continue;
                 }
     			for( int k = 0; k < location->use->items[ j ].item_indices->count; ++k ) {
-    				if( state->items->items[ i ] == location->use->items[ j ].item_indices->items[ k ] ) {
+    				if( game->state.items->items[ i ] == location->use->items[ j ].item_indices->items[ k ] ) {
     					if( i == use ) {
-                            do_actions( ctx, location->use->items[ j ].act );
+                            do_actions( game, location->use->items[ j ].act );
                         }
     				}
                 }
     		}
 		}
 
-        if( ctx->queued_dialog >= 0 ) {
-            state->current_location = -1;
-		    if( state->current_dialog >= 0 ) {
-                state->current_dialog = ctx->queued_dialog;
-                ctx->disable_transition = true;
+        if( game->queued_dialog >= 0 ) {
+            game->state.current_location = -1;
+		    if( game->state.current_dialog >= 0 ) {
+                game->state.current_dialog = game->queued_dialog;
+                game->disable_transition = true;
 			    return GAMESTATE_DIALOG;
             } else {
-                state->current_dialog = ctx->queued_dialog;
+                game->state.current_dialog = game->queued_dialog;
 			    return GAMESTATE_DIALOG;
             }
-        } else if( ctx->queued_location >= 0 ) {
-            state->current_location = ctx->queued_location;
-            state->current_dialog = -1;
+        } else if( game->queued_location >= 0 ) {
+            game->state.current_location = game->queued_location;
+            game->state.current_dialog = -1;
 			return GAMESTATE_LOCATION;
         }
 	}
@@ -673,32 +670,31 @@ gamestate_t location_update( game_t* ctx ) {
 
 
 // dialog
-gamestate_t dialog_init( game_t* ctx ) {
-    ctx->queued_location = -1;
-    ctx->queued_dialog = -1;
+gamestate_t dialog_init( game_t* game ) {
+    game->queued_location = -1;
+    game->queued_dialog = -1;
 
-    ctx->dialog.limit = 0.0f;
-	ctx->dialog.phrase_index = 0;
-	ctx->dialog.phrase_len = -1;
-    ctx->dialog.chr_index = -1;
-    ctx->dialog.enable_options = 0;
+    game->dialog.limit = 0.0f;
+	game->dialog.phrase_index = 0;
+	game->dialog.phrase_len = -1;
+    game->dialog.chr_index = -1;
+    game->dialog.enable_options = 0;
 
-	yarn_t* yarn = ctx->yarn;		
-	game_state_t* state= ctx->game_state;
-	yarn_dialog_t* dialog = &yarn->dialogs->items[ state->current_dialog ];
+	yarn_t* yarn = game->yarn;		
+	yarn_dialog_t* dialog = &yarn->dialogs->items[ game->state.current_dialog ];
 
 	// act:
-	do_actions( ctx, dialog->act );
+	do_actions( game, dialog->act );
 
     for( int i = 0; i < dialog->phrase->count; ++i ) {
-    	if( !test_cond( ctx, &dialog->phrase->items[ i ].cond ) ) {
+    	if( !test_cond( game, &dialog->phrase->items[ i ].cond ) ) {
             continue;
         }
-    	if( ctx->dialog.phrase_len < 0 ) {
-            ctx->dialog.phrase_len = (int) cstr_len( dialog->phrase->items[ i ].text );
+    	if( game->dialog.phrase_len < 0 ) {
+            game->dialog.phrase_len = (int) cstr_len( dialog->phrase->items[ i ].text );
         }
 		if( dialog->phrase->items[ i ].character_index >= 0 ) {
-			ctx->dialog.chr_index = dialog->phrase->items[ i ].character_index;
+			game->dialog.chr_index = dialog->phrase->items[ i ].character_index;
 			break;
 		}
 	}
@@ -707,94 +703,92 @@ gamestate_t dialog_init( game_t* ctx ) {
 }
 		
 
-gamestate_t dialog_update( game_t* ctx ) {
-	if( ctx->game_state->current_dialog < 0 ) {
+gamestate_t dialog_update( game_t* game ) {
+	if( game->state.current_dialog < 0 ) {
         return GAMESTATE_TERMINATE;
     }
 
-    cls( ctx );
-	yarn_t* yarn = ctx->yarn;		
-	game_state_t* state= ctx->game_state;
+    cls( game );
+	yarn_t* yarn = game->yarn;		
+	yarn_dialog_t* dialog = &yarn->dialogs->items[ game->state.current_dialog ];
 
-	yarn_dialog_t* dialog = &yarn->dialogs->items[ state->current_dialog ];
-
-	int mouse_x = input_get_mouse_x( ctx->input );
-	int mouse_y = input_get_mouse_y( ctx->input );
+	int mouse_x = input_get_mouse_x( game->input );
+	int mouse_y = input_get_mouse_y( game->input );
 		
 		
 	// background_dialog:
 	if( yarn->globals.background_dialog >= 0 ) {
-		draw( ctx, ctx->yarn->assets.bitmaps->items[ yarn->globals.background_dialog ], 0, 0 );
+		draw( game, game->yarn->assets.bitmaps->items[ yarn->globals.background_dialog ], 0, 0 );
     }
 			
 	// phrase:
 	int phrase_count = 0;
     for( int i = 0; i < dialog->phrase->count; ++i ) {
-    	if( !test_cond( ctx, &dialog->phrase->items[ i ].cond ) ) {
+    	if( !test_cond( game, &dialog->phrase->items[ i ].cond ) ) {
             continue;
         }
-    	if( phrase_count == ctx->dialog.phrase_index ) {
+    	if( phrase_count == game->dialog.phrase_index ) {
     		string txt = dialog->phrase->items[ i ].text;
     		if( dialog->phrase->items[ i ].character_index >= 0 ) {
-    			ctx->dialog.chr_index = dialog->phrase->items[ i ].character_index;
+    			game->dialog.chr_index = dialog->phrase->items[ i ].character_index;
             }
-    		ctx->dialog.phrase_len = (int) cstr_len( txt );
+    		game->dialog.phrase_len = (int) cstr_len( txt );
     		if( dialog->phrase->items[ i ].character_index >= 0 ) {
-    			wrap_limit( ctx, ctx->font_txt, txt, 5, 116, ctx->color_txt, 310, (int)ctx->dialog.limit );
+    			wrap_limit( game, game->font_txt, txt, 5, 116, game->color_txt, 310, (int)game->dialog.limit );
             } else {
-				wrap_limit( ctx, ctx->font_opt, txt, 5, 161, ctx->color_txt, 310, (int)ctx->dialog.limit );
+				wrap_limit( game, game->font_opt, txt, 5, 161, game->color_txt, 310, (int)game->dialog.limit );
             }
     	}
 		++phrase_count;
     }
-	ctx->dialog.limit += 1.0f;
-    if( ctx->dialog.limit > ctx->dialog.phrase_len && ( was_key_pressed( ctx, APP_KEY_LBUTTON) || was_key_pressed( ctx, APP_KEY_SPACE ) ) ) { 
-    	if( ctx->dialog.phrase_index < phrase_count - 1 ) {
-    		++ctx->dialog.phrase_index; 
-    		ctx->dialog.limit = 0; 
-		} else if( ctx->dialog.enable_options == 0 ) {
-			ctx->dialog.enable_options = 1;
+	game->dialog.limit += 1.0f;
+    if( game->dialog.limit > game->dialog.phrase_len && ( was_key_pressed( game, APP_KEY_LBUTTON) || was_key_pressed( game, APP_KEY_SPACE ) ) ) { 
+    	if( game->dialog.phrase_index < phrase_count - 1 ) {
+    		++game->dialog.phrase_index; 
+    		game->dialog.limit = 0; 
+		} else if( game->dialog.enable_options == 0 ) {
+			game->dialog.enable_options = 1;
 		}
-    } else if( was_key_pressed( ctx, APP_KEY_LBUTTON) || was_key_pressed( ctx, APP_KEY_SPACE ) )  {
-    	ctx->dialog.limit = (float) ctx->dialog.phrase_len;
-        ctx->dialog.enable_options = 0;
+    } else if( was_key_pressed( game, APP_KEY_LBUTTON) || was_key_pressed( game, APP_KEY_SPACE ) )  {
+    	game->dialog.limit = (float) game->dialog.phrase_len;
+        game->dialog.enable_options = 0;
     }
 
-    if( ctx->dialog.enable_options == 1 && !was_key_pressed( ctx, APP_KEY_LBUTTON ) && !was_key_pressed( ctx, APP_KEY_SPACE ) ) {
-        ctx->dialog.enable_options = 2;
+    if( game->dialog.enable_options == 1 && !was_key_pressed( game, APP_KEY_LBUTTON ) && !was_key_pressed( game, APP_KEY_SPACE ) ) {
+        game->dialog.enable_options = 2;
 	}	
 
-    if( ctx->dialog.chr_index >= 0 ) {
-    	yarn_character_t* character = &ctx->yarn->characters->items[ ctx->dialog.chr_index ];
-		center( ctx, ctx->font_name, character->name, 160, 4, ctx->color_name );
+    if( game->dialog.chr_index >= 0 ) {
+    	yarn_character_t* character = &game->yarn->characters->items[ game->dialog.chr_index ];
+		center( game, game->font_name, character->name, 160, 4, game->color_name );
 		if( character->face_index >= 0 ) {
-			box( ctx, 115, 17, 90, 90, ctx->color_facebg );
-			draw( ctx, ctx->yarn->assets.bitmaps->items[ character->face_index ], 115, 17 );
+			box( game, 115, 17, 90, 90, game->color_facebg );
+			draw( game, game->yarn->assets.bitmaps->items[ character->face_index ], 115, 17 );
 		}
 	}
 			
 	// say:
 	int say = -1;
-    if( ctx->dialog.enable_options == 2 ) {
-		if( ctx->queued_dialog < 0 && ctx->queued_location < 0 ) {
-			if( was_key_pressed( ctx, APP_KEY_1 ) ) say = 0;
-			if( was_key_pressed( ctx, APP_KEY_2 ) ) say = 1;
-			if( was_key_pressed( ctx, APP_KEY_3 ) ) say = 2;
-			if( was_key_pressed( ctx, APP_KEY_4 ) ) say = 3;
+    if( game->dialog.enable_options == 2 ) {
+		if( game->queued_dialog < 0 && game->queued_location < 0 ) {
+			if( was_key_pressed( game, APP_KEY_1 ) ) say = 0;
+			if( was_key_pressed( game, APP_KEY_2 ) ) say = 1;
+			if( was_key_pressed( game, APP_KEY_3 ) ) say = 2;
+			if( was_key_pressed( game, APP_KEY_4 ) ) say = 3;
         }
 
 		int c = 0;
 		for( int i = 0; i < dialog->say->count; ++i ) {
-			if( !test_cond( ctx, &dialog->say->items[ i ].cond ) ) {
+			if( !test_cond( game, &dialog->say->items[ i ].cond ) ) {
                 continue;
             }
-			int ypos = 161 + ctx->font_opt->height * c;
-			pixelfont_bounds_t b = text( ctx, ctx->font_opt, dialog->say->items[ i ].text, 5, ypos, ctx->color_opt );
-    		if( ctx->queued_dialog < 0 && ctx->queued_location < 0 ) {
+			int ypos = 161 + game->font_opt->height * c;
+			pixelfont_bounds_t b = text( game, game->font_opt, dialog->say->items[ i ].text, 5, ypos, game->color_opt );
+    		if( game->queued_dialog < 0 && game->queued_location < 0 ) {
 				if( mouse_y >= ypos && mouse_y < ypos + b.height && mouse_x < 277 ) {
-					box( ctx, 4, ypos, 315, b.height, ctx->color_opt );
-					text( ctx, ctx->font_opt, dialog->say->items[ i ].text, 5, ypos, ctx->color_background );
-					if( was_key_pressed( ctx, APP_KEY_LBUTTON ) ) {
+					box( game, 4, ypos, 315, b.height, game->color_opt );
+					text( game, game->font_opt, dialog->say->items[ i ].text, 5, ypos, game->color_background );
+					if( was_key_pressed( game, APP_KEY_LBUTTON ) ) {
 						say = c;
                     }
 				}
@@ -806,31 +800,31 @@ gamestate_t dialog_update( game_t* ctx ) {
 	// use:
 	int use = -1;
 	int c = 0;
-    for( int i = 0; i < state->items->count; ++i ) {
-    	string txt = ctx->yarn->item_ids->items[ state->items->items[ i ] ];
-    	uint8_t color = (uint8_t) ctx->color_disabled;
+    for( int i = 0; i < game->state.items->count; ++i ) {
+    	string txt = game->yarn->item_ids->items[ game->state.items->items[ i ] ];
+    	uint8_t color = (uint8_t) game->color_disabled;
     	bool enabled = false;
     	for( int j = 0; j < dialog->use->count; ++j ) {
-    		if( !test_cond( ctx, &dialog->use->items[ j ].cond ) ) {
+    		if( !test_cond( game, &dialog->use->items[ j ].cond ) ) {
                 continue;
             }
     		for( int k = 0; k < dialog->use->items[ j ].item_indices->count; ++k ) {
-    			if( state->items->items[ i ] == dialog->use->items[ j ].item_indices->items[ k ] ) {
-    				if( ctx->dialog.enable_options == 2 ) {
-		                if( ctx->queued_dialog < 0 && ctx->queued_location < 0 ) {
-    						color = (uint8_t) ctx->color_use;
+    			if( game->state.items->items[ i ] == dialog->use->items[ j ].item_indices->items[ k ] ) {
+    				if( game->dialog.enable_options == 2 ) {
+		                if( game->queued_dialog < 0 && game->queued_location < 0 ) {
+    						color = (uint8_t) game->color_use;
     						enabled = true;
                         }
     				}
     			}
             }
     	}
-    	int ypos = 40 + c * ctx->font_use->height;
-		pixelfont_bounds_t b = center( ctx, ctx->font_use, txt, 287, ypos, color );
+    	int ypos = 40 + c * game->font_use->height;
+		pixelfont_bounds_t b = center( game, game->font_use, txt, 287, ypos, color );
 		if( enabled && mouse_y >= ypos && mouse_y < ypos + b.height && mouse_x > 259 ) {
-			box( ctx, 260, ypos, 56, b.height, ctx->color_use );
-			center( ctx, ctx->font_use, txt, 287, ypos, ctx->color_background );
-			if( was_key_pressed( ctx, APP_KEY_LBUTTON ) ) {
+			box( game, 260, ypos, 56, b.height, game->color_use );
+			center( game, game->font_use, txt, 287, ypos, game->color_background );
+			if( was_key_pressed( game, APP_KEY_LBUTTON ) ) {
 				use = c;
             }
 		}
@@ -838,68 +832,68 @@ gamestate_t dialog_update( game_t* ctx ) {
     }
 
 
-	if( was_key_pressed( ctx, APP_KEY_ESCAPE ) ) {
+	if( was_key_pressed( game, APP_KEY_ESCAPE ) ) {
         return GAMESTATE_TERMINATE;
     }
 
-    if( ctx->queued_dialog >= 0 && ctx->dialog.enable_options == 2  ) {
-        state->current_location = -1;
-		if( state->current_dialog >= 0 ) {
-            state->current_dialog = ctx->queued_dialog;
-			ctx->disable_transition = true;
+    if( game->queued_dialog >= 0 && game->dialog.enable_options == 2  ) {
+        game->state.current_location = -1;
+		if( game->state.current_dialog >= 0 ) {
+            game->state.current_dialog = game->queued_dialog;
+			game->disable_transition = true;
             return GAMESTATE_DIALOG;
         } else {
-            state->current_dialog = ctx->queued_dialog;
+            game->state.current_dialog = game->queued_dialog;
             return GAMESTATE_DIALOG;
         }
     }
-    else if( ctx->queued_location >= 0 && ctx->dialog.enable_options == 2  ) {
-        state->current_location = ctx->queued_location;
-        state->current_dialog = -1;
+    else if( game->queued_location >= 0 && game->dialog.enable_options == 2  ) {
+        game->state.current_location = game->queued_location;
+        game->state.current_dialog = -1;
         return GAMESTATE_LOCATION;
     }
 
-    if( ctx->dialog.enable_options == 2 ) {
+    if( game->dialog.enable_options == 2 ) {
 
-		if( ctx->queued_dialog < 0 && ctx->queued_location < 0 ) {
+		if( game->queued_dialog < 0 && game->queued_location < 0 ) {
 		    c = 0;
 		    for( int i = 0; i < dialog->say->count; ++i ) {
-			    if( !test_cond( ctx, &dialog->say->items[ i ].cond ) ) {
+			    if( !test_cond( game, &dialog->say->items[ i ].cond ) ) {
                     continue;
                 }
 			    if( c == say ) {
-                    do_actions( ctx, dialog->say->items[ i ].act );
+                    do_actions( game, dialog->say->items[ i ].act );
                 }
 			    ++c;
 			}
 			
-    	    for( int i = 0; i < state->items->count; ++i ) {
+    	    for( int i = 0; i < game->state.items->count; ++i ) {
     		    for( int j = 0; j < dialog->use->count; ++j ) {
-    			    if( !test_cond( ctx, &dialog->use->items[ j ].cond ) ) {
+    			    if( !test_cond( game, &dialog->use->items[ j ].cond ) ) {
                         continue;
                     }
     			    for( int k = 0; k < dialog->use->items[ j ].item_indices->count; ++k ) {
-    				    if( state->items->items[ i ] == dialog->use->items[ j ].item_indices->items[ k ] ) {
+    				    if( game->state.items->items[ i ] == dialog->use->items[ j ].item_indices->items[ k ] ) {
     					    if( i == use ) {
-                                do_actions( ctx, dialog->use->items[ j ].act );
+                                do_actions( game, dialog->use->items[ j ].act );
                             }
     					}
     			    }
 			    }
             }
-            if( ctx->queued_dialog >= 0 ) {
-                state->current_location = -1;
-		        if( state->current_dialog >= 0 ) {
-                    state->current_dialog = ctx->queued_dialog;
-			        ctx->disable_transition = true;
+            if( game->queued_dialog >= 0 ) {
+                game->state.current_location = -1;
+		        if( game->state.current_dialog >= 0 ) {
+                    game->state.current_dialog = game->queued_dialog;
+			        game->disable_transition = true;
                     return GAMESTATE_DIALOG;
                 } else {
-                    state->current_dialog = ctx->queued_dialog;
+                    game->state.current_dialog = game->queued_dialog;
                     return GAMESTATE_DIALOG;
                 }
-            } else if( ctx->queued_location >= 0 ) {
-                state->current_location = ctx->queued_location;
-                state->current_dialog = -1;
+            } else if( game->queued_location >= 0 ) {
+                game->state.current_location = game->queued_location;
+                game->state.current_dialog = -1;
                 return GAMESTATE_LOCATION;
             }
 		}
@@ -910,27 +904,27 @@ gamestate_t dialog_update( game_t* ctx ) {
 }
 
 
-gamestate_t exit_init( game_t* ctx ) {
-    (void) ctx;
+gamestate_t exit_init( game_t* game ) {
+    (void) game;
     return GAMESTATE_NO_CHANGE;
 }
 
 
-gamestate_t exit_update( game_t* ctx ) {
-	if( was_key_pressed( ctx, APP_KEY_LBUTTON ) || was_key_pressed( ctx, APP_KEY_SPACE ) || was_key_pressed( ctx, APP_KEY_ESCAPE ) ) {
+gamestate_t exit_update( game_t* game ) {
+	if( was_key_pressed( game, APP_KEY_LBUTTON ) || was_key_pressed( game, APP_KEY_SPACE ) || was_key_pressed( game, APP_KEY_ESCAPE ) ) {
 		return GAMESTATE_TERMINATE;
     }
     return GAMESTATE_NO_CHANGE;
 }
 
 
-gamestate_t terminate_init( game_t* ctx ) {
-    ctx->exit_flag = true;
+gamestate_t terminate_init( game_t* game ) {
+    (void) game;
     return GAMESTATE_NO_CHANGE;
 }
 
 
-gamestate_t terminate_update( game_t* ctx ) {
-    (void) ctx;
+gamestate_t terminate_update( game_t* game ) {
+    game->exit_flag = true;
     return GAMESTATE_NO_CHANGE;
 }
