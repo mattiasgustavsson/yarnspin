@@ -1073,7 +1073,7 @@ buffer_t* yarn_compile( char const* path ) {
 
     for( int i = 0; i < yarn.screen_names->count; ++i ) {
         string_id screen_name = yarn.screen_names->items[ i ];
-        palrle_data_t* bitmap = manage_palrle( convert_bitmap( screen_name, 320, 200, yarn.globals.palette, palette ) );
+        palrle_data_t* bitmap = manage_palrle( convert_bitmap( screen_name, 320, 240, yarn.globals.palette, palette ) );
         array_add( yarn.assets.bitmaps, &bitmap );
         if( !bitmap ) {
 			printf( "Failed to load image: %s\n", screen_name );
@@ -1083,7 +1083,7 @@ buffer_t* yarn_compile( char const* path ) {
     }
     for( int i = 0; i < yarn.image_names->count; ++i ) {
         string_id image_name = yarn.image_names->items[ i ];
-        palrle_data_t* bitmap = manage_palrle( convert_bitmap( image_name, 192, 108, yarn.globals.palette, palette ) );
+        palrle_data_t* bitmap = manage_palrle( convert_bitmap( image_name, 192, 128, yarn.globals.palette, palette ) );
         array_add( yarn.assets.bitmaps, &bitmap );
         if( !bitmap ) {
 			printf( "Failed to load image: %s\n", image_name );

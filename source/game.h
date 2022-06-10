@@ -504,7 +504,7 @@ gamestate_t location_update( game_t* game ) {
         }
     }
     if( game->state.current_image >= 0 ) {
-        draw( game, yarn->assets.bitmaps->items[ game->state.current_image ], 64, 4 );
+        draw( game, yarn->assets.bitmaps->items[ game->state.current_image ], 64, 10 );
     }
 
 
@@ -516,7 +516,7 @@ gamestate_t location_update( game_t* game ) {
         }
     	txt = cstr_cat( txt, cstr_cat( location->txt->items[ i ].text, "\n" ) );
     }
-	wrap( game, game->font_txt, txt, 5, 116, game->color_txt, 310 );
+	wrap( game, game->font_txt, txt, 5, 146, game->color_txt, 310 );
 		
 	// opt:
 	int opt = -1;
@@ -531,7 +531,7 @@ gamestate_t location_update( game_t* game ) {
 			if( !test_cond( game, &location->opt->items[ i ].cond ) ) {
                 continue;
             }
-			int ypos = 161 + game->font_opt->height * c;
+			int ypos = 200 + game->font_opt->height * c;
 			pixelfont_bounds_t b = text( game, game->font_opt, location->opt->items[ i ].text, 5, ypos, game->color_opt );
 			if( mouse_y >= ypos && mouse_y < ypos + b.height && mouse_x < 277 ) {
 				box( game, 4, ypos, 315, b.height, game->color_opt );
@@ -564,7 +564,7 @@ gamestate_t location_update( game_t* game ) {
                 }
             }
         }
-    	int ypos = 40 + c * game->font_use->height;
+    	int ypos = 50 + c * game->font_use->height;
 		pixelfont_bounds_t b = center( game, game->font_use, usetxt, 287, ypos, color );
 		if( enabled && mouse_y >= ypos && mouse_y < ypos + b.height && mouse_x > 259 ) {
 			box( game, 260, ypos, 56, b.height, game->color_use );
@@ -583,7 +583,7 @@ gamestate_t location_update( game_t* game ) {
     	if( !test_cond( game, &location->chr->items[ i ].cond ) ) {
             continue;
         }
-    	int ypos = 40 + c * game->font_chr->height;
+    	int ypos = 50 + c * game->font_chr->height;
         int color = game->color_chr;
         if( game->queued_dialog >= 0 || game->queued_location >= 0 ) {
             color = game->color_disabled;
@@ -734,9 +734,9 @@ gamestate_t dialog_update( game_t* game ) {
             }
     		game->dialog.phrase_len = (int) cstr_len( txt );
     		if( dialog->phrase->items[ i ].character_index >= 0 ) {
-    			wrap_limit( game, game->font_txt, txt, 5, 116, game->color_txt, 310, (int)game->dialog.limit );
+    			wrap_limit( game, game->font_txt, txt, 5, 136, game->color_txt, 310, (int)game->dialog.limit );
             } else {
-				wrap_limit( game, game->font_opt, txt, 5, 161, game->color_txt, 310, (int)game->dialog.limit );
+				wrap_limit( game, game->font_opt, txt, 5, 191, game->color_txt, 310, (int)game->dialog.limit );
             }
     	}
 		++phrase_count;
@@ -760,10 +760,10 @@ gamestate_t dialog_update( game_t* game ) {
 
     if( game->dialog.chr_index >= 0 ) {
     	yarn_character_t* character = &game->yarn->characters->items[ game->dialog.chr_index ];
-		center( game, game->font_name, character->name, 160, 4, game->color_name );
+		center( game, game->font_name, character->name, 160, 10, game->color_name );
 		if( character->face_index >= 0 ) {
-			box( game, 115, 17, 90, 90, game->color_facebg );
-			draw( game, game->yarn->assets.bitmaps->items[ character->face_index ], 115, 17 );
+			box( game, 115, 26, 90, 90, game->color_facebg );
+			draw( game, game->yarn->assets.bitmaps->items[ character->face_index ], 115, 26 );
 		}
 	}
 			
@@ -782,7 +782,7 @@ gamestate_t dialog_update( game_t* game ) {
 			if( !test_cond( game, &dialog->say->items[ i ].cond ) ) {
                 continue;
             }
-			int ypos = 161 + game->font_opt->height * c;
+			int ypos = 200 + game->font_opt->height * c;
 			pixelfont_bounds_t b = text( game, game->font_opt, dialog->say->items[ i ].text, 5, ypos, game->color_opt );
     		if( game->queued_dialog < 0 && game->queued_location < 0 ) {
 				if( mouse_y >= ypos && mouse_y < ypos + b.height && mouse_x < 277 ) {
@@ -819,7 +819,7 @@ gamestate_t dialog_update( game_t* game ) {
     			}
             }
     	}
-    	int ypos = 40 + c * game->font_use->height;
+    	int ypos = 50 + c * game->font_use->height;
 		pixelfont_bounds_t b = center( game, game->font_use, txt, 287, ypos, color );
 		if( enabled && mouse_y >= ypos && mouse_y < ypos + b.height && mouse_x > 259 ) {
 			box( game, 260, ypos, 56, b.height, game->color_use );

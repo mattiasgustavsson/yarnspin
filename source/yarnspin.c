@@ -75,8 +75,8 @@ int app_proc( app_t* app, void* user_data ) {
         // calculate aspect locked width/height
         int scrwidth = displays.displays[ disp ].width - 80;
         int scrheight = displays.displays[ disp ].height - 80;
-        int aspect_width = (int)( ( scrheight * 17 ) / 10 );
-        int aspect_height = (int)( ( scrwidth * 10 ) / 17 );
+        int aspect_width = (int)( ( scrheight * 4.25f ) / 3 );
+        int aspect_height = (int)( ( scrwidth * 3 ) / 4.25f );
         int target_width, target_height;
         if( aspect_height <= scrheight ) {
             target_width = scrwidth;
@@ -112,14 +112,14 @@ int app_proc( app_t* app, void* user_data ) {
     frametimer_t* frametimer = frametimer_create( NULL );
     frametimer_lock_rate( frametimer, 60 );
 
-    static uint8_t canvas[ 320 * 200 ];
+    static uint8_t canvas[ 320 * 240 ];
     memset( canvas, 0, sizeof( canvas) );
 
     // run game
     input_t input;
     input_init( &input, app );
     game_t game;
-    game_init( &game, yarn, &input, canvas, 320, 200 );
+    game_init( &game, yarn, &input, canvas, 320, 240 );
 
     // main loop
     while( app_yield( app ) != APP_STATE_EXIT_REQUESTED && !game.exit_flag ) {
@@ -141,11 +141,11 @@ int app_proc( app_t* app, void* user_data ) {
 				( ( ( ( ( (a)        ) & 0xffU ) * ( ( (b)        ) & 0xffU ) ) >> 8U )        ) )
 		bg = RGBMUL32( fade, bg );		
 
-        static uint32_t screen[ 320 * 200 ];
-        for( int i = 0; i < 320 * 200; ++i) {
+        static uint32_t screen[ 320 * 240 ];
+        for( int i = 0; i < 320 * 240; ++i) {
             screen[ i ] = yarn->assets.palette[ canvas[ i ] ];
         }
-        crtemu_pc_present( crtemu, 0, screen, 320, 200, fade, bg );
+        crtemu_pc_present( crtemu, 0, screen, 320, 240, fade, bg );
         app_present( app, NULL, 1, 1, 0xffffff, 0x000000 );
     }
 

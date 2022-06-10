@@ -29,11 +29,11 @@ void input_update(  struct input_t* input, crtemu_pc_t* crtemu ) {
 			input->mouse_x_ = in.events[ i ].data.mouse_pos.x;
 			input->mouse_y_ = in.events[ i ].data.mouse_pos.y;
             if( crtemu ) {
-                crtemu_pc_coordinates_window_to_bitmap( crtemu, /*384*/320, /*288*/200, &input->mouse_x_, &input->mouse_y_ );
+                crtemu_pc_coordinates_window_to_bitmap( crtemu, /*384*/320, /*288*/240, &input->mouse_x_, &input->mouse_y_ );
                 //mouse_x_ -= 32;
                 //mouse_y_ -= 44;
             } else {
-				app_coordinates_window_to_bitmap( input->app_, 320, 200, &input->mouse_x_, &input->mouse_y_ );
+				app_coordinates_window_to_bitmap( input->app_, 320, 240, &input->mouse_x_, &input->mouse_y_ );
             }
 		} else if( in.events[ i ].type == APP_INPUT_KEY_DOWN ) {
 			input->curr_[ in.events[ i ].data.key ] = true;
