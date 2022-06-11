@@ -342,6 +342,9 @@ int file_exists( char const* filename ) {
 	return 0;
 }
 
+#ifndef _WIN32
+    #include <strings.h>
+#endif
 
 char const* basename( char const* path, char const* extension ) {
 	static char result[ 1024 ];
