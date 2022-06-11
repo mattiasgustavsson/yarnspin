@@ -111,10 +111,12 @@ int app_proc( app_t* app, void* user_data ) {
     app_title( app, "Yarnspin" );
 
     crtemu_pc_t* crtemu = crtemu_pc_create( NULL );
-    int w, h, c;
-    stbi_uc* crtframe = stbi_load( "images/crtframe.png", &w, &h, &c, 4 );
-    crtemu_pc_frame( crtemu, (CRTEMU_PC_U32*) crtframe, w, h );
-    stbi_image_free( crtframe );
+    if( crtemu ) {
+        int w, h, c;
+        stbi_uc* crtframe = stbi_load( "images/crtframe.png", &w, &h, &c, 4 );
+        crtemu_pc_frame( crtemu, (CRTEMU_PC_U32*) crtframe, w, h );
+        stbi_image_free( crtframe );
+    }
 
     frametimer_t* frametimer = frametimer_create( NULL );
     frametimer_lock_rate( frametimer, 60 );
@@ -152,12 +154,18 @@ int app_proc( app_t* app, void* user_data ) {
         for( int i = 0; i < 320 * 240; ++i) {
             screen[ i ] = yarn->assets.palette[ canvas[ i ] ];
         }
-        crtemu_pc_present( crtemu, 0, screen, 320, 240, fade, bg );
-        app_present( app, NULL, 1, 1, 0xffffff, 0x000000 );
+        if( crtemu ) {
+            crtemu_pc_present( crtemu, 0, screen, 320, 240, fade, bg );
+            app_present( app, NULL, 1, 1, 0xffffff, 0x000000 );
+        } else {
+            app_present( app, screen, 320, 240, fade, bg );
+        }
     }
 
     frametimer_destroy( frametimer );
-    crtemu_pc_destroy( crtemu );
+    if( crtemu ) {
+        crtemu_pc_destroy( crtemu );
+    }
     memmgr_clear( &g_memmgr );
     return 0;
 }

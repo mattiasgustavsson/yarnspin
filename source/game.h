@@ -531,7 +531,7 @@ gamestate_t location_update( game_t* game ) {
 			if( !test_cond( game, &location->opt->items[ i ].cond ) ) {
                 continue;
             }
-			int ypos = 200 + game->font_opt->height * c;
+			int ypos = 197 + game->font_opt->height * c;
 			pixelfont_bounds_t b = text( game, game->font_opt, location->opt->items[ i ].text, 5, ypos, game->color_opt );
 			if( mouse_y >= ypos && mouse_y < ypos + b.height && mouse_x < 277 ) {
 				box( game, 4, ypos, 315, b.height, game->color_opt );
@@ -734,9 +734,9 @@ gamestate_t dialog_update( game_t* game ) {
             }
     		game->dialog.phrase_len = (int) cstr_len( txt );
     		if( dialog->phrase->items[ i ].character_index >= 0 ) {
-    			wrap_limit( game, game->font_txt, txt, 5, 136, game->color_txt, 310, (int)game->dialog.limit );
+    			wrap_limit( game, game->font_txt, txt, 5, 126, game->color_txt, 310, (int)game->dialog.limit );
             } else {
-				wrap_limit( game, game->font_opt, txt, 5, 191, game->color_txt, 310, (int)game->dialog.limit );
+				wrap_limit( game, game->font_opt, txt, 5, 197, game->color_txt, 310, (int)game->dialog.limit );
             }
     	}
 		++phrase_count;
@@ -782,7 +782,7 @@ gamestate_t dialog_update( game_t* game ) {
 			if( !test_cond( game, &dialog->say->items[ i ].cond ) ) {
                 continue;
             }
-			int ypos = 200 + game->font_opt->height * c;
+			int ypos = 197 + game->font_opt->height * c;
 			pixelfont_bounds_t b = text( game, game->font_opt, dialog->say->items[ i ].text, 5, ypos, game->color_opt );
     		if( game->queued_dialog < 0 && game->queued_location < 0 ) {
 				if( mouse_y >= ypos && mouse_y < ypos + b.height && mouse_x < 277 ) {
