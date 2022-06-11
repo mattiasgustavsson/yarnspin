@@ -22,7 +22,6 @@
 #include "libs/dir.h"
 #include "libs/frametimer.h"
 #include "libs/file.h"
-#include "libs/file_util.h"
 #include "libs/img.h"
 #include "libs/paldither.h"
 #include "libs/palrle.h"
@@ -30,6 +29,14 @@
 #include "libs/stb_image.h"
 #include "libs/stb_image_write.h"
 #include "libs/stb_truetype.h"
+
+char const* basename( char const* path, char const* extension );
+char const* extname( char const* path );
+
+void create_path( char const* path, int pos ); 
+int file_more_recent( char const* source_path, char const* output_path );
+int file_exists( char const* filename );
+
 
 #include "memmgr.h"
 
@@ -213,6 +220,7 @@ int main( int argc, char** argv ) {
 #define APP_LOG( ctx, level, message ) 
 #include "libs/app.h"
 
+
 #define ARRAY_IMPLEMENTATION
 #include "libs/array.h"
 
@@ -235,9 +243,6 @@ int main( int argc, char** argv ) {
         
 #define FILE_IMPLEMENTATION
 #include "libs/file.h"
-
-#define FILE_UTIL_IMPLEMENTATION
-#include "libs/file_util.h"
 
 #define FRAMETIMER_IMPLEMENTATION
 #include "libs/frametimer.h"
@@ -278,3 +283,134 @@ int main( int argc, char** argv ) {
 
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "libs/stb_truetype.h"
+
+
+#include <sys/stat.h>
+
+void makedir( char const* path ) {
+	#ifdef _WIN32
+		CreateDirectoryA( path, NULL );
+	#else 
+		mkdir( path, S_IRWXU );
+	#endif
+}
+
+
+void create_path( char const* path, int pos ) { 
+    pos = cstr_find( path, "/", pos );
+    if( pos < 0 ) {
+        return;
+    }
+    char const* dir = cstr_mid( path, 0, pos );
+    makedir( dir );
+    create_path( path, pos + 1 );
+}
+
+
+time_t file_last_changed( char const* filename ) {
+	if( filename ) {
+		struct stat result;
+		int ret = stat( filename, &result );
+		if( ret == 0 ) {
+			return result.st_mtime;
+	    }
+	}    
+	return 0;	    
+}
+
+
+int file_more_recent( char const* source_path,  char const* output_path  ) {
+	return file_last_changed( source_path ) > file_last_changed( output_path );
+}
+
+
+int file_exists( char const* filename ) {
+	struct stat result;
+	int ret = stat( filename, &result );
+	if( ret == 0 ) {
+		return result.st_mode & S_IFREG;
+	}
+
+	return 0;
+}
+
+
+char const* basename( char const* path, char const* extension ) {
+	static char result[ 1024 ];
+	strcpy( result, "" );
+
+	if( path ) {
+		char const* lastForwardSlash = strrchr( path, '/' );
+		char const* lastBackSlash = strrchr( path, '\\' );
+		
+		char const* name = 0;
+		
+		if( !lastBackSlash && !lastForwardSlash ) {
+			name = path;
+		} else if( !lastBackSlash ) {
+			name = lastForwardSlash + 1;
+		} else if( !lastForwardSlash ) {
+			name = lastBackSlash + 1;
+		} else if( lastForwardSlash > lastBackSlash ) {
+			name = lastForwardSlash + 1;
+		} else {
+			name = lastBackSlash + 1;
+		}
+			
+		strncpy( result, name, sizeof( result ) );
+			
+		if( extension ) {
+			size_t extlen = strlen( extension );
+			size_t reslen = strlen( result );
+			
+			if( reslen >= extlen ) {
+                #if _WIN32
+				if( stricmp( result + (reslen - extlen), extension ) == 0 ) {
+                #else
+                if( strcasecmp( result + (reslen - extlen), extension ) == 0 ) {
+                #endif
+					result[ reslen - extlen ] = 0;
+				}
+			}
+			
+		}
+	}
+
+	return result;
+}
+
+
+char const* extname( char const* path ) {
+	static char result[ 1024 ];
+	strcpy( result, "" );
+
+	if( path ) {
+		char const* lastForwardSlash = strrchr( path, '/' );
+		char const* lastBackSlash = strrchr( path, '\\' );
+		
+		char const* name = 0;
+		char const* ext = 0;
+		
+		if( !lastBackSlash && !lastForwardSlash ) {
+			name = path;
+		} else if( !lastBackSlash ) {
+			name = lastForwardSlash + 1;
+		} else if( !lastForwardSlash ) {
+			name = lastBackSlash + 1;
+		} else if( lastForwardSlash > lastBackSlash ) {
+			name = lastForwardSlash + 1;
+		} else {
+			name = lastBackSlash + 1;
+		}
+			
+		ext = strrchr( name, '.' );
+		
+		if( ext && !( ext[ 0 ] == '.' && ext[ 1 ] == 0 ) ) {
+			strncpy( result, ext, sizeof( result ) );            
+		}
+	}
+ 
+	return result;
+}     
+
+

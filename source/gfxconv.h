@@ -896,7 +896,7 @@ paldither_palette_t* convert_palette( string palette_filename ) {
 		size_t pal_size;
 		ditherpal = paldither_palette_create( colortable, colortable_count, &pal_size, NULL );	
 	
-		create_path( cdirname( palette_lookup_file ) );
+		create_path( palette_lookup_file, 0 );
 		file_save_data( &ditherpal->color_count, pal_size, palette_lookup_file, FILE_MODE_BINARY );
 	}
 
@@ -962,7 +962,7 @@ palrle_data_t* convert_bitmap( string image_filename, int width, int height, str
 			for( int x = 0; x < outw; ++x )
 				mask[ x + outw * y ] = ( ( (uint32_t*) img )[ x + outw * y ] & 0xff000000 ) ? 0xff : 0x00;
         
-		create_path( cdirname( processed_filename ) );
+		create_path( processed_filename, 0 );
 
         stbi_write_png( intermediate_processed_filename, outw, outh, 4, (stbi_uc*)img, 4 * outw ); 
 
