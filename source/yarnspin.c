@@ -108,7 +108,7 @@ int app_proc( app_t* app, void* user_data ) {
     #endif    
     app_interpolation( app, APP_INTERPOLATION_NONE );
     app_screenmode( app, fullscreen ? APP_SCREENMODE_FULLSCREEN : APP_SCREENMODE_WINDOW );
-    app_title( app, "Yarnspin" );
+    app_title( app, yarn->globals.title );
 
     crtemu_pc_t* crtemu = crtemu_pc_create( NULL );
     if( crtemu ) {
@@ -189,12 +189,12 @@ int main( int argc, char** argv ) {
 		    printf( "Failed to compile game file\n" );
 		    return EXIT_FAILURE;
 	    }    
-        buffer_save( compiled_yarn, "game.yarn" );
+        buffer_save( compiled_yarn, "yarn.dat" );
         buffer_destroy( compiled_yarn );   
     #endif
 
     // load yarn
-    buffer_t* loaded_yarn = buffer_load( "game.yarn" );
+    buffer_t* loaded_yarn = buffer_load( "yarn.dat" );
     yarn_t yarn;
     yarn_load( loaded_yarn, &yarn );
     buffer_destroy( loaded_yarn );    
