@@ -410,8 +410,7 @@ crtemu_pc_t* crtemu_pc_create( void* memctx )
         #endif
         "vec3 tsample( sampler2D samp, vec2 tc, float offs, vec2 resolution )\n"
 	    "    {\n"
-	    "    tc = tc * vec2(1.035, 0.96) + vec2( mix( -0.018,-0.0125*0.75,use_frame), 0.02);\n"
-		"	tc = tc * 1.2 - 0.1;\n"
+        "    tc = tc * vec2(1.156, 1.156) - vec2( 0.078 + 0.003, 0.078 );\n"
 	    "    vec3 s = pow( abs( texture2D( samp, vec2( tc.x, 1.0-tc.y ) ).rgb), vec3( 2.2 ) );\n"
 	    "    return s*vec3(1.25);\n"
 	    "    }\n"
@@ -510,14 +509,9 @@ crtemu_pc_t* crtemu_pc_create( void* memctx )
 		"        col *= 0.0;\n"
 		"    col*=modulate; \n"
 	    "    /* Frame */\n"
-	    "    vec2 fscale = vec2( -0.019, -0.018 );\n"
-		"	vec2 fuv=vec2( uv.x, 1.0 - uv.y)*((1.0)+2.0*fscale)-fscale-vec2(-0.0, 0.005);\n"
-	    "    vec4 f=texture2D(frametexture, fuv * vec2(0.925, 0.81) + vec2( 0.042, 0.09 ));\n"
-	    "    float fvig = clamp( -0.00+512.0*uv.x*uv.y*(1.0-uv.x)*(1.0-uv.y), 0.2, 0.85 );\n"
-		"	col *= fvig;\n"
-        "    float expon = 1.4;\n"
-        "//    f.xyz = vec3(26.0/255.0,26.0/255.0,26.0/255.0);expon=1.0;\n"
-	    "    col = mix( col, mix( max( col, 0.0), pow( abs( f.xyz ), vec3( expon ) ), f.w), vec3( use_frame) );\n"
+		"	vec2 fuv=vec2( uv.x, 1.0 - uv.y);\n"
+	    "    vec4 f=texture2D(frametexture, fuv);\n"
+	    "    col = mix( col, mix( max( col, 0.0), f.xyz, f.w), vec3( use_frame) );\n"
         "    \n"
 		"	gl_FragColor = vec4( col, 1.0 );\n"
 		"	}\n"
@@ -1129,8 +1123,8 @@ void crtemu_pc_present( crtemu_pc_t* crtemu_pc, CRTEMU_PC_U64 time_us, CRTEMU_PC
     int window_width = viewport[ 2 ] - viewport[ 0 ];
     int window_height = viewport[ 3 ] - viewport[ 1 ];
 
-    int aspect_width = (int)( ( window_height * 4.25f ) / 3 );
-    int aspect_height= (int)( ( window_width * 3 ) / 4.25f );
+    int aspect_width = (int)( ( window_height * 4 ) / 3 );
+    int aspect_height= (int)( ( window_width * 3 ) / 4 );
     int target_width, target_height;
     if( aspect_height <= window_height ) 
         {
@@ -1267,8 +1261,8 @@ void crtemu_pc_coordinates_window_to_bitmap( crtemu_pc_t* crtemu_pc, int width, 
     int window_width = viewport[ 2 ] - viewport[ 0 ];
     int window_height = viewport[ 3 ] - viewport[ 1 ];
 
-    int aspect_width = (int)( ( window_height * 4.25f ) / 3 );
-    int aspect_height= (int)( ( window_width * 3 ) / 4.25f );
+    int aspect_width = (int)( ( window_height * 4 ) / 3 );
+    int aspect_height= (int)( ( window_width * 3 ) / 4 );
     int target_width, target_height;
     if( aspect_height <= window_height ) 
         {
@@ -1311,11 +1305,8 @@ void crtemu_pc_coordinates_window_to_bitmap( crtemu_pc_t* crtemu_pc, int width, 
     xp = xp * ( 1.0f - 0.04f ) + 0.04f / 2.0f + 0.003f;
     yp = yp * ( 1.0f - 0.04f ) + 0.04f / 2.0f - 0.001f;
 
-    xp = xp * 1.035f - ( crtemu_pc->use_frame == 0.0f ? 0.018f : 0.0125f*0.75f );
-    yp = yp * 0.96f + 0.02f;
-
-    xp = xp * 1.2f - 0.1f;
-    yp = yp * 1.2f - 0.1f;
+    xp = xp * 1.156f - ( 0.078f + 0.003f );
+    yp = yp * 1.156f - 0.078f;
 
     xp *= width;
     yp *= height;

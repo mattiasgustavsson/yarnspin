@@ -6,6 +6,9 @@
     #include <crtdbg.h>
 #endif
 
+#define CRT_FRAME_IMPLEMENTATION
+#include "crt_frame.h"
+
 #include <ctype.h>
 #include <math.h>
 #include <stdarg.h>
@@ -17,6 +20,7 @@
 #include "libs/app.h"
 #include "libs/array.h"
 #include "libs/buffer.h"
+#include "libs/crtemu.h"
 #include "libs/crtemu_pc.h"
 #include "libs/cstr.h"
 #include "libs/dir.h"
@@ -82,8 +86,8 @@ int app_proc( app_t* app, void* user_data ) {
         // calculate aspect locked width/height
         int scrwidth = displays.displays[ disp ].width - 80;
         int scrheight = displays.displays[ disp ].height - 80;
-        int aspect_width = (int)( ( scrheight * 4.25f ) / 3 );
-        int aspect_height = (int)( ( scrwidth * 3 ) / 4.25f );
+        int aspect_width = (int)( ( scrheight * 4 ) / 3 );
+        int aspect_height = (int)( ( scrwidth * 3 ) / 4 );
         int target_width, target_height;
         if( aspect_height <= scrheight ) {
             target_width = scrwidth;
@@ -110,11 +114,19 @@ int app_proc( app_t* app, void* user_data ) {
     app_screenmode( app, fullscreen ? APP_SCREENMODE_FULLSCREEN : APP_SCREENMODE_WINDOW );
     app_title( app, yarn->globals.title );
 
-    crtemu_pc_t* crtemu = crtemu_pc_create( NULL );
+    crtemu_pc_t* crtemu_pc = crtemu_pc_create( NULL );
+    if( crtemu_pc ) {
+        int w, h, c;
+        stbi_uc* crtframe = stbi_load( "images/crtframe_pc.png", &w, &h, &c, 4 );
+        crtemu_pc_frame( crtemu_pc, (CRTEMU_PC_U32*) crtframe, w, h );
+        stbi_image_free( crtframe );
+    }
+
+    crtemu_t* crtemu = NULL;//crtemu_create( NULL );
     if( crtemu ) {
         int w, h, c;
-        stbi_uc* crtframe = stbi_load( "images/crtframe.png", &w, &h, &c, 4 );
-        crtemu_pc_frame( crtemu, (CRTEMU_PC_U32*) crtframe, w, h );
+        stbi_uc* crtframe = stbi_load( "images/crtframe_tv.png", &w, &h, &c, 4 );
+        crtemu_frame( crtemu, (CRTEMU_U32*) crtframe, w, h );
         stbi_image_free( crtframe );
     }
 
@@ -131,9 +143,10 @@ int app_proc( app_t* app, void* user_data ) {
     game_init( &game, yarn, &input, canvas, 320, 240 );
 
     // main loop
+    APP_U64 time = 0;
     while( app_yield( app ) != APP_STATE_EXIT_REQUESTED && !game.exit_flag ) {
         frametimer_update( frametimer );
-        input_update( &input, crtemu );
+        input_update( &input, crtemu_pc, crtemu );
         game_update( &game );
 
         if( input_was_key_pressed( &input, APP_KEY_F11 ) ) {
@@ -150,21 +163,36 @@ int app_proc( app_t* app, void* user_data ) {
 				( ( ( ( ( (a)        ) & 0xffU ) * ( ( (b)        ) & 0xffU ) ) >> 8U )        ) )
 		bg = RGBMUL32( fade, bg );		
 
-        static uint32_t screen[ 320 * 240 ];
-        for( int i = 0; i < 320 * 240; ++i) {
-            screen[ i ] = yarn->assets.palette[ canvas[ i ] ];
-        }
-        if( crtemu ) {
-            crtemu_pc_present( crtemu, 0, screen, 320, 240, fade, bg );
+        static uint32_t screen[ 364* 306 ];
+        time += 1000000 / 60;
+        if( crtemu_pc ) {
+            for( int i = 0; i < 320 * 240; ++i ) {
+                screen[ i ] = yarn->assets.palette[ canvas[ i ] ];
+            }
+            crtemu_pc_present( crtemu_pc, time, screen, 320, 240, fade, bg );
+            app_present( app, NULL, 1, 1, 0xffffff, 0x000000 );
+        } else if( crtemu ) {
+            for( int y = 0; y < 240; ++y ) {
+                for( int x = 0; x < 320; ++x ) {
+                    screen[ ( 22 + x ) + ( 33 + y ) * 364 ] = yarn->assets.palette[ canvas[ x + y * 320 ] ];
+                }
+            }
+            crtemu_present( crtemu, time, screen, 364, 306, fade, bg );
             app_present( app, NULL, 1, 1, 0xffffff, 0x000000 );
         } else {
+            for( int i = 0; i < 320 * 240; ++i ) {
+                screen[ i ] = yarn->assets.palette[ canvas[ i ] ];
+            }
             app_present( app, screen, 320, 240, fade, bg );
         }
     }
 
     frametimer_destroy( frametimer );
+    if( crtemu_pc ) {
+        crtemu_pc_destroy( crtemu_pc );
+    }
     if( crtemu ) {
-        crtemu_pc_destroy( crtemu );
+        crtemu_destroy( crtemu );
     }
     memmgr_clear( &g_memmgr );
     return 0;
@@ -234,6 +262,9 @@ int main( int argc, char** argv ) {
 
 #define BUFFER_IMPLEMENTATION
 #include "libs/buffer.h"
+
+#define CRTEMU_IMPLEMENTATION
+#include "libs/crtemu.h"
 
 #define CRTEMU_PC_IMPLEMENTATION
 #include "libs/crtemu_pc.h"
