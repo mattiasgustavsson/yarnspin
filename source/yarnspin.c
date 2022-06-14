@@ -164,8 +164,8 @@ int app_proc( app_t* app, void* user_data ) {
     CRTEMU_PC_U32* frame_pc_pixels = NULL;
     if( yarn->assets.frame_pc ) {
         int c;
-        frame_pc_pixels = (CRTEMU_PC_U32*) stbi_load_from_memory( yarn->assets.frame_pc, yarn->assets.frame_pc_size, 
-            &frame_pc_width, &frame_pc_height, &c, 4 );
+        frame_pc_pixels = (CRTEMU_PC_U32*) stbi_load_from_memory( (stbi_uc*) yarn->assets.frame_pc, 
+            yarn->assets.frame_pc_size, &frame_pc_width, &frame_pc_height, &c, 4 );
     }
 
     int frame_tv_width = 0;
@@ -173,8 +173,8 @@ int app_proc( app_t* app, void* user_data ) {
     CRTEMU_U32* frame_tv_pixels = NULL;
     if( yarn->assets.frame_tv ) {
         int c;
-        frame_tv_pixels = (CRTEMU_U32*) stbi_load_from_memory( yarn->assets.frame_tv, yarn->assets.frame_tv_size, 
-            &frame_tv_width, &frame_tv_height, &c, 4 );
+        frame_tv_pixels = (CRTEMU_U32*) stbi_load_from_memory( (stbi_uc*) yarn->assets.frame_tv, 
+            yarn->assets.frame_tv_size, &frame_tv_width, &frame_tv_height, &c, 4 );
     }
 
     int display_filter_index = 0;
