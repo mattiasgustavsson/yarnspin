@@ -782,6 +782,12 @@ typedef struct yarn_assets_t {
 	pixelfont_t* font_name;
 
     array(palrle_data_t*)* bitmaps;
+
+    uint32_t frame_pc_size;
+    void* frame_pc;
+
+    uint32_t frame_tv_size;
+    void* frame_tv;
 } yarn_assets_t;
 
 
@@ -798,6 +804,12 @@ yarn_assets_t* empty_assets( void ) {
 	assets.font_name = NULL;
 
     assets.bitmaps = managed_array(palrle_data_t*);
+
+    assets.frame_pc_size = 0;
+    assets.frame_pc = NULL;
+
+    assets.frame_tv_size = 0;
+    assets.frame_tv = NULL;
 
     return &assets;
 }
@@ -826,6 +838,16 @@ void save_assets( buffer_t* out, yarn_assets_t* assets ) {
     for( int i = 0; i < assets->bitmaps->count; ++i ) {
         buffer_write_u32( out, &assets->bitmaps->items[ i ]->size, 1 );
         buffer_write_u8( out, (uint8_t*) assets->bitmaps->items[ i ], assets->bitmaps->items[ i ]->size );
+    }
+
+    buffer_write_u32( out, &assets->frame_pc_size, 1 );
+    if( assets->frame_pc ) {
+        buffer_write_u8( out, (uint8_t*) assets->frame_pc, assets->frame_pc_size );
+    }
+
+    buffer_write_u32( out, &assets->frame_tv_size, 1 );
+    if( assets->frame_tv ) {
+        buffer_write_u8( out, (uint8_t*) assets->frame_tv, assets->frame_tv_size );
     }
 }
 
@@ -867,6 +889,19 @@ void load_assets( buffer_t* in, yarn_assets_t* assets ) {
         palrle_data_t* rle = manage_palrle( malloc( size ) );
         buffer_read_u8( in, (uint8_t*) rle, size );
         array_add( assets->bitmaps, &rle );
+    }
+
+    
+    buffer_read_u32( in, &assets->frame_pc_size, 1 );
+    if( assets->frame_pc_size ) {
+        assets->frame_pc = manage_alloc( malloc( assets->frame_pc_size ) );
+        buffer_read_u8( in, (uint8_t*) assets->frame_pc, assets->frame_pc_size );
+    }
+
+    buffer_read_u32( in, &assets->frame_tv_size, 1 );
+    if( assets->frame_tv_size ) {
+        assets->frame_tv = manage_alloc( malloc( assets->frame_tv_size ) );
+        buffer_read_u8( in, (uint8_t*) assets->frame_tv, assets->frame_tv_size );
     }
 }
 
@@ -1122,6 +1157,31 @@ buffer_t* yarn_compile( char const* path ) {
 			no_error = false;
 		}
 
+    }
+
+    for( int i = 0; i < yarn.globals.display_filters->count; ++i ) {
+        if( yarn.globals.display_filters->items[ i ] == YARN_DISPLAY_FILTER_PC ) {
+            file_t* file = file_load( "images/crtframe_pc.png", FILE_MODE_BINARY, NULL );
+            yarn.assets.frame_pc_size = file ? (uint32_t) file->size : 0;
+            if( yarn.assets.frame_pc_size ) {
+                yarn.assets.frame_pc = manage_alloc( malloc( yarn.assets.frame_pc_size ) );
+                memcpy( yarn.assets.frame_pc, file->data, yarn.assets.frame_pc_size );
+            } else {
+                yarn.assets.frame_pc = NULL;
+            }
+            file_destroy( file );
+        }
+        if( yarn.globals.display_filters->items[ i ] == YARN_DISPLAY_FILTER_TV ) {
+            file_t* file = file_load( "images/crtframe_tv.png", FILE_MODE_BINARY, NULL );
+            yarn.assets.frame_tv_size = file ? (uint32_t) file->size : 0;
+            if( yarn.assets.frame_tv_size ) {
+                yarn.assets.frame_tv = manage_alloc( malloc( yarn.assets.frame_tv_size ) );
+                memcpy( yarn.assets.frame_tv, file->data, yarn.assets.frame_tv_size );
+            } else {
+                yarn.assets.frame_tv = NULL;
+            }
+            file_destroy( file );
+        }
     }
 
     buffer_t* buffer = buffer_create();

@@ -41,6 +41,7 @@ char const* cbasename( char const* path );
 void create_path( char const* path, int pos ); 
 int file_more_recent( char const* source_path, char const* output_path );
 int file_exists( char const* filename );
+int folder_exists( char const* filename );
 
 void* compress_lzma( void* data, size_t size, size_t* out_size ) {
 
@@ -97,6 +98,9 @@ void paldither_deleter( void* context, void* ptr ) { (void) context; paldither_p
 
 void pixelfont_deleter( void* context, void* ptr ) { (void) context; free( ptr ); }
 #define manage_pixelfont( instance ) ARRAY_CAST( memmgr_add( &g_memmgr, instance, NULL, pixelfont_deleter ) )
+
+void alloc_deleter( void* context, void* ptr ) { (void) context; free( ptr ); }
+#define manage_alloc( instance ) ARRAY_CAST( memmgr_add( &g_memmgr, instance, NULL, alloc_deleter ) )
 
 typedef cstr_t string;
 #define array(type) array_t(type)
@@ -155,6 +159,24 @@ int app_proc( app_t* app, void* user_data ) {
     app_screenmode( app, fullscreen ? APP_SCREENMODE_FULLSCREEN : APP_SCREENMODE_WINDOW );
     app_title( app, yarn->globals.title );
 
+    int frame_pc_width = 0;
+    int frame_pc_height = 0;
+    CRTEMU_PC_U32* frame_pc_pixels = NULL;
+    if( yarn->assets.frame_pc ) {
+        int c;
+        frame_pc_pixels = (CRTEMU_PC_U32*) stbi_load_from_memory( yarn->assets.frame_pc, yarn->assets.frame_pc_size, 
+            &frame_pc_width, &frame_pc_height, &c, 4 );
+    }
+
+    int frame_tv_width = 0;
+    int frame_tv_height = 0;
+    CRTEMU_U32* frame_tv_pixels = NULL;
+    if( yarn->assets.frame_tv ) {
+        int c;
+        frame_tv_pixels = (CRTEMU_U32*) stbi_load_from_memory( yarn->assets.frame_tv, yarn->assets.frame_tv_size, 
+            &frame_tv_width, &frame_tv_height, &c, 4 );
+    }
+
     int display_filter_index = 0;
     yarn_display_filter_t display_filter = yarn->globals.display_filters->items[ display_filter_index ];
 
@@ -208,11 +230,8 @@ int app_proc( app_t* app, void* user_data ) {
                 crtemu = NULL;
             }
             crtemu_pc = crtemu_pc_create( NULL );
-            if( crtemu_pc ) {
-                int w, h, c;
-                stbi_uc* crtframe = stbi_load( "images/crtframe_pc.png", &w, &h, &c, 4 );
-                crtemu_pc_frame( crtemu_pc, (CRTEMU_PC_U32*) crtframe, w, h );
-                stbi_image_free( crtframe );
+            if( crtemu_pc && frame_pc_pixels ) {
+                crtemu_pc_frame( crtemu_pc, frame_pc_pixels, frame_pc_width, frame_pc_height );
             }
         }
 
@@ -221,13 +240,10 @@ int app_proc( app_t* app, void* user_data ) {
                 crtemu_pc_destroy( crtemu_pc );
                 crtemu_pc = NULL;
             }
+            memset( screen, 0, sizeof( screen ) );
             crtemu = crtemu_create( NULL );
-            if( crtemu ) {
-                int w, h, c;
-                stbi_uc* crtframe = stbi_load( "images/crtframe_tv.png", &w, &h, &c, 4 );
-                crtemu_frame( crtemu, (CRTEMU_U32*) crtframe, w, h );
-                stbi_image_free( crtframe );
-                memset( screen, 0, sizeof( screen ) );
+            if( crtemu && frame_tv_pixels ) {
+                crtemu_frame( crtemu, frame_tv_pixels, frame_tv_width, frame_tv_height );
             }
         }
 
@@ -288,24 +304,30 @@ int main( int argc, char** argv ) {
 
     #ifndef __wasm__
         // compile yarn
-	    buffer_t* compiled_yarn = yarn_compile( "." );
-	    if( !compiled_yarn ) {
-		    printf( "Failed to compile game file\n" );
-		    return EXIT_FAILURE;
-	    }    
-        size_t size;
-        void* data = compress_lzma( buffer_data( compiled_yarn ), buffer_size( compiled_yarn ), &size );
-        uint32_t original_size = (uint32_t) buffer_size( compiled_yarn );
-        buffer_destroy( compiled_yarn );   
-        FILE* fp = fopen( "yarn.dat", "wb" );
-        fwrite( &original_size, sizeof( original_size ), 1, fp );
-        fwrite( data, 1, size, fp );
-        fclose( fp );
-        free( data );
+        if( folder_exists( "scripts" ) ) {
+	        buffer_t* compiled_yarn = yarn_compile( "." );
+	        if( !compiled_yarn ) {
+		        printf( "Failed to compile game file\n" );
+		        return EXIT_FAILURE;
+	        }    
+            size_t size;
+            void* data = compress_lzma( buffer_data( compiled_yarn ), buffer_size( compiled_yarn ), &size );
+            uint32_t original_size = (uint32_t) buffer_size( compiled_yarn );
+            buffer_destroy( compiled_yarn );   
+            FILE* fp = fopen( "yarn.dat", "wb" );
+            fwrite( &original_size, sizeof( original_size ), 1, fp );
+            fwrite( data, 1, size, fp );
+            fclose( fp );
+            free( data );
+        }
     #endif
 
     // load and decompress yarn data file
     buffer_t* loaded_yarn = buffer_load( "yarn.dat" );
+	if( !loaded_yarn ) {
+		printf( "Failed to load yarn.dat\n" );
+		return EXIT_FAILURE;
+	}    
     uint32_t uncompressed_size;
     buffer_read_u32( loaded_yarn, &uncompressed_size, 1 );
     buffer_t* decompressed_yarn = buffer_create();
@@ -314,6 +336,7 @@ int main( int argc, char** argv ) {
         buffer_size( loaded_yarn ) - sizeof( uint32_t ), buffer_data( decompressed_yarn ), uncompressed_size );
     buffer_destroy( loaded_yarn );    
     if( decompressed_size != uncompressed_size ) {
+        buffer_destroy( decompressed_yarn );    
 		printf( "Failed to decompress game file\n" );
         return EXIT_FAILURE;
     }
@@ -467,6 +490,16 @@ int file_exists( char const* filename ) {
 	int ret = stat( filename, &result );
 	if( ret == 0 ) {
 		return result.st_mode & S_IFREG;
+	}
+
+	return 0;
+}
+
+int folder_exists( char const* filename ) {
+	struct stat result;
+	int ret = stat( filename, &result );
+	if( ret == 0 ) {
+		return result.st_mode & S_IFDIR;
 	}
 
 	return 0;
