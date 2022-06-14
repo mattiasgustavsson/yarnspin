@@ -42,6 +42,7 @@ buffer_t* buffer_create( void );
 buffer_t* buffer_load( const char* filename );
 void buffer_destroy( buffer_t* buffer );
 bool buffer_save( buffer_t* buffer, char const* filename );
+void buffer_resize( buffer_t* buffer, size_t size );
 size_t buffer_position( buffer_t* buffer );
 size_t buffer_position_set( buffer_t* buffer, size_t position );
 size_t buffer_size( buffer_t* buffer );
@@ -159,6 +160,20 @@ bool buffer_save( buffer_t* buffer, char const* filename ) {
     size_t written = fwrite( buffer->data, 1, buffer->size, fp ); 
     fclose( fp );
     return written == buffer->size;
+}
+
+
+void buffer_resize( buffer_t* buffer, size_t size ) {
+    if( size > buffer->capacity ) {
+        while( size > buffer->capacity ) { 
+            buffer->capacity *= 2; 
+        } 
+        buffer->data = realloc( buffer->data, buffer->capacity ); 
+    }
+    buffer->size = size;
+    if( buffer->position > size ) {
+        buffer->position = size;
+    }
 }
 
 

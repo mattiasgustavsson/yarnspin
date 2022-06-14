@@ -27,6 +27,7 @@
 #include "libs/frametimer.h"
 #include "libs/file.h"
 #include "libs/img.h"
+#include "libs/lzma.h"
 #include "libs/paldither.h"
 #include "libs/palrle.h"
 #include "libs/pixelfont.h"
@@ -41,6 +42,46 @@ void create_path( char const* path, int pos );
 int file_more_recent( char const* source_path, char const* output_path );
 int file_exists( char const* filename );
 
+void* compress_lzma( void* data, size_t size, size_t* out_size ) {
+
+    size_t size_props_count = 5;
+    size_t compression_header_size = ( sizeof( uint16_t ) * 2 + size_props_count * sizeof( unsigned char ) );
+    void* compressed_data = malloc( size + compression_header_size );
+    uint16_t* version = (uint16_t*) compressed_data;
+    *version = 19;
+    uint16_t* props_count = version + 1;
+    unsigned char* props = (unsigned char*)( props_count + 1 );
+    unsigned char* compression_buffer = props + size_props_count; 
+    size_t compressed_size = size;            
+    
+    // TODO: configurable compression rate vs speed?
+    int result = LzmaCompress( compression_buffer, &compressed_size, (unsigned char*) data, size, 
+        props, &size_props_count, -1, 0, -1, -1, -1, -1, NULL, NULL );
+    *props_count = (uint16_t)size_props_count;
+    *out_size = compressed_size + compression_header_size;
+    
+    if( result == SZ_OK )
+        return compressed_data;
+
+    free( compressed_data );
+    return NULL;
+}
+
+
+size_t decompress_lzma( void* compressed_data, size_t compressed_size, void* buffer, size_t size ) {
+    uint16_t* props = (uint16_t*)compressed_data;
+    //assert( *props == 19 );
+    ++props; compressed_size -= 2;
+    size_t props_count = *props;
+    ++props; compressed_size -= 2;
+    compressed_size -= props_count;
+    int ret = LzmaUncompress( (unsigned char*) buffer, &size, ( (unsigned char*) props ) + props_count, 
+        &compressed_size, (unsigned char*) props, props_count );
+    if( ret != SZ_OK ) {
+        return 0;
+    }
+    return size;
+}
 
 #include "memmgr.h"
 
@@ -217,15 +258,35 @@ int main( int argc, char** argv ) {
 		    printf( "Failed to compile game file\n" );
 		    return EXIT_FAILURE;
 	    }    
-        buffer_save( compiled_yarn, "yarn.dat" );
+        size_t size;
+        void* data = compress_lzma( buffer_data( compiled_yarn ), buffer_size( compiled_yarn ), &size );
+        uint32_t original_size = (uint32_t) buffer_size( compiled_yarn );
         buffer_destroy( compiled_yarn );   
+        FILE* fp = fopen( "yarn.dat", "wb" );
+        fwrite( &original_size, sizeof( original_size ), 1, fp );
+        fwrite( data, 1, size, fp );
+        fclose( fp );
+        free( data );
     #endif
 
-    // load yarn
+    // load and decompress yarn data file
     buffer_t* loaded_yarn = buffer_load( "yarn.dat" );
-    yarn_t yarn;
-    yarn_load( loaded_yarn, &yarn );
+    uint32_t uncompressed_size;
+    buffer_read_u32( loaded_yarn, &uncompressed_size, 1 );
+    buffer_t* decompressed_yarn = buffer_create();
+    buffer_resize( decompressed_yarn, uncompressed_size );
+    size_t decompressed_size = decompress_lzma( ( (uint32_t*) buffer_data( loaded_yarn ) ) + 1, 
+        buffer_size( loaded_yarn ) - sizeof( uint32_t ), buffer_data( decompressed_yarn ), uncompressed_size );
     buffer_destroy( loaded_yarn );    
+    if( decompressed_size != uncompressed_size ) {
+		printf( "Failed to decompress game file\n" );
+        return EXIT_FAILURE;
+    }
+    
+    // load yarn
+    yarn_t yarn;
+    yarn_load( decompressed_yarn, &yarn );
+    buffer_destroy( decompressed_yarn );    
 
     return app_run( app_proc, &yarn, NULL, NULL, NULL );
 }
@@ -288,6 +349,9 @@ int main( int argc, char** argv ) {
 
 #define IMG_IMPLEMENTATION
 #include "libs/img.h"
+
+#define LZMA_IMPLEMENTATION
+#include "libs/lzma.h"
 
 #define PALDITHER_IMPLEMENTATION
 #include "libs/paldither.h"
