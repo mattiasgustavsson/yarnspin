@@ -842,6 +842,23 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
                     array_add( yarn->globals.logo_indices, &image_index );
                 }
             }
+        } else if( CMP( global->keyword, "display_filters" ) ) {
+            for( int j = 0; j < global->data->count; ++j ) {
+                string_id id = cstr_trim( global->data->items[ j ] );
+                if( CMP( id, "none" ) ) {
+                    yarn_display_filter_t value = YARN_DISPLAY_FILTER_NONE;
+                    array_add( yarn->globals.display_filters, &value );
+                } else if( CMP( id, "tv" ) ) {
+                    yarn_display_filter_t value = YARN_DISPLAY_FILTER_TV;
+                    array_add( yarn->globals.display_filters, &value );
+                } else if( CMP( id, "pc" ) ) {
+                    yarn_display_filter_t value = YARN_DISPLAY_FILTER_PC;
+                    array_add( yarn->globals.display_filters, &value );
+                } else {
+				    printf( "%s(%d): invalid display_filter declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
+                    no_error = false;
+                }
+            }
         } else if( CMP( global->keyword, "background_location" ) ) {
             if( global->data->count == 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) {
 				int image_index = find_screen_index( cstr_cat( "images/", cstr_trim( global->data->items[ 0 ] ) ), yarn );
@@ -1078,7 +1095,12 @@ bool yarn_compiler( array_param(parser_global_t)* parser_globals_param, array_pa
 			no_error = false;
 		}
 	}
-		
+	
+    if( yarn->globals.display_filters->count == 0 ) {
+        yarn_display_filter_t value = YARN_DISPLAY_FILTER_TV;
+        array_add( yarn->globals.display_filters, &value );
+    }
+
 	yarn->start_location = find_location_index( yarn->globals.start, &context );
 	yarn->start_dialog = find_dialog_index( yarn->globals.start, &context );
 	if( yarn->start_location < 0 && yarn->start_dialog < 0 ) {

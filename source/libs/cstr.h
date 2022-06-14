@@ -288,10 +288,8 @@ cstr.h
         #define _CRT_SECURE_NO_WARNINGS
         #include <string.h>
         #define CSTR_STRNICMP( s1, s2, len ) ( strnicmp( (s1), (s2), (len) ) )
-    #elif defined( __wasm__ )
-        #define CSTR_STRNICMP( s1, s2, len ) ( strncmp( (s1), (s2), (len) ) ) // TODO
     #else
-        #include <string.h>
+        #include <strings.h>
         #define CSTR_STRNICMP( s1, s2, len ) ( strncasecmp( (s1), (s2), (len) ) )        
     #endif
 #endif 

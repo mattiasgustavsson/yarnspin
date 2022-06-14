@@ -611,7 +611,13 @@ void load_character( buffer_t* in, yarn_character_t* character ) {
     character->face_index = read_int( in );
 }
 
-    
+typedef enum yarn_display_filter_t {
+    YARN_DISPLAY_FILTER_NONE,
+    YARN_DISPLAY_FILTER_TV,
+    YARN_DISPLAY_FILTER_PC,
+} yarn_display_filter_t;
+
+
 typedef struct yarn_globals_t {
     string title;
     string author;
@@ -623,6 +629,7 @@ typedef struct yarn_globals_t {
     string font_characters;
     string font_items;
     string font_name;
+    array(yarn_display_filter_t)* display_filters;
     array(int)* logo_indices;
     int background_location;
     int background_dialog;
@@ -655,6 +662,7 @@ yarn_globals_t* empty_globals( void ) {
     globals.font_characters =  cstr( "fonts/Berkelium64.ttf" );
     globals.font_items = cstr( "fonts/Berkelium64.ttf" );
     globals.font_name = cstr( "fonts/Sierra-SCI-Menu-Font.ttf" );
+    globals.display_filters = managed_array(int);
     globals.logo_indices = managed_array(int);
     globals.background_location = -1;
     globals.background_dialog = -1;
@@ -685,6 +693,12 @@ void save_globals( buffer_t* out, yarn_globals_t* globals ) {
 	buffer_write_string( out, &globals->font_characters, 1 );
 	buffer_write_string( out, &globals->font_items, 1 );
 	buffer_write_string( out, &globals->font_name, 1 );
+
+    buffer_write_i32( out, &globals->display_filters->count, 1 );
+    for( int i = 0; i < globals->display_filters->count; ++i ) {
+        int value = (int) globals->display_filters->items[ i ];
+	    buffer_write_i32( out, &value, 1 );
+    }
 
     buffer_write_i32( out, &globals->logo_indices->count, 1 );
 	buffer_write_i32( out, globals->logo_indices->items, globals->logo_indices->count );
@@ -721,6 +735,13 @@ void load_globals( buffer_t* in, yarn_globals_t* globals ) {
 	globals->font_characters = read_string( in );
 	globals->font_items = read_string( in );
 	globals->font_name = read_string( in );
+
+    globals->display_filters = managed_array(int);
+    int display_filters_count = read_int( in );
+    for( int i = 0; i < display_filters_count; ++i ) {
+        yarn_display_filter_t value = (yarn_display_filter_t) read_int( in );
+        array_add( globals->display_filters, &value );
+    }
 
     globals->logo_indices = managed_array(int);
     int logo_indices_count = read_int( in );

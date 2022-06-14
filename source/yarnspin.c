@@ -155,27 +155,17 @@ int app_proc( app_t* app, void* user_data ) {
     app_screenmode( app, fullscreen ? APP_SCREENMODE_FULLSCREEN : APP_SCREENMODE_WINDOW );
     app_title( app, yarn->globals.title );
 
-    crtemu_pc_t* crtemu_pc = crtemu_pc_create( NULL );
-    if( crtemu_pc ) {
-        int w, h, c;
-        stbi_uc* crtframe = stbi_load( "images/crtframe_pc.png", &w, &h, &c, 4 );
-        crtemu_pc_frame( crtemu_pc, (CRTEMU_PC_U32*) crtframe, w, h );
-        stbi_image_free( crtframe );
-    }
-
-    crtemu_t* crtemu = NULL;//crtemu_create( NULL );
-    if( crtemu ) {
-        int w, h, c;
-        stbi_uc* crtframe = stbi_load( "images/crtframe_tv.png", &w, &h, &c, 4 );
-        crtemu_frame( crtemu, (CRTEMU_U32*) crtframe, w, h );
-        stbi_image_free( crtframe );
-    }
+    int display_filter_index = 0;
+    yarn_display_filter_t display_filter = yarn->globals.display_filters->items[ display_filter_index ];
 
     frametimer_t* frametimer = frametimer_create( NULL );
     frametimer_lock_rate( frametimer, 60 );
 
     static uint8_t canvas[ 320 * 240 ];
     memset( canvas, 0, sizeof( canvas) );
+
+    crtemu_pc_t* crtemu_pc = NULL;
+    crtemu_t* crtemu = NULL;
 
     // run game
     input_t input;
@@ -195,6 +185,11 @@ int app_proc( app_t* app, void* user_data ) {
             app_screenmode( app, fullscreen ? APP_SCREENMODE_FULLSCREEN : APP_SCREENMODE_WINDOW );
         }
 
+        if( input_was_key_pressed( &input, APP_KEY_F9 ) ) {
+            display_filter_index = ( display_filter_index + 1 ) % yarn->globals.display_filters->count;
+            display_filter = yarn->globals.display_filters->items[ display_filter_index ];
+        }
+
 		APP_U32 transition = (APP_U32)( ( 255 * abs( game.transition_counter ) / 10 ) );
 		APP_U32 fade = transition << 16 | transition << 8 | transition;
 		uint32_t bg = yarn->assets.palette[ game.color_background ];
@@ -206,6 +201,46 @@ int app_proc( app_t* app, void* user_data ) {
 
         static uint32_t screen[ 364* 306 ];
         time += 1000000 / 60;
+
+        if( display_filter == YARN_DISPLAY_FILTER_PC && crtemu_pc == NULL ) {
+            if( crtemu ) {
+                crtemu_destroy( crtemu );
+                crtemu = NULL;
+            }
+            crtemu_pc = crtemu_pc_create( NULL );
+            if( crtemu_pc ) {
+                int w, h, c;
+                stbi_uc* crtframe = stbi_load( "images/crtframe_pc.png", &w, &h, &c, 4 );
+                crtemu_pc_frame( crtemu_pc, (CRTEMU_PC_U32*) crtframe, w, h );
+                stbi_image_free( crtframe );
+            }
+        }
+
+        if( display_filter == YARN_DISPLAY_FILTER_TV && crtemu == NULL ) {
+            if( crtemu_pc ) {
+                crtemu_pc_destroy( crtemu_pc );
+                crtemu_pc = NULL;
+            }
+            crtemu = crtemu_create( NULL );
+            if( crtemu ) {
+                int w, h, c;
+                stbi_uc* crtframe = stbi_load( "images/crtframe_tv.png", &w, &h, &c, 4 );
+                crtemu_frame( crtemu, (CRTEMU_U32*) crtframe, w, h );
+                stbi_image_free( crtframe );
+                memset( screen, 0, sizeof( screen ) );
+            }
+        }
+
+        if( display_filter == YARN_DISPLAY_FILTER_NONE && crtemu_pc != NULL ) {
+                crtemu_pc_destroy( crtemu_pc );
+                crtemu_pc = NULL;
+        }
+
+        if( display_filter == YARN_DISPLAY_FILTER_NONE && crtemu != NULL ) {
+                crtemu_destroy( crtemu );
+                crtemu = NULL;
+        }
+
         if( crtemu_pc ) {
             for( int i = 0; i < 320 * 240; ++i ) {
                 screen[ i ] = yarn->assets.palette[ canvas[ i ] ];

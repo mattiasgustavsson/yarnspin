@@ -34,7 +34,7 @@ typedef struct parser_section_t {
 
 
 bool is_multi_item_keyword( string keyword ) {
-    char const* multi_item_keywords[] = { "logo", "flags", "items" };
+    char const* multi_item_keywords[] = { "display_filters", "logo", "flags", "items" };
     for( int i = 0; i < ARRAY_COUNT( multi_item_keywords ); ++i ) {
         if( cstr_compare_nocase( keyword, multi_item_keywords[ i ] ) == 0 ) {
             return true;
@@ -48,10 +48,10 @@ bool is_global_keyword( string keyword ) {
 
     char const* global_keywords[] = {  
 	    "title", "author", "start", "items", "flags", 
-	    "palette", "logo", "alone_text", 
+	    "palette", "display_filters", "logo", "alone_text", 
 	    "font_description", "font_options", "font_characters", "font_items", "font_name", 
 	    "background_location", "background_dialog", 
-        "color_background", "color_disabled", "color_txt", "color_opt", "color_chr", "color_use", "color_name", "color_facebg", 
+        "color_background", "color_disabled", "color_txt", "color_opt", "color_chr", "color_use", "color_name", "color_facebg",         
     };
     for( int i = 0; i < ARRAY_COUNT( global_keywords ); ++i ) {
         if( cstr_compare_nocase( keyword, global_keywords[ i ] ) == 0 ) {
