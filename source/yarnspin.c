@@ -6,6 +6,8 @@
     #include <crtdbg.h>
 #endif
 
+#define YARNSPIN_VERSION 1
+
 #define CRT_FRAME_IMPLEMENTATION
 #include "crt_frame.h"
 
@@ -314,33 +316,108 @@ int main( int argc, char** argv ) {
             void* data = compress_lzma( buffer_data( compiled_yarn ), buffer_size( compiled_yarn ), &size );
             uint32_t original_size = (uint32_t) buffer_size( compiled_yarn );
             buffer_destroy( compiled_yarn );   
-            FILE* fp = fopen( "yarn.dat", "wb" );
-            fwrite( &original_size, sizeof( original_size ), 1, fp );
+            FILE* fp = fopen( "yarnspin.dat", "wb" );
+            char header[] = "YARNSPIN";
+            uint32_t version = YARNSPIN_VERSION;
+            uint32_t size_in_bytes = (uint32_t)( size + 2 * strlen( header ) + sizeof( uint32_t ) * 5 );
+            fwrite( header, 1, strlen( header ), fp );
+            fwrite( &version, 1, sizeof( version ), fp );
+            fwrite( &size_in_bytes, 1, sizeof( size_in_bytes ), fp );
+            fwrite( &original_size, 1, sizeof( original_size ), fp );
             fwrite( data, 1, size, fp );
+            fwrite( &size_in_bytes, 1, sizeof( size_in_bytes ), fp );
+            fwrite( &version, 1, sizeof( version ), fp );
+            fwrite( header, 1, strlen( header ), fp );
             fclose( fp );
             free( data );
         }
     #endif
 
-    // load and decompress yarn data file
-    buffer_t* loaded_yarn = buffer_load( "yarn.dat" );
-	if( !loaded_yarn ) {
-		printf( "Failed to load yarn.dat\n" );
-		return EXIT_FAILURE;
-	}    
-    uint32_t uncompressed_size;
-    buffer_read_u32( loaded_yarn, &uncompressed_size, 1 );
+    // load and decompress yarn data 
     buffer_t* decompressed_yarn = buffer_create();
-    buffer_resize( decompressed_yarn, uncompressed_size );
-    size_t decompressed_size = decompress_lzma( ( (uint32_t*) buffer_data( loaded_yarn ) ) + 1, 
-        buffer_size( loaded_yarn ) - sizeof( uint32_t ), buffer_data( decompressed_yarn ), uncompressed_size );
-    buffer_destroy( loaded_yarn );    
-    if( decompressed_size != uncompressed_size ) {
-        buffer_destroy( decompressed_yarn );    
-		printf( "Failed to decompress game file\n" );
-        return EXIT_FAILURE;
+
+    #ifndef __wasm__
+    if( file_exists( "yarnspin.dat" ) ) {
+    #else
+    {
+    #endif
+        // load from external data file if it exists
+        buffer_t* loaded_yarn = buffer_load( "yarnspin.dat" );
+	    if( !loaded_yarn ) {
+		    printf( "Failed to load yarnspin.dat\n" );
+		    return EXIT_FAILURE;
+	    }    
+        char header[ 8 ];
+        buffer_read_i8( loaded_yarn, header, 8 );
+        if( strncmp( header, "YARNSPIN", 8 ) != 0 ) {
+		    printf( "The file yarnspin.dat is not a valid Yarnspin game data file\n" );
+		    return EXIT_FAILURE;
+        }
+        uint32_t version = 0; 
+        buffer_read_u32( loaded_yarn, &version, 1 );
+        if( version != YARNSPIN_VERSION ) {
+		    printf( "The file yarnspin.dat is for a different Yarnspin version\n" );
+		    return EXIT_FAILURE;
+        }
+        uint32_t size_in_bytes; 
+        buffer_read_u32( loaded_yarn, &size_in_bytes, 1 );
+        uint32_t uncompressed_size;
+        buffer_read_u32( loaded_yarn, &uncompressed_size, 1 );
+        buffer_resize( decompressed_yarn, uncompressed_size );
+        void* data = (void*) ( ( (uintptr_t)buffer_data( loaded_yarn ) ) + buffer_position( loaded_yarn ) );
+        size_t size = buffer_size( loaded_yarn ) - buffer_position( loaded_yarn );
+        size_t decompressed_size = decompress_lzma( data, size, buffer_data( decompressed_yarn ), uncompressed_size );
+        buffer_destroy( loaded_yarn );    
+        if( decompressed_size != uncompressed_size ) {
+            buffer_destroy( decompressed_yarn );    
+		    printf( "Failed to decompress game file\n" );
+            return EXIT_FAILURE;
+        }
+    #ifndef __wasm__
+    } else {
+        // load from end of executable, if no external data file is present
+        FILE* fp = fopen( argv[ 0 ], "rb" );
+        if( !fp ) {
+		    printf( "Could not open game data file\n" );
+		    return EXIT_FAILURE;
+        }
+        fseek( fp, -8, SEEK_END );
+        char header[ 8 ];
+        fread( header, 1, 8, fp );
+        if( strncmp( header, "YARNSPIN", 8 ) != 0 ) {
+		    printf( "No yarnspin.dat game data can be loaded\n" );
+		    return EXIT_FAILURE;
+        }
+        fseek( fp, -( 8 + (int) sizeof( uint32_t ) ), SEEK_END );
+        uint32_t version = 0;
+        fread( &version, 1, sizeof( version ), fp );
+        if( version != YARNSPIN_VERSION ) {
+		    printf( "The game data file embedded in the EXE is for a different Yarnspin version\n" );
+		    return EXIT_FAILURE;
+        }
+        fseek( fp, -( 8 + 2 * (int) sizeof( uint32_t ) ), SEEK_END );
+        uint32_t size_in_bytes = 0;
+        fread( &size_in_bytes, 1, sizeof( size_in_bytes ), fp );
+        fseek( fp, -(int)size_in_bytes, SEEK_END );
+        fseek( fp, 8 + sizeof( uint32_t ) * 2, SEEK_CUR );
+
+        uint32_t uncompressed_size;
+        fread( &uncompressed_size, 1, sizeof( uncompressed_size ), fp );
+        buffer_resize( decompressed_yarn, uncompressed_size );
+        size_t size = size_in_bytes - ( 8 + sizeof( uint32_t ) * 3 );
+        void* data = malloc( size );
+        fread( data, 1, size, fp );
+        fclose( fp );
+        size_t decompressed_size = decompress_lzma( data, size, buffer_data( decompressed_yarn ), uncompressed_size );
+        free( data );
+        if( decompressed_size != uncompressed_size ) {
+            buffer_destroy( decompressed_yarn );    
+		    printf( "Failed to decompress game file\n" );
+            return EXIT_FAILURE;
+        }
+    #endif
     }
-    
+
     // load yarn
     yarn_t yarn;
     yarn_load( decompressed_yarn, &yarn );
