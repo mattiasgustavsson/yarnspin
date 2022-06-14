@@ -971,7 +971,9 @@ static void internal_cstr_instance( void ) {
         g_internal_cstr = cstri_create( NULL );
         static int atexit_set = 0;
         if( !atexit_set ) {
+            #ifndef __wasm__
             atexit( internal_cstr_cleanup );
+            #endif
             atexit_set = 1;
         }
     }

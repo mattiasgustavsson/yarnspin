@@ -881,7 +881,7 @@ paldither_palette_t* convert_palette( string palette_filename ) {
 	int colortable_count = palette_from_file( palette_filename, colortable );
 	if( colortable_count <= 0 ) return NULL;
 
-    string palette_lookup_file = cstr_cat( cstr_cat( ".cache/palettes/", basename( palette_filename, extname( palette_filename ) ) ), ".plut" );
+    string palette_lookup_file = cstr_cat( cstr_cat( ".cache/palettes/", cbasename( palette_filename ) ), ".plut" );
 	
 	paldither_palette_t* ditherpal = NULL;
 	if( file_exists( palette_lookup_file ) && !file_more_recent( palette_filename, palette_lookup_file ) ) {
@@ -925,8 +925,8 @@ palrle_data_t* convert_bitmap( string image_filename, int width, int height, str
     }
 
     string processed_filename_no_ext = cstr_format( ".cache/processed/%s/%s/%dx%d/%s_%s", is_face ? "faces" : "images", 
-        cstr( basename( palette_filename, extname( palette_filename ) ) ), width, height, 
-        cstr( basename( image_filename, extname( image_filename ) ) ), cstr_mid( extname( image_filename ), 1, 0 ) ) ;
+        cstr( cbasename( palette_filename ) ), width, height, 
+        cstr( cbasename( image_filename ) ), cstr_mid( cextname( image_filename ), 1, 0 ) ) ;
         
     string processed_filename = cstr_cat( processed_filename_no_ext, ".bitmap" );
     string intermediate_processed_filename = cstr_cat( processed_filename_no_ext, ".png" );

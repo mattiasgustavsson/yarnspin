@@ -35,8 +35,8 @@
 #include "libs/stb_image_write.h"
 #include "libs/stb_truetype.h"
 
-char const* basename( char const* path, char const* extension );
-char const* extname( char const* path );
+char const* cextname( char const* path );
+char const* cbasename( char const* path );
 
 void create_path( char const* path, int pos ); 
 int file_more_recent( char const* source_path, char const* output_path );
@@ -476,7 +476,44 @@ int file_exists( char const* filename ) {
     #include <strings.h>
 #endif
 
-char const* basename( char const* path, char const* extension ) {
+
+char const* cextname( char const* path ) {
+	static char result[ 1024 ];
+	strcpy( result, "" );
+
+	if( path ) {
+		char const* lastForwardSlash = strrchr( path, '/' );
+		char const* lastBackSlash = strrchr( path, '\\' );
+		
+		char const* name = 0;
+		char const* ext = 0;
+		
+		if( !lastBackSlash && !lastForwardSlash ) {
+			name = path;
+		} else if( !lastBackSlash ) {
+			name = lastForwardSlash + 1;
+		} else if( !lastForwardSlash ) {
+			name = lastBackSlash + 1;
+		} else if( lastForwardSlash > lastBackSlash ) {
+			name = lastForwardSlash + 1;
+		} else {
+			name = lastBackSlash + 1;
+		}
+			
+		ext = strrchr( name, '.' );
+		
+		if( ext && !( ext[ 0 ] == '.' && ext[ 1 ] == 0 ) ) {
+			strncpy( result, ext, sizeof( result ) );            
+		}
+	}
+ 
+	return result;
+}     
+
+
+char const* cbasename( char const* path ) {
+    char const* extension = cextname( path );
+
 	static char result[ 1024 ];
 	strcpy( result, "" );
 
@@ -519,39 +556,4 @@ char const* basename( char const* path, char const* extension ) {
 
 	return result;
 }
-
-
-char const* extname( char const* path ) {
-	static char result[ 1024 ];
-	strcpy( result, "" );
-
-	if( path ) {
-		char const* lastForwardSlash = strrchr( path, '/' );
-		char const* lastBackSlash = strrchr( path, '\\' );
-		
-		char const* name = 0;
-		char const* ext = 0;
-		
-		if( !lastBackSlash && !lastForwardSlash ) {
-			name = path;
-		} else if( !lastBackSlash ) {
-			name = lastForwardSlash + 1;
-		} else if( !lastForwardSlash ) {
-			name = lastBackSlash + 1;
-		} else if( lastForwardSlash > lastBackSlash ) {
-			name = lastForwardSlash + 1;
-		} else {
-			name = lastBackSlash + 1;
-		}
-			
-		ext = strrchr( name, '.' );
-		
-		if( ext && !( ext[ 0 ] == '.' && ext[ 1 ] == 0 ) ) {
-			strncpy( result, ext, sizeof( result ) );            
-		}
-	}
- 
-	return result;
-}     
-
 
