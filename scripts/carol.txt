@@ -1,0 +1,55 @@
+=== carol ===
+name: Carol the Writer
+short: Carol
+face: 0526.png
+
+
+=== talk_to_carol ===
+
+act: set have_talked_to_carol
+
+player: Uhm, excuse me...
+carol: Oh hello! Can you guess what we are doing right now?
+player: I... what?
+carol: We are having a dialog!
+carol: Dialogs are a very important concept in Yarnspin. Along with Locations, they make up the majority of the game.
+carol: Dialogs are made up of phrases which are spoken by a character, and Options, which the player can choose among. You can also use Items in a dialog.
+
+act: carol_options
+
+
+=== carol_options ===
+
+carol: What would you like to know next?
+
+say: Tell me about Options, please?
+act: about_say
+
+say: I'd like to know more about Items.
+act: about_dlg_items
+
+say: So how do I actually write a dialog?
+act: get_note_from_carol
+
+say: Thanks, I think that's it for now.
+act: your_desk
+
+
+=== about_say ===
+
+carol: Options in Dialogs work just like options for Locations. You simply click what you want to say, and different things will happen depending on what you choose.
+act: carol_options
+
+
+=== about_dlg_items ===
+
+carol: I want to know more about items too! But I am not so familiar with them, I just know they can be used in dialogs as well as in locations. If you ask around the place, I am sure someone can tell you more about them.
+act: carol_options
+
+
+=== get_note_from_carol ===
+
+carol: If you want to know more about how to go about implementing dialog in the code, just take this note and show it to Alice in the code room, and she will tell you all about it.
+act: get Carol's note
+act: carol_options
+

@@ -1,0 +1,61 @@
+// introduction game - this line is a comment, and will not be executed
+
+title: Yarnspin Example Game
+author: Mattias Gustavsson
+start: welcome
+palette: yarnspin_default.png
+display_filters: tv, pc, none
+logo: yarnspin_logo.png
+
+// you can change the fonts used - but if you don't specify any, sensible defaults will be picked (the example lines below are commented out)
+
+// font_description: Berkelium64.ttf
+// font_options: Sierra-SCI-Menu-Font.ttf
+// font_characters: Berkelium64.ttf
+// font_items: Berkelium64.ttf
+// font_name: Sierra-SCI-Menu-Font.ttf
+
+// you can change the color of all elements - but if you don't specify them, sensible defaults will be picked (the example lines below are commented out)
+
+// color_background: 1
+// color_disabled: 2
+// color_txt: 3
+// color_opt: 4
+// color_chr: 5
+// color_use: 6
+// color_name: 7
+// color_facebg: 8
+
+// you can specify a background image for both the location screen and the dialog screen (the example lines below are commented out)
+// background_location: yarnspin_location_template.gif
+// background_dialog: yarnspin_dialog_template.gif
+
+
+=== welcome ===
+
+img: home-office-336378_960_720.jpg
+txt: Welcome to Yarnspin, the friendly story-telling engine. This short example game will tell you about - and show you - some of the basic features.
+act: your_desk
+
+
+=== end_sure ===
+
+img: office-702539_960_720.jpg
+txt: Are you sure you want to leave so soon?
+
+opt: Yes, I'm sure. Let me out already!
+act: end
+
+opt: No, just kidding, I wanna stay.
+act: your_desk
+
+
+=== end ===
+
+img: yarnspin_logo.png
+txt: Thank you for stopping by. To find out more about how to tell stories with Yarnspin, please check out the documentation - the file is called "yarnspin.pdf", or visit the Yarnspin website:
+txt:
+txt: mattiasgustavsson.com/yarnspin
+
+act: exit
+// the keyword "exit" is a special command, which ends the game

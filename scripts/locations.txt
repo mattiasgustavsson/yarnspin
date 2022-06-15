@@ -1,0 +1,140 @@
+=== your_desk ===
+
+not show_alternate_desk? img: home-office-336377_960_720.jpg
+    show_alternate_desk? img: workstation-336369_960_720.jpg
+
+talked_about_flags? act: toggle show_alternate_desk
+
+txt: What you are looking at here is a Location, and it is one of the two central concepts in Yarnspin. The other one is the Dialog, which you can find out more about by talking to Carol.
+
+chr: carol
+not have_talked_to_carol? act: talk_to_carol
+    have_talked_to_carol? act: carol_options
+
+opt: So what is a Location then?
+act: about_locations
+
+opt: Visit the art department.
+act: art_department
+
+opt: Visit the code room.
+act: code_room
+
+visited_another_room?
+opt: I think that's enough for now.
+act: end_sure
+
+
+=== about_locations ===
+
+act: set visited_another_room
+
+img: lobby-797961_960_720.jpg
+txt: A location consists of an image (like the one with the nice window above), a description text (you are reading it) and three different types of interactions: Characters, Items and Options.
+
+opt: Characters. What's that about?
+act: about_characters
+
+opt: Tell me more about Items.
+act: about_items
+
+opt: And Options then, what are those?
+act: about_options
+
+opt: Go back to my desk.
+act: your_desk
+
+
+=== about_characters ===
+
+txt: Do you see the area to the left of the picture, which reads "You are alone"? If there are other people in a location, their names will be listed there, and you can talk to them by clicking their name. Go back to your desk and talk to Carol, to try it out. She will tell you all about dialogs in Yarnspin.
+act: about_locations
+
+
+=== about_items ===
+
+txt: So, to the right of the picture, there is some space. It might be empty right now, or it might have one or two items listed there - it depends on if you have talked to John or Carol yet, and if you received something from them. In any case, I'll give you something to hold while we talk about it - but I'll take it back when you leave here.
+act: about_items2
+
+
+=== about_items2 ===
+
+act: get Apple
+txt: The things listed there are called Items, and they are things you acquire while playing the game, and you carry them with you. When they are shown in a dark color, it is not currently possible to use them. You can't even click on it.
+act: about_items3
+
+
+=== about_items3 ===
+
+txt: Let's try using an item. Go ahead, click on the apple to take a bite.
+
+use: Apple
+act: eat_apple
+
+opt: No thanks, I'm not hungry.
+act: items_done
+
+
+=== items_done ===
+
+act: drop Apple
+txt: Ok, if you are not going eat it, I'll have it back thanks.
+act: about_locations
+
+
+=== eat_apple ===
+
+act: drop Apple
+img: apple-1181850_960_720.jpg
+txt: Delicious, isn't it? Items can be set up for use in both locations and dialogs, and are useful as an extra option in addition to the ones at the bottom of the screen.
+txt: If you want to know more about Items, please check out the Yarnspin documentation.
+act: about_locations
+
+
+=== about_options ===
+
+txt: You are already familiar with Options - they are what brought you here! Options are those things at the bottom of the screen, that you can click to decide what happens next.
+act: about_options2
+
+
+=== about_options2 ===
+txt: Options can exist both at Location screens and in Dialogs, and it is possible to have different things happen depending on what the player has done earlier in the game.
+act: about_locations
+
+
+=== art_department ===
+
+act: set visited_another_room
+
+img: painting-911804_960_720.jpg
+txt: Making art for your story can seem hard, but Yarnspin can help you out. It is great if you feel confident to draw your own images, but if you'd rather not, you can still get some nice visuals for your game. Ask John, he can tell you all about it.
+
+chr: john
+not have_talked_to_john? act: talk_to_john
+    have_talked_to_john? act: talk_to_john_again
+
+opt: Visit the code room.
+act: code_room
+
+opt: Go back to my desk.
+act: your_desk
+
+
+=== code_room ===
+
+act: set visited_another_room
+
+img: monitor-1307227_960_720.jpg
+txt: Code is what drives the game, makes it possible for the player to interact with things, and decides what will happen. But don't worry, code in Yarnspin is very friendly. Just ask Alice, she will tell you all about it.
+
+chr: alice
+not have_talked_to_alice? act: talk_to_alice
+    have_talked_to_alice? act: talk_to_alice_again
+
+opt: Visit the art department.
+act: art_department
+
+opt: Go back to my desk.
+act: your_desk
+
+

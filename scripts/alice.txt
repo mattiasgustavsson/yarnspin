@@ -1,0 +1,102 @@
+=== alice ===
+
+name: Alice the Code Wiz
+short: Alice
+face: 0893.png
+
+
+=== talk_to_alice ===
+
+act: set have_talked_to_alice
+
+alice: Hello! Let me tell you about code. It might sound scary if you are new to it, but with Yarnspin, coding is very friendly and easy. You can start with the basics, and as you go along, you can involve the more advanced bits. But don't worry, most of it is nice and easy.
+
+alice: The main concepts in the code are Globals, which are overall settings for the game, Flags, which can be used to keep track of what have happened so far (and to decide what will happen next), and Sections, which come in three flavours: Location, Dialog or Character.
+
+act: alice_options
+
+
+=== talk_to_alice_again ===
+
+alice: You are back! I thought I might have scared you off...
+player: I don't scare that easily.
+
+act: alice_options
+
+
+=== alice_options ===
+
+alice: So, what do you wanna know?
+
+use: John's note
+act: about_art_code
+
+use: Carol's note
+act: about_dialog_code
+
+say: Tell me more about these Globals.
+act: code_globals
+
+say: So what are Flags all about?
+act: code_flags
+
+say: You said there were different kinds of Sections?
+act: code_sections
+
+say: I don't have any more questions right now.
+act: alice_no_more_questions
+
+
+=== alice_no_more_questions ===
+
+alice: Welcome back any time!
+act: code_room
+
+
+=== code_globals ===
+
+alice: At the top of a code file, before you declare any section, you can define global settings for your game. This includes things like stating the title of the game, and who the author is (that's you!)
+alice: Using globals, it is also possible to change settings like fonts and colors, and even choose an entirely different palette for your game, which can make a world of difference for how it looks.
+act: alice_options
+
+
+=== code_flags ===
+
+alice: Ok, so Flags are something that have a name, and which can be either SET or NOT SET. You can write statements in the code to set, clear and toggle flags.
+alice: You can also test if a flag is set or not, and do different things depending on its state. For example, you can set a flag the first time you visit a location, and then you can test that flag on the next visit, to have a character greet you with something like 'You are back!'...
+alice: To find out more about flags, and exactly how they work, please have a look at the Yarnspin documentation, and the example game script.
+alice: Oh, I almost forgot! I want to show you an example of how flags work. From now on, every time you get back to your desk, it will alternate between two different (but similar) images. This is all done using flags.
+act: set talked_about_flags
+act: alice_options
+
+
+=== code_sections ===
+
+alice: Yeah, that's right. First, there are a type of section to define a Location. For these, you can specify an image, a description text, declare actions to be peformed (like, for example, setting or clearing flags) and list characters and items related to the location.
+alice: Then there's the Dialog section type, where you can list phrases to be spoken by characters or the player, and also list options for the player to say. You can also list items which can be used during the dialog, and actions just like you can for locations.
+alice: And finally, there are the Character section type. This is the simplest type of section, and is used to specify the name and appearence of a character.
+alice: For more information of how to exactly define a section in code, please refer to the Yarnspin documentation and the example scripts.
+act: alice_options
+
+
+=== about_art_code ===
+
+act: drop John's note
+
+player: John from the art department told me to give you this note...
+alice: And now you are ready to learn how to use code to get art into your game? How wonderful!
+alice: Getting images into your Yarnspin game is very easy. Just save them into the 'images' folder, and then you can refer to them from the code. Yarnspin will automatically resize and palettize them for you.
+alice: When it comes to portrait pictures for characters, there is already a thousand of them in the 'faces' folder, ready for you to use. But remember, you can always draw your own too, and just save them in the 'faces' folder.
+act: alice_options
+
+
+=== about_dialog_code ===
+
+act: drop Carol's note
+
+player: Carol the writer gave me this note here..
+alice: Oh, you want to learn how to code dialog? Well, there's nothing to it, really!
+alice: In the script code, you just write the characters name, followed by what they say. If you use the name 'player' the line  will be spoken by the player, and shown at the bottom of the screen.
+
+act: alice_options
+

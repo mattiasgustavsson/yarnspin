@@ -1,0 +1,72 @@
+=== john ===
+
+name: John the Art Guy
+short: John
+face: 0578.png
+
+
+=== talk_to_john ===
+
+act: set have_talked_to_john
+
+john: Did I hear someone say Art? That happens to be my specialty.
+john: I know a lot of people feel that they don't have any artistic talent. I don't believe that for a moment! Anyone can learn to draw, you just need to practice it.
+john: But while you are building up your confidence in your own drawing skill, I will tell you about some of the alternatives that Yarnspin offer.
+
+act: john_options
+
+
+=== talk_to_john_again ===
+
+john: Hello again!
+act: john_options
+
+
+=== john_options ===
+
+john: So what can I tell you about next?
+
+say: What, I don't have to draw the images myself?
+act: sourcing_images
+
+say: And what about characters? Pictures of people?
+act: sourcing_faces
+
+say: Ok, I have my images - now what?
+act: get_note_from_john
+
+say: Thanks, I have to get going now.
+act: john_no_more_questions
+
+
+=== get_note_from_john ===
+
+john: If you want to know more about how to go about specifying images in the code, just take this note and show it to Alice in the code room, and she will tell you.
+act: get John's note
+act: john_options
+
+
+=== john_no_more_questions ===
+
+john: There's always a place for you here in the art department.
+act: art_department
+
+
+=== sourcing_images ===
+
+john: Not necessarily! There are plenty of images available that are free to use for your games. But remember, not every image you find is ok to use - you must have the proper permission. And if you use a photo of a person, you need permission from both the photographer and the person in the photo.
+act: sourcing_images2
+
+
+=== sourcing_images2 ===
+
+john: So if you want to find pictures to use for locations, I recommend www.pixabay.com. All pictures there are public domain, and you can use them freely. But note that you can't use pictures of people, without their specific permission. So Yarnspin gives you another option for this.
+act: john_options
+
+
+=== sourcing_faces ===
+
+john: Yarnspin actually includes a whole bunch of character pictures, ready for you to use. I should know, I'm one of them. And so is Alice and Carol, who you can also talk to. Yarnspin comes with one thousand computer generated characters of many different types. If you don't want to draw your own, that is.
+act: john_options
+
+
