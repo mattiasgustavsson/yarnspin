@@ -884,7 +884,7 @@ paldither_palette_t* convert_palette( string palette_filename ) {
     string palette_lookup_file = cstr_cat( cstr_cat( ".cache/palettes/", cbasename( palette_filename ) ), ".plut" );
 
     paldither_palette_t* ditherpal = NULL;
-    if( file_exists( palette_lookup_file ) && !file_more_recent( palette_filename, palette_lookup_file ) ) {
+    if( file_exists( palette_lookup_file ) && g_cache_version == YARNSPIN_VERSION && !file_more_recent( palette_filename, palette_lookup_file ) ) {
         file_t* file = file_load( palette_lookup_file, FILE_MODE_BINARY, NULL );
         if( file ) {
             ditherpal = paldither_palette_create_from_data( file->data, file->size, NULL );
@@ -932,6 +932,7 @@ palrle_data_t* convert_bitmap( string image_filename, int width, int height, str
     string intermediate_processed_filename = cstr_cat( processed_filename_no_ext, ".png" );
 
     if( !file_exists( processed_filename ) || !file_exists( intermediate_processed_filename ) ||
+        g_cache_version != YARNSPIN_VERSION ||
         file_more_recent( cstr_cat( is_face ? "faces/" : "images/", image_filename ), processed_filename ) ||
         file_more_recent( cstr_cat( is_face ? "faces/" : "images/", image_filename ), intermediate_processed_filename ) ) {
 

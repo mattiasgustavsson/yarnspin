@@ -38,6 +38,10 @@
 #include "libs/stb_truetype.h"
 
 
+// Version number stored in the file .cache\VERSION, read at start of program
+int g_cache_version = 0;
+
+
 // forward declares for helper functions placed at the end of this file
 
 char const* cextname( char const* path );
@@ -280,6 +284,11 @@ int main( int argc, char** argv ) {
     #ifndef __wasm__
         // compile yarn
         if( folder_exists( "scripts" ) ) {
+            file_t* version_file = file_load( ".cache/VERSION", FILE_MODE_TEXT, NULL );
+            if( version_file ) {
+                g_cache_version = atoi( (char const*) version_file->data );
+                file_destroy( version_file );
+            }
             buffer_t* compiled_yarn = yarn_compile( "." );
             if( !compiled_yarn ) {
                 printf( "Failed to compile game file\n" );
@@ -303,6 +312,10 @@ int main( int argc, char** argv ) {
             fwrite( header, 1, strlen( header ), fp );
             fclose( fp );
             free( data );
+
+            char version_string[ 16 ];
+            sprintf( version_string, "%d", (int) YARNSPIN_VERSION );
+            file_save_data( version_string, strlen( version_string ), ".cache/VERSION", FILE_MODE_TEXT );
         }
     #endif
 
