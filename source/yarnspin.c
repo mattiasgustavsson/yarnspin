@@ -47,6 +47,7 @@ void create_path( char const* path, int pos );
 int file_more_recent( char const* source_path, char const* output_path );
 int file_exists( char const* filename );
 int folder_exists( char const* filename );
+char const* get_executable_filename( void );
 
 void* compress_lzma( void* data, size_t size, size_t* out_size );
 size_t decompress_lzma( void* compressed_data, size_t compressed_size, void* buffer, size_t size );
@@ -348,7 +349,12 @@ int main( int argc, char** argv ) {
     #ifndef __wasm__
     } else {
         // load from end of executable, if no external data file is present
-        FILE* fp = fopen( argv[ 0 ], "rb" );
+        char const* filename = get_executable_filename();
+        if( !filename ) {
+            printf( "Could not determine executable file\n" );
+            return EXIT_FAILURE;
+        }
+        FILE* fp = fopen( filename, "rb" );
         if( !fp ) {
             printf( "Could not open game data file\n" );
             return EXIT_FAILURE;
@@ -398,20 +404,6 @@ int main( int argc, char** argv ) {
     return app_run( app_proc, &yarn, NULL, NULL, NULL );
 }
 
-
-// pass-through so the program will build with either /SUBSYSTEM:WINDOWS or /SUBSYSTEM:CONSOLE
-#if defined( _WIN32 ) && !defined( __TINYC__ )
-    #ifdef __cplusplus
-        extern "C" int __stdcall WinMain( struct HINSTANCE__*, struct HINSTANCE__*, char*, int ) {
-            return main( __argc, __argv );
-        }
-    #else
-        struct HINSTANCE__;
-        int __stdcall WinMain( struct HINSTANCE__* a, struct HINSTANCE__* b, char* c, int d ) {
-            (void) a, b, c, d; return main( __argc, __argv );
-        }
-    #endif
-#endif
 
 #define APP_IMPLEMENTATION
 #ifdef _WIN32
@@ -681,3 +673,58 @@ size_t decompress_lzma( void* compressed_data, size_t compressed_size, void* buf
     }
     return size;
 }
+
+
+char const* get_executable_filename( void ) {
+    static char filename[ 1024 ];
+    #ifdef _WIN32
+        DWORD sz = GetModuleFileNameA( NULL, filename, (DWORD) sizeof( filename ) );
+        if( sz <= 0 || sz >= sizeof( filename ) ) {
+            return NULL;
+        }
+    #else
+        size_t sz = readlink( "/proc/self/exe", filename, sizeof( filename ) );
+        if( sz <= 0 || sz >= sizeof( filename ) ) {
+            return NULL;
+        }
+    #endif
+    return filename;
+}
+
+
+void ensure_console_open( void ) {
+    #ifdef _WIN32
+        #ifdef __TINYC__
+           HMODULE dll = LoadLibrary( "kernel32" );
+           HWND (*WINAPI GetConsoleWindow)(void) = GetProcAddress( dll, "GetConsoleWindow");
+           BOOL (*WINAPI AttachConsole)(DWORD) = GetProcAddress( dll, "AttachConsole");
+        #endif
+       if( GetConsoleWindow() == NULL) {
+            if( AttachConsole( ATTACH_PARENT_PROCESS ) ) {
+                freopen( "CONOUT$", "w", stdout );
+                freopen( "CONOUT$", "w", stderr );
+                SetFocus( GetConsoleWindow() );
+            }
+        }
+    #endif
+}
+
+
+// pass-through so the program will build with either /SUBSYSTEM:WINDOWS or /SUBSYSTEM:CONSOLE
+#if defined( _WIN32 )
+    #ifdef __cplusplus
+        extern "C" int __stdcall WinMain( struct HINSTANCE__*, struct HINSTANCE__*, char*, int ) {
+            ensure_console_open();
+            return main( __argc, __argv );
+            return result;
+        }
+    #else
+        struct HINSTANCE__;
+        int __stdcall WinMain( struct HINSTANCE__* a, struct HINSTANCE__* b, char* c, int d ) {
+            (void) a, b, c, d; 
+            ensure_console_open();
+            return main( __argc, __argv );
+        }
+    #endif
+#endif
+
