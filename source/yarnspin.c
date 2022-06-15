@@ -417,6 +417,11 @@ int main( int argc, char** argv ) {
     #endif
     }
 
+    // if -c or --compile parameter were specified, don't run the game, just exit after compiling the yarn
+    if( argc == 2 && ( strcmp( argv[ 1 ], "-c" ) == 0 || strcmp( argv[ 1 ], "--compile" ) == 0 ) ) {
+        return EXIT_SUCCESS;
+    }
+
     // load yarn
     yarn_t yarn;
     yarn_load( decompressed_yarn, &yarn );
