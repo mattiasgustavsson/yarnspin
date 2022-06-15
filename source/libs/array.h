@@ -3,7 +3,7 @@
           Licensing information can be found at the end of the file.
 ------------------------------------------------------------------------------
 
-array.h - v1.0 - Dynamic array library for C/C++.
+array.h - v0.1 - Dynamic array library for C/C++.
 
 Do this:
     #define ARRAY_IMPLEMENTATION

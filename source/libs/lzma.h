@@ -1,3 +1,5 @@
+// Single header version of Igor Pavlov's LzmaLib. Public domain.
+// #define LZMA_IMPLEMENTATION in one source file for implementation
 
 #ifndef LZMA_H
 #define LZMA_H

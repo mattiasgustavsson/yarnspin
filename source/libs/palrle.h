@@ -4,6 +4,10 @@
 ------------------------------------------------------------------------------
 
 palrle.h - v0.1 - Run-length encoding of palettized bitmaps, for C/C++.
+
+Do this:
+    #define PALRLE_IMPLEMENTATION
+before you include this file in *one* C/C++ file to create the implementation.
 */
 
 #ifndef palrle_h

@@ -3,7 +3,7 @@
           Licensing information can be found at the end of the file.
 ------------------------------------------------------------------------------
 
-cstr.h - v1.0 - String interning library for C/C++.
+cstr.h - v0.9 - String interning library for C/C++.
 
 Do this:
     #define CSTR_IMPLEMENTATION

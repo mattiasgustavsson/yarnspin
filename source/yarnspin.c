@@ -1,13 +1,16 @@
 #define _CRT_NONSTDC_NO_DEPRECATE
 #define _CRT_SECURE_NO_WARNINGS
 
+// Need to do this before anything else is included, to get proper filenames in memory leak reporting
 #if defined( _WIN32 ) && defined( _DEBUG )
     #define _CRTDBG_MAP_ALLOC
     #include <crtdbg.h>
 #endif
 
+// Yarnspin version for file formats. Increment by one for each release
 #define YARNSPIN_VERSION 1
 
+// C standard lib includes
 #include <ctype.h>
 #include <math.h>
 #include <stdarg.h>
@@ -16,6 +19,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+// Library includes
 #include "libs/app.h"
 #include "libs/array.h"
 #include "libs/buffer.h"
@@ -26,13 +30,15 @@
 #include "libs/frametimer.h"
 #include "libs/file.h"
 #include "libs/img.h"
-#include "libs/lzma.h"
 #include "libs/paldither.h"
 #include "libs/palrle.h"
 #include "libs/pixelfont.h"
 #include "libs/stb_image.h"
 #include "libs/stb_image_write.h"
 #include "libs/stb_truetype.h"
+
+
+// forward declares for helper functions placed at the end of this file
 
 char const* cextname( char const* path );
 char const* cbasename( char const* path );
@@ -42,50 +48,15 @@ int file_more_recent( char const* source_path, char const* output_path );
 int file_exists( char const* filename );
 int folder_exists( char const* filename );
 
-void* compress_lzma( void* data, size_t size, size_t* out_size ) {
-
-    size_t size_props_count = 5;
-    size_t compression_header_size = ( sizeof( uint16_t ) * 2 + size_props_count * sizeof( unsigned char ) );
-    void* compressed_data = malloc( size + compression_header_size );
-    uint16_t* version = (uint16_t*) compressed_data;
-    *version = 19;
-    uint16_t* props_count = version + 1;
-    unsigned char* props = (unsigned char*)( props_count + 1 );
-    unsigned char* compression_buffer = props + size_props_count;
-    size_t compressed_size = size;
-
-    // TODO: configurable compression rate vs speed?
-    int result = LzmaCompress( compression_buffer, &compressed_size, (unsigned char*) data, size,
-        props, &size_props_count, -1, 0, -1, -1, -1, -1, NULL, NULL );
-    *props_count = (uint16_t)size_props_count;
-    *out_size = compressed_size + compression_header_size;
-
-    if( result == SZ_OK )
-        return compressed_data;
-
-    free( compressed_data );
-    return NULL;
-}
+void* compress_lzma( void* data, size_t size, size_t* out_size );
+size_t decompress_lzma( void* compressed_data, size_t compressed_size, void* buffer, size_t size );
 
 
-size_t decompress_lzma( void* compressed_data, size_t compressed_size, void* buffer, size_t size ) {
-    uint16_t* props = (uint16_t*)compressed_data;
-    //assert( *props == 19 );
-    ++props; compressed_size -= 2;
-    size_t props_count = *props;
-    ++props; compressed_size -= 2;
-    compressed_size -= props_count;
-    int ret = LzmaUncompress( (unsigned char*) buffer, &size, ( (unsigned char*) props ) + props_count,
-        &compressed_size, (unsigned char*) props, props_count );
-    if( ret != SZ_OK ) {
-        return 0;
-    }
-    return size;
-}
+// automatic memory management helper stuff
 
 #include "memmgr.h"
-
 static struct memmgr_t g_memmgr = { 0 };
+
 void array_deleter( void* context, void* ptr ) { (void) context; internal_array_destroy( (struct internal_array_t*) ptr ); }
 #define managed_array( type ) ARRAY_CAST( memmgr_add( &g_memmgr, array_create( type ), NULL, array_deleter ) )
 
@@ -101,18 +72,22 @@ void pixelfont_deleter( void* context, void* ptr ) { (void) context; free( ptr )
 void alloc_deleter( void* context, void* ptr ) { (void) context; free( ptr ); }
 #define manage_alloc( instance ) ARRAY_CAST( memmgr_add( &g_memmgr, instance, NULL, alloc_deleter ) )
 
+
+// helper defines
 typedef cstr_t string;
 #define array(type) array_t(type)
 #define array_param(type) array_param_t(type)
 #define ARRAY_COUNT( x ) ( sizeof( x ) / sizeof( *(x) ) )
 
+
+// yarnspin files
 #include "gfxconv.h"
 #include "yarn.h"
-
 #include "input.h"
 #include "game.h"
 
 
+// main game loop and setup
 int app_proc( app_t* app, void* user_data ) {
     yarn_t* yarn = (yarn_t*) user_data;
 
@@ -664,3 +639,45 @@ char const* cbasename( char const* path ) {
     return result;
 }
 
+
+
+void* compress_lzma( void* data, size_t size, size_t* out_size ) {
+
+    size_t size_props_count = 5;
+    size_t compression_header_size = ( sizeof( uint16_t ) * 2 + size_props_count * sizeof( unsigned char ) );
+    void* compressed_data = malloc( size + compression_header_size );
+    uint16_t* version = (uint16_t*) compressed_data;
+    *version = 19;
+    uint16_t* props_count = version + 1;
+    unsigned char* props = (unsigned char*)( props_count + 1 );
+    unsigned char* compression_buffer = props + size_props_count;
+    size_t compressed_size = size;
+
+    // TODO: configurable compression rate vs speed?
+    int result = LzmaCompress( compression_buffer, &compressed_size, (unsigned char*) data, size,
+        props, &size_props_count, -1, 0, -1, -1, -1, -1, NULL, NULL );
+    *props_count = (uint16_t)size_props_count;
+    *out_size = compressed_size + compression_header_size;
+
+    if( result == SZ_OK )
+        return compressed_data;
+
+    free( compressed_data );
+    return NULL;
+}
+
+
+size_t decompress_lzma( void* compressed_data, size_t compressed_size, void* buffer, size_t size ) {
+    uint16_t* props = (uint16_t*)compressed_data;
+    //assert( *props == 19 );
+    ++props; compressed_size -= 2;
+    size_t props_count = *props;
+    ++props; compressed_size -= 2;
+    compressed_size -= props_count;
+    int ret = LzmaUncompress( (unsigned char*) buffer, &size, ( (unsigned char*) props ) + props_count,
+        &compressed_size, (unsigned char*) props, props_count );
+    if( ret != SZ_OK ) {
+        return 0;
+    }
+    return size;
+}
