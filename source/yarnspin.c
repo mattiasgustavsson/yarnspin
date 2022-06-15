@@ -673,7 +673,10 @@ size_t decompress_lzma( void* compressed_data, size_t compressed_size, void* buf
     }
     return size;
 }
-
+ 
+#ifndef _WIN32
+    #include <unistd.h>
+#endif
 
 char const* get_executable_filename( void ) {
     static char filename[ 1024 ];
