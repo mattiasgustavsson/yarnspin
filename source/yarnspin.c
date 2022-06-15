@@ -265,6 +265,14 @@ int app_proc( app_t* app, void* user_data ) {
     if( crtemu ) {
         crtemu_destroy( crtemu );
     }
+
+    if( frame_tv_pixels ) {
+        stbi_image_free( frame_tv_pixels );
+    }
+
+    if( frame_pc_pixels ) {
+        stbi_image_free( frame_pc_pixels );
+    }
     memmgr_clear( &g_memmgr );
     return 0;
 }
