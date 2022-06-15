@@ -716,7 +716,6 @@ void ensure_console_open( void ) {
         extern "C" int __stdcall WinMain( struct HINSTANCE__*, struct HINSTANCE__*, char*, int ) {
             ensure_console_open();
             return main( __argc, __argv );
-            return result;
         }
     #else
         struct HINSTANCE__;
