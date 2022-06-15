@@ -3,7 +3,7 @@
 
 // If you want buffer to swap endianness on read/write, do this before include #define BUFFER_BIG_ENDIAN
 
-#ifndef BUFFER_I8_T 
+#ifndef BUFFER_I8_T
     #define BUFFER_I8_T char
 #endif
 
@@ -19,7 +19,7 @@
     #define BUFFER_I64_T long long
 #endif
 
-#ifndef BUFFER_U8_T 
+#ifndef BUFFER_U8_T
     #define BUFFER_U8_T unsigned char
 #endif
 
@@ -157,7 +157,7 @@ bool buffer_save( buffer_t* buffer, char const* filename ) {
     if( !fp ) {
         return false;
     }
-    size_t written = fwrite( buffer->data, 1, buffer->size, fp ); 
+    size_t written = fwrite( buffer->data, 1, buffer->size, fp );
     fclose( fp );
     return written == buffer->size;
 }
@@ -165,10 +165,10 @@ bool buffer_save( buffer_t* buffer, char const* filename ) {
 
 void buffer_resize( buffer_t* buffer, size_t size ) {
     if( size > buffer->capacity ) {
-        while( size > buffer->capacity ) { 
-            buffer->capacity *= 2; 
-        } 
-        buffer->data = realloc( buffer->data, buffer->capacity ); 
+        while( size > buffer->capacity ) {
+            buffer->capacity *= 2;
+        }
+        buffer->data = realloc( buffer->data, buffer->capacity );
     }
     buffer->size = size;
     if( buffer->position > size ) {
@@ -214,7 +214,7 @@ void* buffer_data( buffer_t* buffer ) {
             } \
             return result; \
         }
-#else 
+#else
     #define BUFFER_READ_IMPL \
         { \
             int result = 0; \
@@ -266,7 +266,7 @@ int buffer_read_bool( buffer_t* buffer, bool* value, int count ) BUFFER_READ_IMP
 
 #undef BUFFER_READ_IMPL
 
-	
+
 #ifndef BUFFER_BIG_ENDIAN
     #define BUFFER_WRITE_IMPL \
         { \
@@ -337,7 +337,7 @@ int buffer_write_u32( buffer_t* buffer, BUFFER_U32_T const* value, int count ) B
 int buffer_write_u64( buffer_t* buffer, BUFFER_U64_T const* value, int count ) BUFFER_WRITE_IMPL
 int buffer_write_float( buffer_t* buffer, float const* value, int count ) BUFFER_WRITE_IMPL
 int buffer_write_double( buffer_t* buffer, double const* value, int count ) BUFFER_WRITE_IMPL
-int buffer_write_bool( buffer_t* buffer, bool const* value, int count ) BUFFER_WRITE_IMPL 
+int buffer_write_bool( buffer_t* buffer, bool const* value, int count ) BUFFER_WRITE_IMPL
 
 #undef BUFFER_WRITE_IMPL
 

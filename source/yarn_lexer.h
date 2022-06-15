@@ -189,7 +189,7 @@ typedef struct lexer_section_t {
 } lexer_section_t;
 
 
-bool yarn_lexer( string filename, string yarn_source, array_param(lexer_declaration_t)* globals, 
+bool yarn_lexer( string filename, string yarn_source, array_param(lexer_declaration_t)* globals,
     array_param(lexer_section_t)* sections ) {
 
     array(line_t)* lexer_lines = array_create( line_t );
@@ -248,7 +248,7 @@ bool yarn_lexer( string filename, string yarn_source, array_param(lexer_declarat
             }
         }
     }
-    
+
     array_destroy( lexer_lines );
     return !lexer_errors;
 }

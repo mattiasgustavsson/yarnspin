@@ -18,14 +18,14 @@ before you include this file in *one* C/C++ file to create the implementation.
 #endif
 
 #ifndef CSTR_SIZE_T
-    #define _CRT_NONSTDC_NO_DEPRECATE 
+    #define _CRT_NONSTDC_NO_DEPRECATE
     #define _CRT_SECURE_NO_WARNINGS
     #include <stddef.h>
     #define CSTR_SIZE_T size_t
 #endif
 
 #ifndef CSTR_BOOL_T
-    #define _CRT_NONSTDC_NO_DEPRECATE 
+    #define _CRT_NONSTDC_NO_DEPRECATE
     #define _CRT_SECURE_NO_WARNINGS
     #include <stdbool.h>
     #define CSTR_BOOL_T bool
@@ -33,7 +33,7 @@ before you include this file in *one* C/C++ file to create the implementation.
 
 
 #ifndef CSTR_VA_LIST_T
-    #define _CRT_NONSTDC_NO_DEPRECATE 
+    #define _CRT_NONSTDC_NO_DEPRECATE
     #define _CRT_SECURE_NO_WARNINGS
     #include <stdarg.h>
     #define CSTR_VA_LIST_T va_list
@@ -203,17 +203,17 @@ cstr.h
 #ifdef CSTR_IMPLEMENTATION
 #undef CSTR_IMPLEMENTATION
 
-#ifndef CSTR_DEFAULT_BLOCK_SIZE 
+#ifndef CSTR_DEFAULT_BLOCK_SIZE
     #define CSTR_DEFAULT_BLOCK_SIZE 0x400000 /* 4 MB */
 #endif
 
 #ifndef CSTR_MUTEX_LOCK
-    #define CSTR_MUTEX_LOCK() 
-    #define CSTR_MUTEX_UNLOCK() 
+    #define CSTR_MUTEX_LOCK()
+    #define CSTR_MUTEX_UNLOCK()
 #endif
 
 #ifndef CSTR_VA_START
-    #define _CRT_NONSTDC_NO_DEPRECATE 
+    #define _CRT_NONSTDC_NO_DEPRECATE
     #define _CRT_SECURE_NO_WARNINGS
     #include <stdarg.h>
     #define CSTR_VA_START va_start
@@ -221,95 +221,95 @@ cstr.h
 #endif
 
 #ifndef CSTR_ASSERT
-    #define _CRT_NONSTDC_NO_DEPRECATE 
+    #define _CRT_NONSTDC_NO_DEPRECATE
     #define _CRT_SECURE_NO_WARNINGS
     #include <assert.h>
     #define CSTR_ASSERT( expression, message ) assert( ( expression ) && ( message ) )
 #endif
 
 #ifndef CSTR_ISSPACE
-    #define _CRT_NONSTDC_NO_DEPRECATE 
+    #define _CRT_NONSTDC_NO_DEPRECATE
     #define _CRT_SECURE_NO_WARNINGS
     #include <ctype.h>
     #define CSTR_ISSPACE( c ) ( isspace( c ) )
-#endif 
+#endif
 
 #ifndef CSTR_TOUPPER
-    #define _CRT_NONSTDC_NO_DEPRECATE 
+    #define _CRT_NONSTDC_NO_DEPRECATE
     #define _CRT_SECURE_NO_WARNINGS
     #include <ctype.h>
     #define CSTR_TOUPPER( c ) ( toupper( c ) )
-#endif 
+#endif
 
 #ifndef CSTR_TOLOWER
-    #define _CRT_NONSTDC_NO_DEPRECATE 
+    #define _CRT_NONSTDC_NO_DEPRECATE
     #define _CRT_SECURE_NO_WARNINGS
     #include <ctype.h>
     #define CSTR_TOLOWER( c ) ( tolower( c ) )
-#endif 
+#endif
 
 #ifndef CSTR_MEMCPY
-    #define _CRT_NONSTDC_NO_DEPRECATE 
+    #define _CRT_NONSTDC_NO_DEPRECATE
     #define _CRT_SECURE_NO_WARNINGS
     #include <string.h>
     #define CSTR_MEMCPY( dst, src, cnt ) ( memcpy( (dst), (src), (cnt) ) )
-#endif 
+#endif
 
 #ifndef CSTR_MEMCMP
-    #define _CRT_NONSTDC_NO_DEPRECATE 
+    #define _CRT_NONSTDC_NO_DEPRECATE
     #define _CRT_SECURE_NO_WARNINGS
     #include <string.h>
     #define CSTR_MEMCMP( a, b, cnt ) ( memcmp( (a), (b), (cnt) ) )
-#endif 
+#endif
 
 #ifndef CSTR_MEMSET
-    #define _CRT_NONSTDC_NO_DEPRECATE 
+    #define _CRT_NONSTDC_NO_DEPRECATE
     #define _CRT_SECURE_NO_WARNINGS
     #include <string.h>
     #define CSTR_MEMSET( ptr, val, cnt ) ( memset( (ptr), (val), (cnt) ) )
-#endif 
+#endif
 
 #ifndef CSTR_STRLEN
-    #define _CRT_NONSTDC_NO_DEPRECATE 
+    #define _CRT_NONSTDC_NO_DEPRECATE
     #define _CRT_SECURE_NO_WARNINGS
     #include <string.h>
-    #define CSTR_STRLEN( s ) ( strlen( s ) )        
-#endif 
+    #define CSTR_STRLEN( s ) ( strlen( s ) )
+#endif
 
 #ifndef CSTR_STRSTR
-    #define _CRT_NONSTDC_NO_DEPRECATE 
+    #define _CRT_NONSTDC_NO_DEPRECATE
     #define _CRT_SECURE_NO_WARNINGS
-    #define CSTR_STRSTR( s1, s2 ) ( strstr( (s1), (s2) ) )        
-#endif 
+    #define CSTR_STRSTR( s1, s2 ) ( strstr( (s1), (s2) ) )
+#endif
 
 #ifndef CSTR_STRNICMP
     #ifdef _WIN32
-        #define _CRT_NONSTDC_NO_DEPRECATE 
+        #define _CRT_NONSTDC_NO_DEPRECATE
         #define _CRT_SECURE_NO_WARNINGS
         #include <string.h>
         #define CSTR_STRNICMP( s1, s2, len ) ( strnicmp( (s1), (s2), (len) ) )
     #else
         #include <strings.h>
-        #define CSTR_STRNICMP( s1, s2, len ) ( strncasecmp( (s1), (s2), (len) ) )        
+        #define CSTR_STRNICMP( s1, s2, len ) ( strncasecmp( (s1), (s2), (len) ) )
     #endif
-#endif 
+#endif
 
 #ifndef CSTR_VSNPRINTF
-    #define _CRT_NONSTDC_NO_DEPRECATE 
+    #define _CRT_NONSTDC_NO_DEPRECATE
     #define _CRT_SECURE_NO_WARNINGS
     #include <stdio.h>
     #define CSTR_VSNPRINTF( s, n, fmt, args ) ( vsnprintf( (s), (n), (fmt), (args) ) )
 #endif
 
 #ifndef CSTR_MALLOC
-    #define _CRT_NONSTDC_NO_DEPRECATE 
+    #define _CRT_NONSTDC_NO_DEPRECATE
     #define _CRT_SECURE_NO_WARNINGS
     #include <stdlib.h>
     #define CSTR_MALLOC( ctx, size ) ( malloc( size ) )
     #define CSTR_FREE( ctx, ptr ) ( free( ptr ) )
 #endif
 
-#define _CRT_NONSTDC_NO_DEPRECATE 
+#define _CRT_NONSTDC_NO_DEPRECATE
 #define _CRT_SECURE_NO_WARNINGS
 #include <stdarg.h>
 
@@ -344,28 +344,28 @@ struct cstri_t {
 
 
 static CSTR_U32 internal_cstr_hash( char const* str, CSTR_SIZE_T length ) {
-	CSTR_U32 m = 0x5bd1e995u;
-	CSTR_U32 h = 0x31313137u;
-	while( length >= 4 ) {
-		CSTR_U32 k = *(CSTR_U32 *)str;
-		k *= m;
-		k ^= k >> 24;
-		k *= m;
-		h *= m;
-		h ^= k;
-		str += 4;
-		length -= 4;
-	}
+    CSTR_U32 m = 0x5bd1e995u;
+    CSTR_U32 h = 0x31313137u;
+    while( length >= 4 ) {
+        CSTR_U32 k = *(CSTR_U32 *)str;
+        k *= m;
+        k ^= k >> 24;
+        k *= m;
+        h *= m;
+        h ^= k;
+        str += 4;
+        length -= 4;
+    }
     switch( length ) {
         case 3: h ^= str[ 2 ] << 16;
         case 2: h ^= str[ 1 ] << 8;
         case 1: h ^= str[ 0 ];
                 h *= m;
-	}
-	h ^= h >> 13;
-	h *= m;
-	h ^= h >> 15;
-	return h;
+    }
+    h ^= h >> 13;
+    h *= m;
+    h ^= h >> 15;
+    return h;
 }
 
 
@@ -376,13 +376,13 @@ static struct cstr_slot_t* internal_cstr_interned( struct cstri_t* cstri, char c
                 str -= sizeof( CSTR_U32 );
                 CSTR_U32 hash = *(CSTR_U32*) str;
                 str -= sizeof( CSTR_SIZE_T );
-        	    size_t slot = ( hash & ( cstri->hash_table_capacity - 1 ) );
-	            while( cstri->hash_table[ slot ].string ) {
+                size_t slot = ( hash & ( cstri->hash_table_capacity - 1 ) );
+                while( cstri->hash_table[ slot ].string ) {
                     if( cstri->hash_table[ slot ].string == str ) {
                         return &cstri->hash_table[ slot ];
                     }
-		            slot = ( slot + 1 ) & ( cstri->hash_table_capacity - 1 );
-	            }   
+                    slot = ( slot + 1 ) & ( cstri->hash_table_capacity - 1 );
+                }
                 return NULL;
             }
         }
@@ -392,16 +392,16 @@ static struct cstr_slot_t* internal_cstr_interned( struct cstri_t* cstri, char c
 
 
 static struct cstr_slot_t* internal_cstr_find_slot( struct cstri_t* cstri, CSTR_U32 hash, char const* str, CSTR_SIZE_T len ) {
-	size_t slot = ( hash & ( cstri->hash_table_capacity - 1 ) );
-	while( cstri->hash_table[ slot ].string ) {
-		if( cstri->hash_table[ slot ].hash == hash && cstri->hash_table[ slot ].length == len ) {
+    size_t slot = ( hash & ( cstri->hash_table_capacity - 1 ) );
+    while( cstri->hash_table[ slot ].string ) {
+        if( cstri->hash_table[ slot ].hash == hash && cstri->hash_table[ slot ].length == len ) {
             char const* slot_string = cstri->hash_table[ slot ].string + sizeof( CSTR_SIZE_T ) + sizeof( CSTR_U32 );
-			if( CSTR_MEMCMP( slot_string, str, len ) == 0 ) {
+            if( CSTR_MEMCMP( slot_string, str, len ) == 0 ) {
                 break;
-			}
-		}
-		slot = ( slot + 1 ) & ( cstri->hash_table_capacity - 1 );
-	}   
+            }
+        }
+        slot = ( slot + 1 ) & ( cstri->hash_table_capacity - 1 );
+    }
     return &cstri->hash_table[ slot ];
 }
 
@@ -428,7 +428,7 @@ static char const* internal_cstr_insert( struct cstri_t* cstri, char const* str,
 
         cstri->hash_table_capacity *= 2;
 
-        cstri->hash_table = (struct cstr_slot_t*) CSTR_MALLOC( cstri->memctx,  
+        cstri->hash_table = (struct cstr_slot_t*) CSTR_MALLOC( cstri->memctx,
             cstri->hash_table_capacity * sizeof( *cstri->hash_table ) );
         CSTR_MEMSET( cstri->hash_table, 0, cstri->hash_table_capacity * sizeof( *cstri->hash_table ) );
 
@@ -440,7 +440,7 @@ static char const* internal_cstr_insert( struct cstri_t* cstri, char const* str,
                     new_slot = ( new_slot + 1 ) & ( cstri->hash_table_capacity - 1 );
                 }
                 cstri->hash_table[ new_slot ] = old_table[ i ];
-            }               
+            }
         }
 
         CSTR_FREE( cstri->memctx, old_table );
@@ -543,10 +543,10 @@ struct cstr_restore_point_t* cstri_restore_point( struct cstri_t* cstri ) {
 
 
 void cstri_rollback( struct cstri_t* cstri, struct cstr_restore_point_t* restore_point ) {
-    // find the block containing the restore point    
+    // find the block containing the restore point
     CSTR_SIZE_T index = cstri->blocks_count;
     for( CSTR_SIZE_T i = 0; i < cstri->blocks_count; ++i ) {
-        if( restore_point >= (struct cstr_restore_point_t*)cstri->blocks[ i ].head 
+        if( restore_point >= (struct cstr_restore_point_t*)cstri->blocks[ i ].head
           && restore_point <= (struct cstr_restore_point_t*)cstri->blocks[ i ].tail ) {
             index = i;
             break;
@@ -575,9 +575,9 @@ void cstri_rollback( struct cstri_t* cstri, struct cstr_restore_point_t* restore
             CSTR_U32 hash = *(CSTR_U32*)( ptr + sizeof( CSTR_SIZE_T ) );
 
             size_t slot = ( hash & ( cstri->hash_table_capacity - 1 ) );
-	        while( cstri->hash_table[ slot ].string ) {
-		        slot = ( slot + 1 ) & ( cstri->hash_table_capacity - 1 );
-	        }   
+            while( cstri->hash_table[ slot ].string ) {
+                slot = ( slot + 1 ) & ( cstri->hash_table_capacity - 1 );
+            }
             cstri->hash_table[ slot ].hash = hash;
             cstri->hash_table[ slot ].length = len;
             cstri->hash_table[ slot ].string = ptr;
@@ -638,13 +638,13 @@ char const* cstri_vformat( struct cstri_t* cstri, char const* format, CSTR_VA_LI
     if( !format ) {
         return internal_cstr_insert( cstri, "", 0 );
     }
-	int size = CSTR_VSNPRINTF( cstri->temp_buffer, cstri->temp_capacity, format, args );
+    int size = CSTR_VSNPRINTF( cstri->temp_buffer, cstri->temp_capacity, format, args );
     if( size < 0 ) {
         return NULL;
     }
     if( (CSTR_SIZE_T) size >= cstri->temp_capacity ) {
         internal_cstr_temp_buffer( cstri, size + 1u );
-    	CSTR_VSNPRINTF( cstri->temp_buffer, cstri->temp_capacity, format, args );
+        CSTR_VSNPRINTF( cstri->temp_buffer, cstri->temp_capacity, format, args );
     }
     return internal_cstr_insert( cstri, cstri->temp_buffer, (CSTR_SIZE_T)size );
 }
@@ -654,15 +654,15 @@ char const* cstri_format( struct cstri_t* cstri, char const* format, ... ) {
     if( !format ) {
         return internal_cstr_insert( cstri, "", 0 );
     }
-	CSTR_VA_LIST_T args;
-	CSTR_VA_START( args, format );
+    CSTR_VA_LIST_T args;
+    CSTR_VA_START( args, format );
     char const* ret = cstri_vformat( cstri, format, args );
     CSTR_VA_END( args );
     return ret;
 }
 
 
-char const* cstri_trim( struct cstri_t* cstri, char const* str ) { 
+char const* cstri_trim( struct cstri_t* cstri, char const* str ) {
     if( !str ) {
         return internal_cstr_insert( cstri, "", 0 );
     }
@@ -674,11 +674,11 @@ char const* cstri_trim( struct cstri_t* cstri, char const* str ) {
     while( end > start && CSTR_ISSPACE( *( end - 1 ) ) ) {
         --end;
     }
-    return internal_cstr_insert( cstri, start, (CSTR_SIZE_T)( end - start ) ); 
+    return internal_cstr_insert( cstri, start, (CSTR_SIZE_T)( end - start ) );
 }
 
 
-char const* cstri_ltrim( struct cstri_t* cstri, char const* str ) { 
+char const* cstri_ltrim( struct cstri_t* cstri, char const* str ) {
     if( !str ) {
         return internal_cstr_insert( cstri, "", 0 );
     }
@@ -687,11 +687,11 @@ char const* cstri_ltrim( struct cstri_t* cstri, char const* str ) {
     while( start < end && CSTR_ISSPACE( *start ) ) {
         ++start;
     }
-    return internal_cstr_insert( cstri, start, (CSTR_SIZE_T)( end - start ) ); 
+    return internal_cstr_insert( cstri, start, (CSTR_SIZE_T)( end - start ) );
 }
 
 
-char const* cstri_rtrim( struct cstri_t* cstri, char const* str ) { 
+char const* cstri_rtrim( struct cstri_t* cstri, char const* str ) {
     if( !str ) {
         return internal_cstr_insert( cstri, "", 0 );
     }
@@ -700,11 +700,11 @@ char const* cstri_rtrim( struct cstri_t* cstri, char const* str ) {
     while( end > start && CSTR_ISSPACE( *( end - 1 ) ) ) {
         --end;
     }
-    return internal_cstr_insert( cstri, start, (CSTR_SIZE_T)( end - start ) ); 
+    return internal_cstr_insert( cstri, start, (CSTR_SIZE_T)( end - start ) );
 }
 
 
-char const* cstri_left( struct cstri_t* cstri, char const* str, size_t n ) { 
+char const* cstri_left( struct cstri_t* cstri, char const* str, size_t n ) {
     if( !str ) {
         return internal_cstr_insert( cstri, "", 0 );
     }
@@ -712,11 +712,11 @@ char const* cstri_left( struct cstri_t* cstri, char const* str, size_t n ) {
     if( len <= n ) {
         return internal_cstr_insert( cstri, str, len );
     }
-    return internal_cstr_insert( cstri, str, n ); 
+    return internal_cstr_insert( cstri, str, n );
 }
 
 
-char const* cstri_right( struct cstri_t* cstri, char const* str, size_t n ) { 
+char const* cstri_right( struct cstri_t* cstri, char const* str, size_t n ) {
     if( !str ) {
         return internal_cstr_insert( cstri, "", 0 );
     }
@@ -724,11 +724,11 @@ char const* cstri_right( struct cstri_t* cstri, char const* str, size_t n ) {
     if( len <= n ) {
         return internal_cstr_insert( cstri, str, len );
     }
-    return internal_cstr_insert( cstri, str + len - n, n ); 
+    return internal_cstr_insert( cstri, str + len - n, n );
 }
 
 
-char const* cstri_mid( struct cstri_t* cstri, char const* str, size_t start, size_t n ) { 
+char const* cstri_mid( struct cstri_t* cstri, char const* str, size_t start, size_t n ) {
     if( !str ) {
         return internal_cstr_insert( cstri, "", 0 );
     }
@@ -739,11 +739,11 @@ char const* cstri_mid( struct cstri_t* cstri, char const* str, size_t start, siz
     if( len - start <= n || n <= 0 ) {
         return internal_cstr_insert( cstri, str + start, len - start );
     }
-    return internal_cstr_insert( cstri, str + start, n ); 
+    return internal_cstr_insert( cstri, str + start, n );
 }
 
 
-char const* cstri_upper( struct cstri_t* cstri, char const* str ) { 
+char const* cstri_upper( struct cstri_t* cstri, char const* str ) {
     if( !str ) {
         return internal_cstr_insert( cstri, "", 0 );
     }
@@ -752,11 +752,11 @@ char const* cstri_upper( struct cstri_t* cstri, char const* str ) {
     for( CSTR_SIZE_T i = 0; i < len; ++i ) {
         temp[ i ] = (char) CSTR_TOUPPER( str[ i ] );
     }
-    return internal_cstr_insert( cstri, temp, len ); 
+    return internal_cstr_insert( cstri, temp, len );
 }
 
 
-char const* cstri_lower( struct cstri_t* cstri, char const* str ) { 
+char const* cstri_lower( struct cstri_t* cstri, char const* str ) {
     if( !str ) {
         return internal_cstr_insert( cstri, "", 0 );
     }
@@ -765,61 +765,61 @@ char const* cstri_lower( struct cstri_t* cstri, char const* str ) {
     for( CSTR_SIZE_T i = 0; i < len; ++i ) {
         temp[ i ] = (char) CSTR_TOLOWER( str[ i ] );
     }
-    return internal_cstr_insert( cstri, temp, len ); 
+    return internal_cstr_insert( cstri, temp, len );
 }
 
 #pragma warning( push )
 #pragma warning( disable: 4100 )
 
 char const* cstri_lpad( struct cstri_t* cstri, char const* str, char padding, CSTR_SIZE_T total_max_length ) {
-    return NULL; // todo 
+    return NULL; // todo
 }
 
 
 char const* cstri_rpad( struct cstri_t* cstri, char const* str, char padding, CSTR_SIZE_T total_max_length ) {
-    return NULL; // todo 
+    return NULL; // todo
 }
 
 
 char const* cstri_join( struct cstri_t* cstri, char const* a, char const* b, char const* separator ) {
-    return NULL; // todo 
+    return NULL; // todo
 }
 
 
 char const* cstri_replace( struct cstri_t* cstri, char const* str, char const* find, char const* replacement ) {
-    return NULL; // todo 
+    return NULL; // todo
 }
 
 
 char const* cstri_insert( struct cstri_t* cstri, char const* str, int position, char const* insertion ) {
-    return NULL; // todo 
+    return NULL; // todo
 }
 
 
 char const* cstri_remove( struct cstri_t* cstri, char const* str, int start, int length ) {
-    return NULL; // todo 
+    return NULL; // todo
 }
 
 #pragma warning( pop )
 
-char const* cstri_int( struct cstri_t* cstri, int i ) { 
-    return cstri_format( cstri, "%d", i ); 
+char const* cstri_int( struct cstri_t* cstri, int i ) {
+    return cstri_format( cstri, "%d", i );
 }
 
 
-char const* cstri_float( struct cstri_t* cstri, float f ) { 
-    return cstri_format( cstri, "%f", f ); 
+char const* cstri_float( struct cstri_t* cstri, float f ) {
+    return cstri_format( cstri, "%f", f );
 }
 
 
-CSTR_BOOL_T cstri_starts( struct cstri_t* cstri, char const* str, char const* start ) { 
+CSTR_BOOL_T cstri_starts( struct cstri_t* cstri, char const* str, char const* start ) {
     CSTR_SIZE_T str_len = cstri_len( cstri, str );
     CSTR_SIZE_T start_len = cstri_len( cstri, start );
     return str_len >= start_len && CSTR_MEMCMP( str, start, start_len ) == 0;
 }
 
 
-CSTR_BOOL_T cstri_ends( struct cstri_t* cstri, char const* str, char const* end ) { 
+CSTR_BOOL_T cstri_ends( struct cstri_t* cstri, char const* str, char const* end ) {
     CSTR_SIZE_T str_len = cstri_len( cstri, str );
     CSTR_SIZE_T end_len = cstri_len( cstri, end );
     return str_len >= end_len && CSTR_MEMCMP( str + str_len - end_len, end, end_len ) == 0;
@@ -860,7 +860,7 @@ int cstri_compare_nocase( struct cstri_t* cstri, char const* a, char const* b ) 
 }
 
 
-int cstri_find( struct cstri_t* cstri, char const* str, char const* find, int start ) { 
+int cstri_find( struct cstri_t* cstri, char const* str, char const* find, int start ) {
     if( !str || !find || start < 0) {
         return -1;
     }
@@ -876,7 +876,7 @@ int cstri_find( struct cstri_t* cstri, char const* str, char const* find, int st
 }
 
 
-int cstri_rfind( struct cstri_t* cstri, char const* str, char const* find, int start ) { 
+int cstri_rfind( struct cstri_t* cstri, char const* str, char const* find, int start ) {
     (void) cstri, (void)str, (void)find, (void)start;
     // todo
     return -1;
@@ -934,7 +934,7 @@ char const* cstri_tokenize( struct cstri_t* cstri, struct cstr_tokenizer_t* toke
     }
 
     tokenizer->internal = (void*) pos;
-    
+
     // no more tokens?
     if( *token == '\0' ) {
         return NULL;
@@ -980,7 +980,7 @@ static void internal_cstr_instance( void ) {
 }
 
 
-void cstr_reset( void ) { 
+void cstr_reset( void ) {
     CSTR_MUTEX_LOCK();
     internal_cstr_cleanup();
     CSTR_MUTEX_UNLOCK();
@@ -1004,139 +1004,139 @@ void cstr_rollback( struct cstr_restore_point_t* restore_point ) {
 }
 
 
-char const* cstr( char const* str ) { 
+char const* cstr( char const* str ) {
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    char const* ret = cstri( g_internal_cstr, str ); 
+    char const* ret = cstri( g_internal_cstr, str );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
 
 
-char const* cstr_n( char const* str, CSTR_SIZE_T n ) { 
+char const* cstr_n( char const* str, CSTR_SIZE_T n ) {
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    char const* ret = cstri_n( g_internal_cstr, str, n ); 
+    char const* ret = cstri_n( g_internal_cstr, str, n );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
 
 
-CSTR_BOOL_T cstr_is_interned( char const* str ) { 
+CSTR_BOOL_T cstr_is_interned( char const* str ) {
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    CSTR_BOOL_T ret = cstri_is_interned( g_internal_cstr, str ); 
+    CSTR_BOOL_T ret = cstri_is_interned( g_internal_cstr, str );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
 
 
-CSTR_SIZE_T cstr_len( char const* str ) { 
+CSTR_SIZE_T cstr_len( char const* str ) {
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    CSTR_SIZE_T ret = cstri_len( g_internal_cstr, str ); 
+    CSTR_SIZE_T ret = cstri_len( g_internal_cstr, str );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
 
 
-char const* cstr_cat( char const* a, char const* b ) { 
+char const* cstr_cat( char const* a, char const* b ) {
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    char const* ret = cstri_cat( g_internal_cstr, a, b ); 
+    char const* ret = cstri_cat( g_internal_cstr, a, b );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
 
 
-char const* cstr_vformat( char const* format, CSTR_VA_LIST_T args ) { 
+char const* cstr_vformat( char const* format, CSTR_VA_LIST_T args ) {
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    char const* ret = cstri_vformat( g_internal_cstr, format, args ); 
+    char const* ret = cstri_vformat( g_internal_cstr, format, args );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
 
 
-char const* cstr_format( char const* format, ... ) { 
+char const* cstr_format( char const* format, ... ) {
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-	CSTR_VA_LIST_T args;
-	CSTR_VA_START( args, format );
-    char const* ret = cstri_vformat( g_internal_cstr, format, args ); 
+    CSTR_VA_LIST_T args;
+    CSTR_VA_START( args, format );
+    char const* ret = cstri_vformat( g_internal_cstr, format, args );
     CSTR_VA_END( args );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
 
 
-char const* cstr_trim( char const* str ) { 
+char const* cstr_trim( char const* str ) {
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    char const* ret = cstri_trim( g_internal_cstr, str ); 
+    char const* ret = cstri_trim( g_internal_cstr, str );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
 
 
-char const* cstr_ltrim( char const* str ) { 
+char const* cstr_ltrim( char const* str ) {
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    char const* ret = cstri_ltrim( g_internal_cstr, str ); 
+    char const* ret = cstri_ltrim( g_internal_cstr, str );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
 
 
-char const* cstr_rtrim( char const* str ) { 
+char const* cstr_rtrim( char const* str ) {
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    char const* ret = cstri_rtrim( g_internal_cstr, str ); 
+    char const* ret = cstri_rtrim( g_internal_cstr, str );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
 
 
-char const* cstr_left( char const* str, size_t n ) { 
+char const* cstr_left( char const* str, size_t n ) {
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    char const* ret = cstri_left( g_internal_cstr, str, n ); 
+    char const* ret = cstri_left( g_internal_cstr, str, n );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
 
 
-char const* cstr_right( char const* str, size_t n ) { 
+char const* cstr_right( char const* str, size_t n ) {
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    char const* ret = cstri_right( g_internal_cstr, str, n ); 
+    char const* ret = cstri_right( g_internal_cstr, str, n );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
 
 
-char const* cstr_mid( char const* str, size_t start, size_t n ) { 
+char const* cstr_mid( char const* str, size_t start, size_t n ) {
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    char const* ret = cstri_mid( g_internal_cstr, str, start, n ); 
+    char const* ret = cstri_mid( g_internal_cstr, str, start, n );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
 
 
-char const* cstr_upper( char const* str ) { 
+char const* cstr_upper( char const* str ) {
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    char const* ret = cstri_upper( g_internal_cstr, str ); 
+    char const* ret = cstri_upper( g_internal_cstr, str );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
 
 
-char const* cstr_lower( char const* str ) { 
+char const* cstr_lower( char const* str ) {
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    char const* ret = cstri_lower( g_internal_cstr, str ); 
+    char const* ret = cstri_lower( g_internal_cstr, str );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
@@ -1145,7 +1145,7 @@ char const* cstr_lower( char const* str ) {
 char const* cstr_lpad( char const* str, char padding, CSTR_SIZE_T total_max_length ) {
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    char const* ret = cstri_lpad( g_internal_cstr, str, padding, total_max_length ); 
+    char const* ret = cstri_lpad( g_internal_cstr, str, padding, total_max_length );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
@@ -1154,7 +1154,7 @@ char const* cstr_lpad( char const* str, char padding, CSTR_SIZE_T total_max_leng
 char const* cstr_rpad( char const* str, char padding, CSTR_SIZE_T total_max_length ) {
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    char const* ret = cstri_rpad( g_internal_cstr, str, padding, total_max_length ); 
+    char const* ret = cstri_rpad( g_internal_cstr, str, padding, total_max_length );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
@@ -1163,7 +1163,7 @@ char const* cstr_rpad( char const* str, char padding, CSTR_SIZE_T total_max_leng
 char const* cstr_join( char const* a, char const* b, char const* separator ) {
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    char const* ret = cstri_join( g_internal_cstr, a, b, separator ); 
+    char const* ret = cstri_join( g_internal_cstr, a, b, separator );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
@@ -1172,7 +1172,7 @@ char const* cstr_join( char const* a, char const* b, char const* separator ) {
 char const* cstr_replace( char const* str, char const* find, char const* replacement ) {
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    char const* ret = cstri_replace( g_internal_cstr, str, find, replacement ); 
+    char const* ret = cstri_replace( g_internal_cstr, str, find, replacement );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
@@ -1181,7 +1181,7 @@ char const* cstr_replace( char const* str, char const* find, char const* replace
 char const* cstr_insert( char const* str, int position, char const* insertion ) {
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    char const* ret = cstri_insert( g_internal_cstr, str, position,insertion ); 
+    char const* ret = cstri_insert( g_internal_cstr, str, position,insertion );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
@@ -1190,43 +1190,43 @@ char const* cstr_insert( char const* str, int position, char const* insertion ) 
 char const* cstr_remove( char const* str, int start, int length ) {
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    char const* ret = cstri_remove( g_internal_cstr, str, start, length ); 
+    char const* ret = cstri_remove( g_internal_cstr, str, start, length );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
 
 
-char const* cstr_int( int i ) { 
+char const* cstr_int( int i ) {
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    char const* ret = cstri_int( g_internal_cstr, i ); 
+    char const* ret = cstri_int( g_internal_cstr, i );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
 
 
-char const* cstr_float( float f ) { 
+char const* cstr_float( float f ) {
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    char const* ret = cstri_float( g_internal_cstr, f ); 
+    char const* ret = cstri_float( g_internal_cstr, f );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
 
 
-CSTR_BOOL_T cstr_starts( char const* str, char const* start ) { 
+CSTR_BOOL_T cstr_starts( char const* str, char const* start ) {
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    CSTR_BOOL_T ret = cstri_starts( g_internal_cstr, str, start ); 
+    CSTR_BOOL_T ret = cstri_starts( g_internal_cstr, str, start );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
 
 
-CSTR_BOOL_T cstr_ends( char const* str, char const* end ) { 
+CSTR_BOOL_T cstr_ends( char const* str, char const* end ) {
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    CSTR_BOOL_T ret = cstri_ends( g_internal_cstr, str, end ); 
+    CSTR_BOOL_T ret = cstri_ends( g_internal_cstr, str, end );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
@@ -1238,7 +1238,7 @@ CSTR_BOOL_T cstr_is_equal( char const* a, char const* b ) {
     }
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    int ret = cstri_is_equal( g_internal_cstr, a, b ); 
+    int ret = cstri_is_equal( g_internal_cstr, a, b );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
@@ -1250,7 +1250,7 @@ int cstr_compare( char const* a, char const* b ) {
     }
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    int ret = cstri_compare( g_internal_cstr, a, b ); 
+    int ret = cstri_compare( g_internal_cstr, a, b );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
@@ -1262,25 +1262,25 @@ int cstr_compare_nocase( char const* a, char const* b ) {
     }
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    int ret = cstri_compare_nocase( g_internal_cstr, a, b ); 
+    int ret = cstri_compare_nocase( g_internal_cstr, a, b );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
 
 
-int cstr_find( char const* str, char const* find, int start ) { 
+int cstr_find( char const* str, char const* find, int start ) {
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    int ret = cstri_find( g_internal_cstr, str, find, start ); 
+    int ret = cstri_find( g_internal_cstr, str, find, start );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
 
 
-int cstr_rfind( char const* str, char const* find, int start ) { 
+int cstr_rfind( char const* str, char const* find, int start ) {
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    int ret = cstri_rfind( g_internal_cstr, str, find, start ); 
+    int ret = cstri_rfind( g_internal_cstr, str, find, start );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
@@ -1289,7 +1289,7 @@ int cstr_rfind( char const* str, char const* find, int start ) {
 CSTR_U32 cstr_hash( char const* str ) {
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    CSTR_U32 ret = cstri_hash( g_internal_cstr, str ); 
+    CSTR_U32 ret = cstri_hash( g_internal_cstr, str );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
@@ -1298,7 +1298,7 @@ CSTR_U32 cstr_hash( char const* str ) {
 struct cstr_tokenizer_t cstr_tokenizer( char const* str ) {
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    struct cstr_tokenizer_t ret = cstri_tokenizer( g_internal_cstr, str ); 
+    struct cstr_tokenizer_t ret = cstri_tokenizer( g_internal_cstr, str );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
@@ -1307,7 +1307,7 @@ struct cstr_tokenizer_t cstr_tokenizer( char const* str ) {
 char const* cstr_tokenize( struct cstr_tokenizer_t* tokenizer, char const* separators ) {
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    char const* ret = cstri_tokenize( g_internal_cstr, tokenizer, separators ); 
+    char const* ret = cstri_tokenize( g_internal_cstr, tokenizer, separators );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
@@ -1316,7 +1316,7 @@ char const* cstr_tokenize( struct cstr_tokenizer_t* tokenizer, char const* separ
 char* cstr_temp_buffer( size_t capacity ) {
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    char* ret = cstri_temp_buffer( g_internal_cstr, capacity ); 
+    char* ret = cstri_temp_buffer( g_internal_cstr, capacity );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
@@ -2095,7 +2095,7 @@ void test_cstr_int( void ) {
     TESTFW_TEST_END();
 }
 
-    
+
 void test_cstr_float( void ) {
     TESTFW_TEST_BEGIN( "Use cstr_float" );
     char const* str = cstr_float( 42.0f );
@@ -2126,7 +2126,7 @@ void test_cstr_float( void ) {
     TESTFW_TEST_END();
 }
 
-    
+
 void test_cstr_starts( void ) {
     TESTFW_TEST_BEGIN( "Use cstr_starts with matching substring" );
     TESTFW_EXPECTED( cstr_starts( "TestString", "Test" ) == true );
@@ -2367,66 +2367,66 @@ void test_cstr_hash( void ) {
 
 void test_cstr_tokenize( void ) {
     TESTFW_TEST_BEGIN( "Can tokenize sample string" );
-    
+
     struct cstr_tokenizer_t tokenizer = cstr_tokenizer( "A string\tof ,,tokens\nand some  more tokens    " );
     TESTFW_EXPECTED( tokenizer.internal != NULL );
-    
+
     char const* token1 = cstr_tokenize( &tokenizer, " ,\t\n" );
     TESTFW_EXPECTED( cstr_is_interned( token1 ) );
     TESTFW_EXPECTED( token1 != NULL );
     TESTFW_EXPECTED( strcmp( token1, "A" ) == 0 );
-    
+
     char const* token2 = cstr_tokenize( &tokenizer, " ,\t\n" );
     TESTFW_EXPECTED( cstr_is_interned( token2 ) );
     TESTFW_EXPECTED( token2 != NULL );
     TESTFW_EXPECTED( strcmp( token2, "string" ) == 0 );
-    
+
     char const* token3 = cstr_tokenize( &tokenizer, " ,\t\n" );
     TESTFW_EXPECTED( cstr_is_interned( token3 ) );
     TESTFW_EXPECTED( token3 != NULL );
     TESTFW_EXPECTED( strcmp( token3, "of" ) == 0 );
-    
+
     char const* token4 = cstr_tokenize( &tokenizer, " ,\t\n" );
     TESTFW_EXPECTED( cstr_is_interned( token4 ) );
     TESTFW_EXPECTED( token4 != NULL );
     TESTFW_EXPECTED( strcmp( token4, "tokens" ) == 0 );
-    
+
     char const* token5 = cstr_tokenize( &tokenizer, " ,\t\n" );
     TESTFW_EXPECTED( cstr_is_interned( token5 ) );
     TESTFW_EXPECTED( token5 != NULL );
     TESTFW_EXPECTED( strcmp( token5, "and" ) == 0 );
-    
+
     char const* token6 = cstr_tokenize( &tokenizer, " ,\t\n" );
     TESTFW_EXPECTED( cstr_is_interned( token6 ) );
     TESTFW_EXPECTED( token6 != NULL );
     TESTFW_EXPECTED( strcmp( token6, "some" ) == 0 );
-    
+
     char const* token7 = cstr_tokenize( &tokenizer, " ,\t\n" );
     TESTFW_EXPECTED( cstr_is_interned( token7 ) );
     TESTFW_EXPECTED( token7 != NULL );
     TESTFW_EXPECTED( strcmp( token7, "more" ) == 0 );
-    
+
     char const* token8 = cstr_tokenize( &tokenizer, " ,\t\n" );
     TESTFW_EXPECTED( cstr_is_interned( token8 ) );
     TESTFW_EXPECTED( token8 != NULL );
     TESTFW_EXPECTED( strcmp( token8, "tokens" ) == 0 );
-    
+
     char const* token9 = cstr_tokenize( &tokenizer, " ,\t\n" );
     TESTFW_EXPECTED( token9 == NULL );
 
     TESTFW_TEST_END();
 
 
-    TESTFW_TEST_BEGIN( "Can tokenize string containing only separators" );  
+    TESTFW_TEST_BEGIN( "Can tokenize string containing only separators" );
     struct cstr_tokenizer_t tokenizer = cstr_tokenizer( " \t ,,\n   " );
-    TESTFW_EXPECTED( tokenizer.internal != NULL );    
+    TESTFW_EXPECTED( tokenizer.internal != NULL );
     char const* token = cstr_tokenize( &tokenizer, " ,\t\n" );
     TESTFW_EXPECTED( token == NULL );
     TESTFW_TEST_END();
 
-    TESTFW_TEST_BEGIN( "Can tokenize NULL string" );  
+    TESTFW_TEST_BEGIN( "Can tokenize NULL string" );
     struct cstr_tokenizer_t tokenizer = cstr_tokenizer( NULL );
-    TESTFW_EXPECTED( tokenizer.internal != NULL );    
+    TESTFW_EXPECTED( tokenizer.internal != NULL );
     char const* token = cstr_tokenize( &tokenizer, " ,\t\n" );
     TESTFW_EXPECTED( token == NULL );
     TESTFW_TEST_END();
@@ -2437,7 +2437,7 @@ int main( int argc, char** argv ) {
     (void) argc, argv;
 
     TESTFW_INIT();
-    
+
     test_cstr();
     test_cstr_n();
     test_cstr_len();
@@ -2470,14 +2470,14 @@ int main( int argc, char** argv ) {
 
 // pass-through so the program will build with either /SUBSYSTEM:WINDOWS or /SUBSYSTEM:CONSOLE
 #if defined( _WIN32 ) && !defined( __TINYC__ )
-    #ifdef __cplusplus 
-        extern "C" int __stdcall WinMain( struct HINSTANCE__*, struct HINSTANCE__*, char*, int ) { 
-            return main( __argc, __argv ); 
+    #ifdef __cplusplus
+        extern "C" int __stdcall WinMain( struct HINSTANCE__*, struct HINSTANCE__*, char*, int ) {
+            return main( __argc, __argv );
         }
     #else
         struct HINSTANCE__;
-        int __stdcall WinMain( struct HINSTANCE__* a, struct HINSTANCE__* b, char* c, int d ) { 
-            (void) a, b, c, d; return main( __argc, __argv ); 
+        int __stdcall WinMain( struct HINSTANCE__* a, struct HINSTANCE__* b, char* c, int d ) {
+            (void) a, b, c, d; return main( __argc, __argv );
         }
     #endif
 #endif
@@ -2490,7 +2490,7 @@ int main( int argc, char** argv ) {
 
 /*
 revision history:
-    1.0     first released version  
+    1.0     first released version
 */
 
 

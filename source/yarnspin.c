@@ -1,4 +1,4 @@
-#define _CRT_NONSTDC_NO_DEPRECATE 
+#define _CRT_NONSTDC_NO_DEPRECATE
 #define _CRT_SECURE_NO_WARNINGS
 
 #if defined( _WIN32 ) && defined( _DEBUG )
@@ -7,9 +7,6 @@
 #endif
 
 #define YARNSPIN_VERSION 1
-
-#define CRT_FRAME_IMPLEMENTATION
-#include "crt_frame.h"
 
 #include <ctype.h>
 #include <math.h>
@@ -40,7 +37,7 @@
 char const* cextname( char const* path );
 char const* cbasename( char const* path );
 
-void create_path( char const* path, int pos ); 
+void create_path( char const* path, int pos );
 int file_more_recent( char const* source_path, char const* output_path );
 int file_exists( char const* filename );
 int folder_exists( char const* filename );
@@ -54,15 +51,15 @@ void* compress_lzma( void* data, size_t size, size_t* out_size ) {
     *version = 19;
     uint16_t* props_count = version + 1;
     unsigned char* props = (unsigned char*)( props_count + 1 );
-    unsigned char* compression_buffer = props + size_props_count; 
-    size_t compressed_size = size;            
-    
+    unsigned char* compression_buffer = props + size_props_count;
+    size_t compressed_size = size;
+
     // TODO: configurable compression rate vs speed?
-    int result = LzmaCompress( compression_buffer, &compressed_size, (unsigned char*) data, size, 
+    int result = LzmaCompress( compression_buffer, &compressed_size, (unsigned char*) data, size,
         props, &size_props_count, -1, 0, -1, -1, -1, -1, NULL, NULL );
     *props_count = (uint16_t)size_props_count;
     *out_size = compressed_size + compression_header_size;
-    
+
     if( result == SZ_OK )
         return compressed_data;
 
@@ -78,7 +75,7 @@ size_t decompress_lzma( void* compressed_data, size_t compressed_size, void* buf
     size_t props_count = *props;
     ++props; compressed_size -= 2;
     compressed_size -= props_count;
-    int ret = LzmaUncompress( (unsigned char*) buffer, &size, ( (unsigned char*) props ) + props_count, 
+    int ret = LzmaUncompress( (unsigned char*) buffer, &size, ( (unsigned char*) props ) + props_count,
         &compressed_size, (unsigned char*) props, props_count );
     if( ret != SZ_OK ) {
         return 0;
@@ -151,12 +148,12 @@ int app_proc( app_t* app, void* user_data ) {
         app_window_pos( app, x, y );
         app_window_size( app, w, h );
     }
-    
+
     #ifndef __wasm__
         bool fullscreen = true;
     #else
         bool fullscreen = false;
-    #endif    
+    #endif
     app_interpolation( app, APP_INTERPOLATION_NONE );
     app_screenmode( app, fullscreen ? APP_SCREENMODE_FULLSCREEN : APP_SCREENMODE_WINDOW );
     app_title( app, yarn->globals.title );
@@ -166,7 +163,7 @@ int app_proc( app_t* app, void* user_data ) {
     CRTEMU_PC_U32* frame_pc_pixels = NULL;
     if( yarn->assets.frame_pc ) {
         int c;
-        frame_pc_pixels = (CRTEMU_PC_U32*) stbi_load_from_memory( (stbi_uc*) yarn->assets.frame_pc, 
+        frame_pc_pixels = (CRTEMU_PC_U32*) stbi_load_from_memory( (stbi_uc*) yarn->assets.frame_pc,
             yarn->assets.frame_pc_size, &frame_pc_width, &frame_pc_height, &c, 4 );
     }
 
@@ -175,7 +172,7 @@ int app_proc( app_t* app, void* user_data ) {
     CRTEMU_U32* frame_tv_pixels = NULL;
     if( yarn->assets.frame_tv ) {
         int c;
-        frame_tv_pixels = (CRTEMU_U32*) stbi_load_from_memory( (stbi_uc*) yarn->assets.frame_tv, 
+        frame_tv_pixels = (CRTEMU_U32*) stbi_load_from_memory( (stbi_uc*) yarn->assets.frame_tv,
             yarn->assets.frame_tv_size, &frame_tv_width, &frame_tv_height, &c, 4 );
     }
 
@@ -214,14 +211,14 @@ int app_proc( app_t* app, void* user_data ) {
             display_filter = yarn->globals.display_filters->items[ display_filter_index ];
         }
 
-		APP_U32 transition = (APP_U32)( ( 255 * abs( game.transition_counter ) / 10 ) );
-		APP_U32 fade = transition << 16 | transition << 8 | transition;
-		uint32_t bg = yarn->assets.palette[ game.color_background ];
-		#define RGBMUL32( a, b) \
-			( ( ( ( ( ( (a) >> 16U ) & 0xffU ) * ( ( (b) >> 16U ) & 0xffU ) ) >> 8U ) << 16U ) | \
-				( ( ( ( ( (a) >> 8U  ) & 0xffU ) * ( ( (b) >> 8U  ) & 0xffU ) ) >> 8U ) << 8U  ) | \
-				( ( ( ( ( (a)        ) & 0xffU ) * ( ( (b)        ) & 0xffU ) ) >> 8U )        ) )
-		bg = RGBMUL32( fade, bg );		
+        APP_U32 transition = (APP_U32)( ( 255 * abs( game.transition_counter ) / 10 ) );
+        APP_U32 fade = transition << 16 | transition << 8 | transition;
+        uint32_t bg = yarn->assets.palette[ game.color_background ];
+        #define RGBMUL32( a, b) \
+            ( ( ( ( ( ( (a) >> 16U ) & 0xffU ) * ( ( (b) >> 16U ) & 0xffU ) ) >> 8U ) << 16U ) | \
+                ( ( ( ( ( (a) >> 8U  ) & 0xffU ) * ( ( (b) >> 8U  ) & 0xffU ) ) >> 8U ) << 8U  ) | \
+                ( ( ( ( ( (a)        ) & 0xffU ) * ( ( (b)        ) & 0xffU ) ) >> 8U )        ) )
+        bg = RGBMUL32( fade, bg );
 
         static uint32_t screen[ 364* 306 ];
         time += 1000000 / 60;
@@ -296,26 +293,26 @@ int app_proc( app_t* app, void* user_data ) {
 int main( int argc, char** argv ) {
     (void) argc, (void ) argv;
 
-	// Enable windows memory leak detection (will report leaks in the Output window)
+    // Enable windows memory leak detection (will report leaks in the Output window)
     #if defined( _WIN32 ) && defined( _DEBUG )
-		int flag = _CrtSetDbgFlag( _CRTDBG_REPORT_FLAG ); // Get current flag
-		flag |= _CRTDBG_LEAK_CHECK_DF; // Turn on leak-checking bit
-		_CrtSetDbgFlag( flag ); // Set flag to the new value
-		//_CrtSetBreakAlloc( 0 ); // Can be manually commented back in to break at a certain allocation
-	#endif
+        int flag = _CrtSetDbgFlag( _CRTDBG_REPORT_FLAG ); // Get current flag
+        flag |= _CRTDBG_LEAK_CHECK_DF; // Turn on leak-checking bit
+        _CrtSetDbgFlag( flag ); // Set flag to the new value
+        //_CrtSetBreakAlloc( 0 ); // Can be manually commented back in to break at a certain allocation
+    #endif
 
     #ifndef __wasm__
         // compile yarn
         if( folder_exists( "scripts" ) ) {
-	        buffer_t* compiled_yarn = yarn_compile( "." );
-	        if( !compiled_yarn ) {
-		        printf( "Failed to compile game file\n" );
-		        return EXIT_FAILURE;
-	        }    
+            buffer_t* compiled_yarn = yarn_compile( "." );
+            if( !compiled_yarn ) {
+                printf( "Failed to compile game file\n" );
+                return EXIT_FAILURE;
+            }
             size_t size;
             void* data = compress_lzma( buffer_data( compiled_yarn ), buffer_size( compiled_yarn ), &size );
             uint32_t original_size = (uint32_t) buffer_size( compiled_yarn );
-            buffer_destroy( compiled_yarn );   
+            buffer_destroy( compiled_yarn );
             FILE* fp = fopen( "yarnspin.dat", "wb" );
             char header[] = "YARNSPIN";
             uint32_t version = YARNSPIN_VERSION;
@@ -333,7 +330,7 @@ int main( int argc, char** argv ) {
         }
     #endif
 
-    // load and decompress yarn data 
+    // load and decompress yarn data
     buffer_t* decompressed_yarn = buffer_create();
 
     #ifndef __wasm__
@@ -343,23 +340,23 @@ int main( int argc, char** argv ) {
     #endif
         // load from external data file if it exists
         buffer_t* loaded_yarn = buffer_load( "yarnspin.dat" );
-	    if( !loaded_yarn ) {
-		    printf( "Failed to load yarnspin.dat\n" );
-		    return EXIT_FAILURE;
-	    }    
+        if( !loaded_yarn ) {
+            printf( "Failed to load yarnspin.dat\n" );
+            return EXIT_FAILURE;
+        }
         char header[ 8 ];
         buffer_read_i8( loaded_yarn, header, 8 );
         if( strncmp( header, "YARNSPIN", 8 ) != 0 ) {
-		    printf( "The file yarnspin.dat is not a valid Yarnspin game data file\n" );
-		    return EXIT_FAILURE;
+            printf( "The file yarnspin.dat is not a valid Yarnspin game data file\n" );
+            return EXIT_FAILURE;
         }
-        uint32_t version = 0; 
+        uint32_t version = 0;
         buffer_read_u32( loaded_yarn, &version, 1 );
         if( version != YARNSPIN_VERSION ) {
-		    printf( "The file yarnspin.dat is for a different Yarnspin version\n" );
-		    return EXIT_FAILURE;
+            printf( "The file yarnspin.dat is for a different Yarnspin version\n" );
+            return EXIT_FAILURE;
         }
-        uint32_t size_in_bytes; 
+        uint32_t size_in_bytes;
         buffer_read_u32( loaded_yarn, &size_in_bytes, 1 );
         uint32_t uncompressed_size;
         buffer_read_u32( loaded_yarn, &uncompressed_size, 1 );
@@ -367,10 +364,10 @@ int main( int argc, char** argv ) {
         void* data = (void*) ( ( (uintptr_t)buffer_data( loaded_yarn ) ) + buffer_position( loaded_yarn ) );
         size_t size = buffer_size( loaded_yarn ) - buffer_position( loaded_yarn );
         size_t decompressed_size = decompress_lzma( data, size, buffer_data( decompressed_yarn ), uncompressed_size );
-        buffer_destroy( loaded_yarn );    
+        buffer_destroy( loaded_yarn );
         if( decompressed_size != uncompressed_size ) {
-            buffer_destroy( decompressed_yarn );    
-		    printf( "Failed to decompress game file\n" );
+            buffer_destroy( decompressed_yarn );
+            printf( "Failed to decompress game file\n" );
             return EXIT_FAILURE;
         }
     #ifndef __wasm__
@@ -378,22 +375,22 @@ int main( int argc, char** argv ) {
         // load from end of executable, if no external data file is present
         FILE* fp = fopen( argv[ 0 ], "rb" );
         if( !fp ) {
-		    printf( "Could not open game data file\n" );
-		    return EXIT_FAILURE;
+            printf( "Could not open game data file\n" );
+            return EXIT_FAILURE;
         }
         fseek( fp, -8, SEEK_END );
         char header[ 8 ];
         fread( header, 1, 8, fp );
         if( strncmp( header, "YARNSPIN", 8 ) != 0 ) {
-		    printf( "No yarnspin.dat game data can be loaded\n" );
-		    return EXIT_FAILURE;
+            printf( "No yarnspin.dat game data can be loaded\n" );
+            return EXIT_FAILURE;
         }
         fseek( fp, -( 8 + (int) sizeof( uint32_t ) ), SEEK_END );
         uint32_t version = 0;
         fread( &version, 1, sizeof( version ), fp );
         if( version != YARNSPIN_VERSION ) {
-		    printf( "The game data file embedded in the EXE is for a different Yarnspin version\n" );
-		    return EXIT_FAILURE;
+            printf( "The game data file embedded in the EXE is for a different Yarnspin version\n" );
+            return EXIT_FAILURE;
         }
         fseek( fp, -( 8 + 2 * (int) sizeof( uint32_t ) ), SEEK_END );
         uint32_t size_in_bytes = 0;
@@ -411,8 +408,8 @@ int main( int argc, char** argv ) {
         size_t decompressed_size = decompress_lzma( data, size, buffer_data( decompressed_yarn ), uncompressed_size );
         free( data );
         if( decompressed_size != uncompressed_size ) {
-            buffer_destroy( decompressed_yarn );    
-		    printf( "Failed to decompress game file\n" );
+            buffer_destroy( decompressed_yarn );
+            printf( "Failed to decompress game file\n" );
             return EXIT_FAILURE;
         }
     #endif
@@ -421,7 +418,7 @@ int main( int argc, char** argv ) {
     // load yarn
     yarn_t yarn;
     yarn_load( decompressed_yarn, &yarn );
-    buffer_destroy( decompressed_yarn );    
+    buffer_destroy( decompressed_yarn );
 
     return app_run( app_proc, &yarn, NULL, NULL, NULL );
 }
@@ -429,27 +426,27 @@ int main( int argc, char** argv ) {
 
 // pass-through so the program will build with either /SUBSYSTEM:WINDOWS or /SUBSYSTEM:CONSOLE
 #if defined( _WIN32 ) && !defined( __TINYC__ )
-    #ifdef __cplusplus 
-        extern "C" int __stdcall WinMain( struct HINSTANCE__*, struct HINSTANCE__*, char*, int ) { 
-            return main( __argc, __argv ); 
+    #ifdef __cplusplus
+        extern "C" int __stdcall WinMain( struct HINSTANCE__*, struct HINSTANCE__*, char*, int ) {
+            return main( __argc, __argv );
         }
     #else
         struct HINSTANCE__;
-        int __stdcall WinMain( struct HINSTANCE__* a, struct HINSTANCE__* b, char* c, int d ) { 
-            (void) a, b, c, d; return main( __argc, __argv ); 
+        int __stdcall WinMain( struct HINSTANCE__* a, struct HINSTANCE__* b, char* c, int d ) {
+            (void) a, b, c, d; return main( __argc, __argv );
         }
     #endif
 #endif
 
 #define APP_IMPLEMENTATION
-#ifdef _WIN32 
+#ifdef _WIN32
     #define APP_WINDOWS
 #elif __wasm__
     #define APP_WASM
-#else 
+#else
     #define APP_SDL
 #endif
-#define APP_LOG( ctx, level, message ) 
+#define APP_LOG( ctx, level, message )
 #include "libs/app.h"
 
 
@@ -475,7 +472,7 @@ int main( int argc, char** argv ) {
     #define DIR_POSIX
 #endif
 #include "libs/dir.h"
-        
+
 #define FILE_IMPLEMENTATION
 #include "libs/file.h"
 
@@ -514,7 +511,7 @@ int main( int argc, char** argv ) {
 #pragma warning( push )
 #pragma warning( disable: 4204 )
 #pragma warning( disable: 4244 ) // conversion from 'int' to 'short', possible loss of data
-#pragma warning( disable: 4365 ) 
+#pragma warning( disable: 4365 )
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "libs/stb_image_write.h"
 #pragma warning( pop )
@@ -526,15 +523,15 @@ int main( int argc, char** argv ) {
 #include <sys/stat.h>
 
 void makedir( char const* path ) {
-	#ifdef _WIN32
-		CreateDirectoryA( path, NULL );
-	#else 
-		mkdir( path, S_IRWXU );
-	#endif
+    #ifdef _WIN32
+        CreateDirectoryA( path, NULL );
+    #else
+        mkdir( path, S_IRWXU );
+    #endif
 }
 
 
-void create_path( char const* path, int pos ) { 
+void create_path( char const* path, int pos ) {
     pos = cstr_find( path, "/", pos );
     if( pos < 0 ) {
         return;
@@ -546,40 +543,40 @@ void create_path( char const* path, int pos ) {
 
 
 time_t file_last_changed( char const* filename ) {
-	if( filename ) {
-		struct stat result;
-		int ret = stat( filename, &result );
-		if( ret == 0 ) {
-			return result.st_mtime;
-	    }
-	}    
-	return 0;	    
+    if( filename ) {
+        struct stat result;
+        int ret = stat( filename, &result );
+        if( ret == 0 ) {
+            return result.st_mtime;
+        }
+    }
+    return 0;
 }
 
 
 int file_more_recent( char const* source_path,  char const* output_path  ) {
-	return file_last_changed( source_path ) > file_last_changed( output_path );
+    return file_last_changed( source_path ) > file_last_changed( output_path );
 }
 
 
 int file_exists( char const* filename ) {
-	struct stat result;
-	int ret = stat( filename, &result );
-	if( ret == 0 ) {
-		return result.st_mode & S_IFREG;
-	}
+    struct stat result;
+    int ret = stat( filename, &result );
+    if( ret == 0 ) {
+        return result.st_mode & S_IFREG;
+    }
 
-	return 0;
+    return 0;
 }
 
 int folder_exists( char const* filename ) {
-	struct stat result;
-	int ret = stat( filename, &result );
-	if( ret == 0 ) {
-		return result.st_mode & S_IFDIR;
-	}
+    struct stat result;
+    int ret = stat( filename, &result );
+    if( ret == 0 ) {
+        return result.st_mode & S_IFDIR;
+    }
 
-	return 0;
+    return 0;
 }
 
 #ifndef _WIN32
@@ -588,82 +585,82 @@ int folder_exists( char const* filename ) {
 
 
 char const* cextname( char const* path ) {
-	static char result[ 1024 ];
-	strcpy( result, "" );
+    static char result[ 1024 ];
+    strcpy( result, "" );
 
-	if( path ) {
-		char const* lastForwardSlash = strrchr( path, '/' );
-		char const* lastBackSlash = strrchr( path, '\\' );
-		
-		char const* name = 0;
-		char const* ext = 0;
-		
-		if( !lastBackSlash && !lastForwardSlash ) {
-			name = path;
-		} else if( !lastBackSlash ) {
-			name = lastForwardSlash + 1;
-		} else if( !lastForwardSlash ) {
-			name = lastBackSlash + 1;
-		} else if( lastForwardSlash > lastBackSlash ) {
-			name = lastForwardSlash + 1;
-		} else {
-			name = lastBackSlash + 1;
-		}
-			
-		ext = strrchr( name, '.' );
-		
-		if( ext && !( ext[ 0 ] == '.' && ext[ 1 ] == 0 ) ) {
-			strncpy( result, ext, sizeof( result ) );            
-		}
-	}
- 
-	return result;
-}     
+    if( path ) {
+        char const* lastForwardSlash = strrchr( path, '/' );
+        char const* lastBackSlash = strrchr( path, '\\' );
+
+        char const* name = 0;
+        char const* ext = 0;
+
+        if( !lastBackSlash && !lastForwardSlash ) {
+            name = path;
+        } else if( !lastBackSlash ) {
+            name = lastForwardSlash + 1;
+        } else if( !lastForwardSlash ) {
+            name = lastBackSlash + 1;
+        } else if( lastForwardSlash > lastBackSlash ) {
+            name = lastForwardSlash + 1;
+        } else {
+            name = lastBackSlash + 1;
+        }
+
+        ext = strrchr( name, '.' );
+
+        if( ext && !( ext[ 0 ] == '.' && ext[ 1 ] == 0 ) ) {
+            strncpy( result, ext, sizeof( result ) );
+        }
+    }
+
+    return result;
+}
 
 
 char const* cbasename( char const* path ) {
     char const* extension = cextname( path );
 
-	static char result[ 1024 ];
-	strcpy( result, "" );
+    static char result[ 1024 ];
+    strcpy( result, "" );
 
-	if( path ) {
-		char const* lastForwardSlash = strrchr( path, '/' );
-		char const* lastBackSlash = strrchr( path, '\\' );
-		
-		char const* name = 0;
-		
-		if( !lastBackSlash && !lastForwardSlash ) {
-			name = path;
-		} else if( !lastBackSlash ) {
-			name = lastForwardSlash + 1;
-		} else if( !lastForwardSlash ) {
-			name = lastBackSlash + 1;
-		} else if( lastForwardSlash > lastBackSlash ) {
-			name = lastForwardSlash + 1;
-		} else {
-			name = lastBackSlash + 1;
-		}
-			
-		strncpy( result, name, sizeof( result ) );
-			
-		if( extension ) {
-			size_t extlen = strlen( extension );
-			size_t reslen = strlen( result );
-			
-			if( reslen >= extlen ) {
+    if( path ) {
+        char const* lastForwardSlash = strrchr( path, '/' );
+        char const* lastBackSlash = strrchr( path, '\\' );
+
+        char const* name = 0;
+
+        if( !lastBackSlash && !lastForwardSlash ) {
+            name = path;
+        } else if( !lastBackSlash ) {
+            name = lastForwardSlash + 1;
+        } else if( !lastForwardSlash ) {
+            name = lastBackSlash + 1;
+        } else if( lastForwardSlash > lastBackSlash ) {
+            name = lastForwardSlash + 1;
+        } else {
+            name = lastBackSlash + 1;
+        }
+
+        strncpy( result, name, sizeof( result ) );
+
+        if( extension ) {
+            size_t extlen = strlen( extension );
+            size_t reslen = strlen( result );
+
+            if( reslen >= extlen ) {
                 #if _WIN32
-				if( stricmp( result + (reslen - extlen), extension ) == 0 ) {
+                if( stricmp( result + (reslen - extlen), extension ) == 0 ) {
                 #else
                 if( strcasecmp( result + (reslen - extlen), extension ) == 0 ) {
                 #endif
-					result[ reslen - extlen ] = 0;
-				}
-			}
-			
-		}
-	}
+                    result[ reslen - extlen ] = 0;
+                }
+            }
 
-	return result;
+        }
+    }
+
+    return result;
 }
 

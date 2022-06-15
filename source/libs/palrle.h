@@ -10,13 +10,13 @@ palrle.h - v0.1 - Run-length encoding of palettized bitmaps, for C/C++.
 #define palrle_h
 
 #ifndef PALRLE_U8
-	#define PALRLE_U8 unsigned char
+    #define PALRLE_U8 unsigned char
 #endif
 #ifndef PALRLE_U16
-	#define PALRLE_U16 unsigned short
+    #define PALRLE_U16 unsigned short
 #endif
 #ifndef PALRLE_U32
-	#define PALRLE_U32 unsigned int
+    #define PALRLE_U32 unsigned int
 #endif
 
 typedef struct palrle_data_t {
@@ -46,7 +46,7 @@ void palrle_free( palrle_data_t* rle_data, void* memctx );
 
 /*
 ----------------------
-	IMPLEMENTATION
+    IMPLEMENTATION
 ----------------------
 */
 
@@ -54,11 +54,11 @@ void palrle_free( palrle_data_t* rle_data, void* memctx );
 #undef PALRLE_IMPLEMENTATION
 
 #ifndef PALRLE_MALLOC
-	#define _CRT_NONSTDC_NO_DEPRECATE 
-	#define _CRT_SECURE_NO_WARNINGS
-	#include <stdlib.h>
-	#define PALRLE_MALLOC( ctx, size ) ( malloc( size ) )
-	#define PALRLE_FREE( ctx, ptr ) ( free( ptr ) )
+    #define _CRT_NONSTDC_NO_DEPRECATE
+    #define _CRT_SECURE_NO_WARNINGS
+    #include <stdlib.h>
+    #define PALRLE_MALLOC( ctx, size ) ( malloc( size ) )
+    #define PALRLE_FREE( ctx, ptr ) ( free( ptr ) )
 #endif
 
 
@@ -87,14 +87,14 @@ palrle_data_t* palrle_encode( PALRLE_U8* pixels, int width, int height, PALRLE_U
         if( palette ) memcpy( data->data, palette, sizeof( PALRLE_U32 ) * palette_count );
         return data;
     }
-    
-    palrle_data_t* data = (palrle_data_t*) PALRLE_MALLOC( memctx, 
+
+    palrle_data_t* data = (palrle_data_t*) PALRLE_MALLOC( memctx,
         sizeof( palrle_data_t ) + // size for the struct itself
         sizeof( PALRLE_U32 ) * palette_count + // size for storing palette entries
         sizeof( PALRLE_U32 ) * vpitch + // size for storing the offset for each row
         hpitch * vpitch * 2 ); // assume worst case - we should never need more than twice the number of pixels
-    memset( data, 0, sizeof( palrle_data_t ) + sizeof( PALRLE_U32 ) * palette_count + sizeof( PALRLE_U32 ) * vpitch + 
-        hpitch * vpitch * 2 ); 
+    memset( data, 0, sizeof( palrle_data_t ) + sizeof( PALRLE_U32 ) * palette_count + sizeof( PALRLE_U32 ) * vpitch +
+        hpitch * vpitch * 2 );
 
 
     data->size = (PALRLE_U32) ( sizeof( palrle_data_t ) - sizeof( PALRLE_U8 ) );
@@ -106,7 +106,7 @@ palrle_data_t* palrle_encode( PALRLE_U8* pixels, int width, int height, PALRLE_U
     data->vpitch = (PALRLE_U16) vpitch;
     data->palette_count = (PALRLE_U16) palette_count;
     if( palette ) memcpy( data->data, palette, sizeof( PALRLE_U32 ) * palette_count );
-    
+
     int row_offset = (int)( sizeof( PALRLE_U32 ) * palette_count );
     int rle_offset = (int)( row_offset + sizeof( PALRLE_U32 ) * vpitch );
     for( int y = 0; y < vpitch; ++y ) {
@@ -174,7 +174,7 @@ palrle_data_t* palrle_encode( PALRLE_U8* pixels, int width, int height, PALRLE_U
 }
 
 
-palrle_data_t* palrle_encode_mask( PALRLE_U8* pixels, PALRLE_U8* mask, int width, int height, PALRLE_U32* palette, int palette_count, void* memctx ) {    
+palrle_data_t* palrle_encode_mask( PALRLE_U8* pixels, PALRLE_U8* mask, int width, int height, PALRLE_U32* palette, int palette_count, void* memctx ) {
     (void) memctx;
     // Crop to smallest non-empty region
     int xmin = width;
@@ -209,14 +209,14 @@ palrle_data_t* palrle_encode_mask( PALRLE_U8* pixels, PALRLE_U8* mask, int width
         if( palette ) memcpy( data->data, palette, sizeof( PALRLE_U32 ) * palette_count );
         return data;
     }
-    
-    palrle_data_t* data = (palrle_data_t*) PALRLE_MALLOC( memctx, 
+
+    palrle_data_t* data = (palrle_data_t*) PALRLE_MALLOC( memctx,
         sizeof( palrle_data_t ) + // size for the struct itself
         sizeof( PALRLE_U32 ) * palette_count + // size for storing palette entries
         sizeof( PALRLE_U32 ) * vpitch + // size for storing the offset for each row
         hpitch * vpitch * 2 ); // assume worst case - we should never need more than twice the number of pixels
-    memset( data, 0, sizeof( palrle_data_t ) + sizeof( PALRLE_U32 ) * palette_count + sizeof( PALRLE_U32 ) * vpitch + 
-        hpitch * vpitch * 2 ); 
+    memset( data, 0, sizeof( palrle_data_t ) + sizeof( PALRLE_U32 ) * palette_count + sizeof( PALRLE_U32 ) * vpitch +
+        hpitch * vpitch * 2 );
 
 
     data->size = (PALRLE_U32) ( sizeof( palrle_data_t ) - sizeof( PALRLE_U8 ) );
@@ -228,7 +228,7 @@ palrle_data_t* palrle_encode_mask( PALRLE_U8* pixels, PALRLE_U8* mask, int width
     data->vpitch = (PALRLE_U16) vpitch;
     data->palette_count = (PALRLE_U16) palette_count;
     if( palette ) memcpy( data->data, palette, sizeof( PALRLE_U32 ) * palette_count );
-    
+
     int row_offset = (int)( sizeof( PALRLE_U32 ) * palette_count );
     int rle_offset = (int)( row_offset + sizeof( PALRLE_U32 ) * vpitch );
     for( int y = 0; y < vpitch; ++y ) {
@@ -255,7 +255,7 @@ palrle_data_t* palrle_encode_mask( PALRLE_U8* pixels, PALRLE_U8* mask, int width
             int count = 0;
             int tx = x;
             while( tx < hpitch ) {
-                if( mask[ tx + xmin + ( y + ymin ) * width ] == 0 ) break; 
+                if( mask[ tx + xmin + ( y + ymin ) * width ] == 0 ) break;
                 if( pixels[ tx + xmin + ( y + ymin ) * width ] != color ) break;
                 if( count >= 127 ) break;
                 ++count;
@@ -284,7 +284,7 @@ palrle_data_t* palrle_encode_mask( PALRLE_U8* pixels, PALRLE_U8* mask, int width
                     count = 0;
                     tx = x;
                     while( tx < hpitch ) {
-                        if( mask[ tx + xmin + ( y + ymin ) * width ] == 0 ) break; 
+                        if( mask[ tx + xmin + ( y + ymin ) * width ] == 0 ) break;
                         if( pixels[ tx + xmin + ( y + ymin ) * width ] != color ) break;
                         if( count > 2 ) break; // No need to keep counting, we know this is a run
                         ++count;
@@ -394,22 +394,22 @@ ALTERNATIVE A - MIT License
 
 Copyright (c) 2019 Mattias Gustavsson
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of 
-this software and associated documentation files (the "Software"), to deal in 
-the Software without restriction, including without limitation the rights to 
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies 
-of the Software, and to permit persons to whom the Software is furnished to do 
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of the Software, and to permit persons to whom the Software is furnished to do
 so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all 
+The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ------------------------------------------------------------------------------
@@ -418,22 +418,22 @@ ALTERNATIVE B - Public Domain (www.unlicense.org)
 
 This is free and unencumbered software released into the public domain.
 
-Anyone is free to copy, modify, publish, use, compile, sell, or distribute this 
-software, either in source code form or as a compiled binary, for any purpose, 
+Anyone is free to copy, modify, publish, use, compile, sell, or distribute this
+software, either in source code form or as a compiled binary, for any purpose,
 commercial or non-commercial, and by any means.
 
-In jurisdictions that recognize copyright laws, the author or authors of this 
-software dedicate any and all copyright interest in the software to the public 
-domain. We make this dedication for the benefit of the public at large and to 
-the detriment of our heirs and successors. We intend this dedication to be an 
-overt act of relinquishment in perpetuity of all present and future rights to 
+In jurisdictions that recognize copyright laws, the author or authors of this
+software dedicate any and all copyright interest in the software to the public
+domain. We make this dedication for the benefit of the public at large and to
+the detriment of our heirs and successors. We intend this dedication to be an
+overt act of relinquishment in perpetuity of all present and future rights to
 this software under copyright law.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
-AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN 
-ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION 
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ------------------------------------------------------------------------------

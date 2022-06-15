@@ -14,14 +14,14 @@ before you include this file in *one* C/C++ file to create the implementation.
 #define array_h
 
 #ifndef ARRAY_BOOL_T
-    #define _CRT_NONSTDC_NO_DEPRECATE 
+    #define _CRT_NONSTDC_NO_DEPRECATE
     #define _CRT_SECURE_NO_WARNINGS
     #include <stdbool.h>
     #define ARRAY_BOOL_T bool
 #endif
 
-#define array_t( type ) struct { int count; type* items; } 
-#define array_param_t( type ) void 
+#define array_t( type ) struct { int count; type* items; }
+#define array_param_t( type ) void
 #define array_create( type ) ARRAY_CAST( (void*)internal_array_create( sizeof( type ), NULL ) )
 #define array_create_memctx( type, memctx ) ARRAY_CAST( (void*)internal_array_create( sizeof( type ), (memctx) ) )
 #define array_destroy( array ) internal_array_destroy( (struct internal_array_t*) (array) )
@@ -40,9 +40,9 @@ before you include this file in *one* C/C++ file to create the implementation.
 // In C, a void* can be implicitly cast to any other kind of pointer, while in C++ you need an explicit cast. In most
 // cases, the explicit cast works for both C and C++, but if we consider the case where we have nested structs, then
 // the way you refer to them differs between C and C++ (in C++, `parent_type::nested_type`, in C just `nested_type`).
-// In addition, with the automatic cast in C, it is possible to use unnamed nested structs and still dynamically 
+// In addition, with the automatic cast in C, it is possible to use unnamed nested structs and still dynamically
 // allocate arrays of that type - this would be desirable when the code is compiled from C++ as well.
-// This VOID_CAST macro allows for automatic cast from void* in C++. In C, it does nothing, but for C++ it uses a 
+// This VOID_CAST macro allows for automatic cast from void* in C++. In C, it does nothing, but for C++ it uses a
 // simple template function to define a cast-to-anything operator.
 // Use like this:
 //      struct {
@@ -54,7 +54,7 @@ before you include this file in *one* C/C++ file to create the implementation.
 //
 #ifndef ARRAY_CAST
     #ifdef __cplusplus
-        struct array_cast {   
+        struct array_cast {
             inline array_cast( void* x_ ) : x( x_ ) { }
             inline array_cast( void const* x_ ) : x( (void*) x_ ) { }
             template< typename T > inline operator T() { return (T)x; } // cast to whatever requested
@@ -96,7 +96,7 @@ void* internal_array_item( struct internal_array_t* array, int index );
 
 
 #ifndef ARRAY_MALLOC
-    #define _CRT_NONSTDC_NO_DEPRECATE 
+    #define _CRT_NONSTDC_NO_DEPRECATE
     #define _CRT_SECURE_NO_WARNINGS
     #include <stdlib.h>
     #define ARRAY_MALLOC( ctx, size ) ( malloc( size ) )
@@ -104,39 +104,39 @@ void* internal_array_item( struct internal_array_t* array, int index );
 #endif
 
 #ifndef ARRAY_MEMCPY
-    #define _CRT_NONSTDC_NO_DEPRECATE 
+    #define _CRT_NONSTDC_NO_DEPRECATE
     #define _CRT_SECURE_NO_WARNINGS
     #include <string.h>
     #define ARRAY_MEMCPY( dst, src, cnt ) ( memcpy( (dst), (src), (cnt) ) )
-#endif 
+#endif
 
 #ifndef ARRAY_MEMMOVE
-    #define _CRT_NONSTDC_NO_DEPRECATE 
+    #define _CRT_NONSTDC_NO_DEPRECATE
     #define _CRT_SECURE_NO_WARNINGS
     #include <string.h>
     #define ARRAY_MEMMOVE( dst, src, cnt ) ( memcpy( (dst), (src), (cnt) ) )
-#endif 
+#endif
 
 #ifndef ARRAY_MEMCMP
-    #define _CRT_NONSTDC_NO_DEPRECATE 
+    #define _CRT_NONSTDC_NO_DEPRECATE
     #define _CRT_SECURE_NO_WARNINGS
     #include <string.h>
     #define ARRAY_MEMCMP( a, b, cnt ) ( memcmp( (a), (b), (cnt) ) )
-#endif 
+#endif
 
 #ifndef ARRAY_QSORT
-    #define _CRT_NONSTDC_NO_DEPRECATE 
+    #define _CRT_NONSTDC_NO_DEPRECATE
     #define _CRT_SECURE_NO_WARNINGS
     #include <stdlib.h>
     #define ARRAY_QSORT( base, num, size, cmp ) ( qsort( (base), (num), (size), (cmp) ) )
-#endif 
+#endif
 
 #ifndef ARRAY_BSEARCH
-    #define _CRT_NONSTDC_NO_DEPRECATE 
+    #define _CRT_NONSTDC_NO_DEPRECATE
     #define _CRT_SECURE_NO_WARNINGS
     #include <stdlib.h>
     #define ARRAY_BSEARCH( key, base, num, size, cmp ) ( bsearch( (key), (base), (num), (size), (cmp) ) )
-#endif 
+#endif
 
 
 struct internal_array_t {
@@ -173,7 +173,7 @@ void* internal_array_add( struct internal_array_t* array, void* item ) {
         ARRAY_MEMCPY( array->items, items, (size_t)array->count * array->item_size );
         ARRAY_FREE( array->memctx, items );
     }
-    ARRAY_MEMCPY( (void*)( ( (uintptr_t) array->items ) + array->count * array->item_size ), item, 
+    ARRAY_MEMCPY( (void*)( ( (uintptr_t) array->items ) + array->count * array->item_size ), item,
         (size_t)array->item_size );
     ++array->count;
     return (void*)( ( (uintptr_t) array->items ) + ( array->count - 1 ) * array->item_size );
@@ -183,7 +183,7 @@ void* internal_array_add( struct internal_array_t* array, void* item ) {
 void internal_array_remove( struct internal_array_t* array, int index ) {
     if( index >= 0 && index < array->count ) {
         --array->count;
-        ARRAY_MEMMOVE( (void*)( ( (uintptr_t) array->items ) + index * array->item_size ), 
+        ARRAY_MEMMOVE( (void*)( ( (uintptr_t) array->items ) + index * array->item_size ),
             (void*)( ( (uintptr_t) array->items ) + array->count  * array->item_size ), (size_t) array->item_size );
     }
 }
@@ -191,8 +191,8 @@ void internal_array_remove( struct internal_array_t* array, int index ) {
 void internal_array_remove_ordered( struct internal_array_t* array, int index ) {
     if( index >= 0 && index < array->count ) {
         --array->count;
-        ARRAY_MEMMOVE( (void*)( ( (uintptr_t) array->items ) + index * array->item_size ), 
-            (void*)( ( (uintptr_t) array->items ) + ( index + 1 ) * array->item_size ), 
+        ARRAY_MEMMOVE( (void*)( ( (uintptr_t) array->items ) + index * array->item_size ),
+            (void*)( ( (uintptr_t) array->items ) + ( index + 1 ) * array->item_size ),
             (size_t)array->item_size * ( array->count - index ) );
     }
 }
@@ -200,7 +200,7 @@ void internal_array_remove_ordered( struct internal_array_t* array, int index ) 
 ARRAY_BOOL_T internal_array_get( struct internal_array_t* array, int index, void* item ) {
     ARRAY_BOOL_T result = index >= 0 && index < array->count;
     if( result ) {
-        ARRAY_MEMCPY( item, (void*)( ( (uintptr_t) array->items ) + index * array->item_size ), 
+        ARRAY_MEMCPY( item, (void*)( ( (uintptr_t) array->items ) + index * array->item_size ),
             (size_t) array->item_size );
     }
     return result;
@@ -209,7 +209,7 @@ ARRAY_BOOL_T internal_array_get( struct internal_array_t* array, int index, void
 ARRAY_BOOL_T internal_array_set( struct internal_array_t* array, int index, void const* item ) {
     ARRAY_BOOL_T result = index >= 0 && index < array->count;
     if( result ) {
-        ARRAY_MEMCPY( (void*)( ( (uintptr_t) array->items ) + index * array->item_size ), item, 
+        ARRAY_MEMCPY( (void*)( ( (uintptr_t) array->items ) + index * array->item_size ), item,
             (size_t) array->item_size );
     }
     return result;
@@ -231,14 +231,14 @@ int internal_array_bsearch( struct internal_array_t* array, void* key, int (*com
     int result = -1;
     if( item ) {
         result = (int)( ( ((uintptr_t)item) - ((uintptr_t)array->items) ) / array->item_size );
-    }       
+    }
     return result;
 }
 
 
 int internal_array_find( struct internal_array_t* array, void* item ) {
     for( int i = 0; i < array->count; ++i ) {
-        if( ARRAY_MEMCMP( (void*)( ( (uintptr_t) array->items ) + i * array->item_size ), item, 
+        if( ARRAY_MEMCMP( (void*)( ( (uintptr_t) array->items ) + i * array->item_size ), item,
             (size_t) array->item_size) == 0 ) {
 
             return i;

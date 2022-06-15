@@ -49,15 +49,15 @@ void read_string_array( buffer_t* in, array_param(string)* array ) {
 
 
 typedef struct yarn_cond_flag_t {
-	bool is_not;
-	int flag_index;
+    bool is_not;
+    int flag_index;
 } yarn_cond_flag_t;
 
 
 typedef struct yarn_cond_or_t {
-	array(yarn_cond_flag_t)* flags;
+    array(yarn_cond_flag_t)* flags;
 } yarn_cond_or_t ;
-	
+
 
 yarn_cond_or_t* empty_cond_or( void ) {
     static yarn_cond_or_t cond_or;
@@ -69,14 +69,14 @@ yarn_cond_or_t* empty_cond_or( void ) {
 void save_cond_or( buffer_t* out, yarn_cond_or_t* cond_or ) {
     buffer_write_i32( out, &cond_or->flags->count, 1 );
     for( int i = 0; i < cond_or->flags->count; ++i ) {
-	    buffer_write_bool( out, &cond_or->flags->items[ i ].is_not, 1 );
-	    buffer_write_i32( out, &cond_or->flags->items[ i ].flag_index, 1 );
+        buffer_write_bool( out, &cond_or->flags->items[ i ].is_not, 1 );
+        buffer_write_i32( out, &cond_or->flags->items[ i ].flag_index, 1 );
     }
 }
 
 
 typedef struct yarn_cond_t {
-	array(yarn_cond_or_t)* ands;
+    array(yarn_cond_or_t)* ands;
 } yarn_cond_t;
 
 
@@ -90,7 +90,7 @@ yarn_cond_t* empty_cond( void ) {
 void save_cond( buffer_t* out, yarn_cond_t* cond ) {
     buffer_write_i32( out, &cond->ands->count, 1 );
     for( int i = 0; i < cond->ands->count; ++i ) {
-	    save_cond_or( out, &cond->ands->items[ i ] );
+        save_cond_or( out, &cond->ands->items[ i ] );
     }
 }
 
@@ -100,7 +100,7 @@ void load_cond( buffer_t* in, yarn_cond_t* cond ) {
     int ands_count = read_int( in );
     for( int i = 0; i < ands_count; ++i ) {
         yarn_cond_or_t cond_or;
-	    cond_or.flags = managed_array( yarn_cond_flag_t );
+        cond_or.flags = managed_array( yarn_cond_flag_t );
         int flags_count = read_int( in );
         for( int j = 0; j < flags_count; ++j ) {
             yarn_cond_flag_t flag;
@@ -114,25 +114,25 @@ void load_cond( buffer_t* in, yarn_cond_t* cond ) {
 
 
 typedef enum yarn_action_type_t {
-	ACTION_TYPE_NONE,
-	ACTION_TYPE_GOTO_LOCATION,
+    ACTION_TYPE_NONE,
+    ACTION_TYPE_GOTO_LOCATION,
     ACTION_TYPE_GOTO_DIALOG,
-	ACTION_TYPE_EXIT,
-	ACTION_TYPE_FLAG_SET,
-	ACTION_TYPE_FLAG_CLEAR,
-	ACTION_TYPE_FLAG_TOGGLE,
-	ACTION_TYPE_ITEM_GET,
-	ACTION_TYPE_ITEM_DROP,
+    ACTION_TYPE_EXIT,
+    ACTION_TYPE_FLAG_SET,
+    ACTION_TYPE_FLAG_CLEAR,
+    ACTION_TYPE_FLAG_TOGGLE,
+    ACTION_TYPE_ITEM_GET,
+    ACTION_TYPE_ITEM_DROP,
 } yarn_action_type_t;
 
 
 typedef struct yarn_act_t {
-	yarn_cond_t cond;
-	yarn_action_type_t type;
-	int param_location_index;
-	int param_dialog_index;
-	int param_flag_index;
-	int param_item_index;
+    yarn_cond_t cond;
+    yarn_action_type_t type;
+    int param_location_index;
+    int param_dialog_index;
+    int param_flag_index;
+    int param_item_index;
 } yarn_act_t;
 
 
@@ -140,10 +140,10 @@ yarn_act_t* empty_act( void ) {
     static yarn_act_t act;
     act.cond = *empty_cond();
     act.type = ACTION_TYPE_NONE;
-	act.param_location_index = -1;
-	act.param_dialog_index = -1;
-	act.param_flag_index = -1;
-	act.param_item_index = -1;
+    act.param_location_index = -1;
+    act.param_dialog_index = -1;
+    act.param_flag_index = -1;
+    act.param_item_index = -1;
     return &act;
 }
 
@@ -151,16 +151,16 @@ yarn_act_t* empty_act( void ) {
 void save_act( buffer_t* out, yarn_act_t* act ) {
     save_cond( out, &act->cond );
     int type = (int)act->type;
-	buffer_write_i32( out, &type, 1 );
-	buffer_write_i32( out, &act->param_location_index, 1 );
-	buffer_write_i32( out, &act->param_dialog_index, 1 );
-	buffer_write_i32( out, &act->param_flag_index, 1 );
-	buffer_write_i32( out, &act->param_item_index, 1 );
+    buffer_write_i32( out, &type, 1 );
+    buffer_write_i32( out, &act->param_location_index, 1 );
+    buffer_write_i32( out, &act->param_dialog_index, 1 );
+    buffer_write_i32( out, &act->param_flag_index, 1 );
+    buffer_write_i32( out, &act->param_item_index, 1 );
 }
 
 
 void load_act( buffer_t* in, yarn_act_t* act ) {
-    load_cond( in, &act->cond );    
+    load_cond( in, &act->cond );
     act->type = (yarn_action_type_t) read_int( in );
     act->param_location_index = read_int( in );
     act->param_dialog_index = read_int( in );
@@ -170,11 +170,11 @@ void load_act( buffer_t* in, yarn_act_t* act ) {
 
 
 typedef struct yarn_opt_t {
-	yarn_cond_t cond;
-	string text;
-	array(yarn_act_t)* act;
+    yarn_cond_t cond;
+    string text;
+    array(yarn_act_t)* act;
 } yarn_opt_t;
-	
+
 
 yarn_opt_t* empty_opt( void ) {
     static yarn_opt_t opt;
@@ -187,7 +187,7 @@ yarn_opt_t* empty_opt( void ) {
 
 void save_opt( buffer_t* out, yarn_opt_t* opt ) {
     save_cond( out, &opt->cond );
-	buffer_write_string( out, &opt->text, 1 );
+    buffer_write_string( out, &opt->text, 1 );
     buffer_write_i32( out, &opt->act->count, 1 );
     for( int i = 0; i < opt->act->count; ++i ) {
         save_act( out, &opt->act->items[ i ] );
@@ -196,11 +196,11 @@ void save_opt( buffer_t* out, yarn_opt_t* opt ) {
 
 
 typedef struct yarn_use_t {
-	yarn_cond_t cond;
-	array(int)* item_indices;
-	array(yarn_act_t)* act;
+    yarn_cond_t cond;
+    array(int)* item_indices;
+    array(yarn_act_t)* act;
 } yarn_use_t;
-	
+
 
 yarn_use_t* empty_use( void ) {
     static yarn_use_t use;
@@ -225,9 +225,9 @@ void save_use( buffer_t* out, yarn_use_t* use ) {
 
 
 typedef struct yarn_chr_t {
-	yarn_cond_t cond;
-	array(int)* chr_indices;
-	array(yarn_act_t)* act;
+    yarn_cond_t cond;
+    array(int)* chr_indices;
+    array(yarn_act_t)* act;
 } yarn_chr_t;
 
 
@@ -254,8 +254,8 @@ void save_chr( buffer_t* out, yarn_chr_t* chr ) {
 
 
 typedef struct yarn_img_t {
-	yarn_cond_t cond;
-	int image_index;	
+    yarn_cond_t cond;
+    int image_index;
 } yarn_img_t;
 
 
@@ -268,8 +268,8 @@ yarn_img_t* empty_img( void ) {
 
 
 typedef struct yarn_txt_t {
-	yarn_cond_t cond;
-	string text;	
+    yarn_cond_t cond;
+    string text;
 } yarn_txt_t;
 
 
@@ -282,32 +282,32 @@ yarn_txt_t* empty_txt( void ) {
 
 
 typedef struct yarn_location_t {
-	string_id id;
-	array(yarn_img_t)* img;
+    string_id id;
+    array(yarn_img_t)* img;
     array(yarn_txt_t)* txt;
-	array(yarn_act_t)* act;
-	array(yarn_opt_t)* opt;	
-	array(yarn_use_t)* use;
-	array(yarn_chr_t)* chr;
+    array(yarn_act_t)* act;
+    array(yarn_opt_t)* opt;
+    array(yarn_use_t)* use;
+    array(yarn_chr_t)* chr;
 } yarn_location_t;
 
 
 yarn_location_t* empty_location( void ) {
     static yarn_location_t location;
     location.id = NULL;
-	location.img = managed_array(yarn_img_t);
+    location.img = managed_array(yarn_img_t);
     location.txt = managed_array(yarn_txt_t);
-	location.act = managed_array(yarn_act_t);
-	location.opt = managed_array(yarn_opt_t);	
-	location.use = managed_array(yarn_use_t);
-	location.chr = managed_array(yarn_chr_t);
+    location.act = managed_array(yarn_act_t);
+    location.opt = managed_array(yarn_opt_t);
+    location.use = managed_array(yarn_use_t);
+    location.chr = managed_array(yarn_chr_t);
     return &location;
 }
 
 
 void save_location( buffer_t* out, yarn_location_t* location ) {
-	buffer_write_string( out, &location->id, 1 );
-    
+    buffer_write_string( out, &location->id, 1 );
+
     buffer_write_i32( out, &location->img->count, 1 );
     for( int i = 0; i < location->img->count; ++i ) {
         save_cond( out, &location->img->items[ i ].cond );
@@ -350,10 +350,10 @@ void load_location( buffer_t* in, yarn_location_t* location ) {
     for( int i = 0; i < imgs_count; ++i ) {
         yarn_img_t img;
         load_cond( in, &img.cond );
-	    img.image_index = read_int( in );	
+        img.image_index = read_int( in );
         array_add( location->img, &img );
     }
-    
+
     location->txt = managed_array(yarn_txt_t);
     int txts_count = read_int( in );
     for( int i = 0; i < txts_count; ++i ) {
@@ -371,13 +371,13 @@ void load_location( buffer_t* in, yarn_location_t* location ) {
         array_add( location->act, &act );
     }
 
-	location->opt = managed_array(yarn_opt_t);	
+    location->opt = managed_array(yarn_opt_t);
     int opts_count = read_int( in );
     for( int i = 0; i < opts_count; ++i ) {
         yarn_opt_t opt;
         load_cond( in, &opt.cond );
-        opt.text = read_string( in );       
-	    opt.act = managed_array(yarn_act_t);
+        opt.text = read_string( in );
+        opt.act = managed_array(yarn_act_t);
         int count = read_int( in );
         for( int j = 0; j < count; ++j ) {
             yarn_act_t act;
@@ -387,7 +387,7 @@ void load_location( buffer_t* in, yarn_location_t* location ) {
         array_add( location->opt, &opt );
     }
 
-	location->use = managed_array(yarn_use_t);
+    location->use = managed_array(yarn_use_t);
     int uses_count = read_int( in );
     for( int i = 0; i < uses_count; ++i ) {
         yarn_use_t use;
@@ -398,7 +398,7 @@ void load_location( buffer_t* in, yarn_location_t* location ) {
             int value = read_int( in );
             array_add( use.item_indices, &value );
         }
-	    use.act = managed_array(yarn_act_t);
+        use.act = managed_array(yarn_act_t);
         int count = read_int( in );
         for( int j = 0; j < count; ++j ) {
             yarn_act_t act;
@@ -408,7 +408,7 @@ void load_location( buffer_t* in, yarn_location_t* location ) {
         array_add( location->use, &use );
     }
 
-	location->chr = managed_array(yarn_chr_t);
+    location->chr = managed_array(yarn_chr_t);
     int chrs_count = read_int( in );
     for( int i = 0; i < chrs_count; ++i ) {
         yarn_chr_t chr;
@@ -419,7 +419,7 @@ void load_location( buffer_t* in, yarn_location_t* location ) {
             int value = read_int( in );
             array_add( chr.chr_indices, &value );
         }
-	    chr.act = managed_array(yarn_act_t);
+        chr.act = managed_array(yarn_act_t);
         int count = read_int( in );
         for( int j = 0; j < count; ++j ) {
             yarn_act_t act;
@@ -433,9 +433,9 @@ void load_location( buffer_t* in, yarn_location_t* location ) {
 
 
 typedef struct yarn_phrase_t {
-	yarn_cond_t cond;
-	int character_index;
-	string text;	
+    yarn_cond_t cond;
+    int character_index;
+    string text;
 } yarn_phrase_t;
 
 
@@ -449,9 +449,9 @@ yarn_phrase_t* empty_phrase( void ) {
 
 
 typedef struct yarn_say_t {
-	yarn_cond_t cond;
-	string text;
-	array(yarn_act_t)* act;
+    yarn_cond_t cond;
+    string text;
+    array(yarn_act_t)* act;
 } yarn_say_t;
 
 
@@ -466,7 +466,7 @@ yarn_say_t* empty_say( void ) {
 
 void save_say( buffer_t* out, yarn_say_t* say ) {
     save_cond( out, &say->cond );
-	buffer_write_string( out, &say->text, 1 );
+    buffer_write_string( out, &say->text, 1 );
     buffer_write_i32( out, &say->act->count, 1 );
     for( int i = 0; i < say->act->count; ++i ) {
         save_act( out, &say->act->items[ i ] );
@@ -475,27 +475,27 @@ void save_say( buffer_t* out, yarn_say_t* say ) {
 
 
 typedef struct yarn_dialog_t {
-	string_id id;
-	array(yarn_act_t)* act;
-	array(yarn_phrase_t)* phrase;
-	array(yarn_say_t)* say;	
-	array(yarn_use_t)* use;
+    string_id id;
+    array(yarn_act_t)* act;
+    array(yarn_phrase_t)* phrase;
+    array(yarn_say_t)* say;
+    array(yarn_use_t)* use;
 } yarn_dialog_t;
 
 
 yarn_dialog_t* empty_dialog( void ) {
     static yarn_dialog_t dialog;
     dialog.id = NULL;
-	dialog.act = managed_array(yarn_act_t);
-	dialog.phrase = managed_array(yarn_phrase_t);
-	dialog.say = managed_array(yarn_say_t);	
-	dialog.use = managed_array(yarn_use_t);
+    dialog.act = managed_array(yarn_act_t);
+    dialog.phrase = managed_array(yarn_phrase_t);
+    dialog.say = managed_array(yarn_say_t);
+    dialog.use = managed_array(yarn_use_t);
     return &dialog;
 }
 
 
 void save_dialog( buffer_t* out, yarn_dialog_t* dialog ) {
-	buffer_write_string( out, &dialog->id, 1 );
+    buffer_write_string( out, &dialog->id, 1 );
 
     buffer_write_i32( out, &dialog->act->count, 1 );
     for( int i = 0; i < dialog->act->count; ++i ) {
@@ -506,7 +506,7 @@ void save_dialog( buffer_t* out, yarn_dialog_t* dialog ) {
     for( int i = 0; i < dialog->phrase->count; ++i ) {
         save_cond( out, &dialog->phrase->items[ i ].cond );
         buffer_write_i32( out, &dialog->phrase->items[ i ].character_index, 1 );
-    	buffer_write_string( out, &dialog->phrase->items[ i ].text, 1 );
+        buffer_write_string( out, &dialog->phrase->items[ i ].text, 1 );
     }
 
     buffer_write_i32( out, &dialog->say->count, 1 );
@@ -548,7 +548,7 @@ void load_dialog( buffer_t* in, yarn_dialog_t* dialog ) {
         yarn_say_t say;
         load_cond( in, &say.cond );
         say.text = read_string( in );
-	    say.act = managed_array(yarn_act_t);
+        say.act = managed_array(yarn_act_t);
         int count = read_int( in );
         for( int j = 0; j < count; ++j ) {
             yarn_act_t act;
@@ -559,7 +559,7 @@ void load_dialog( buffer_t* in, yarn_dialog_t* dialog ) {
     }
 
 
-	dialog->use = managed_array(yarn_use_t);
+    dialog->use = managed_array(yarn_use_t);
     int uses_count = read_int( in );
     for( int i = 0; i < uses_count; ++i ) {
         yarn_use_t use;
@@ -570,7 +570,7 @@ void load_dialog( buffer_t* in, yarn_dialog_t* dialog ) {
             int value = read_int( in );
             array_add( use.item_indices, &value );
         }
-	    use.act = managed_array(yarn_act_t);
+        use.act = managed_array(yarn_act_t);
         int count = read_int( in );
         for( int j = 0; j < count; ++j ) {
             yarn_act_t act;
@@ -579,27 +579,27 @@ void load_dialog( buffer_t* in, yarn_dialog_t* dialog ) {
         }
         array_add( dialog->use, &use );
     }
-}    
+}
 
 
 typedef struct yarn_character_t {
-	string name;	
-	string short_name;
-	int face_index;
+    string name;
+    string short_name;
+    int face_index;
 } yarn_character_t;
-	
+
 
 yarn_character_t* empty_character( void ) {
     static yarn_character_t character;
     character.name = NULL;
     character.short_name = NULL;
     character.face_index = -1;
-	return &character;
+    return &character;
 }
 
 
 void save_character( buffer_t* out, yarn_character_t* character ) {
-	buffer_write_string( out, &character->name, 1 );
+    buffer_write_string( out, &character->name, 1 );
     buffer_write_string( out, &character->short_name, 1 );
     buffer_write_i32( out, &character->face_index, 1 );
 }
@@ -633,14 +633,14 @@ typedef struct yarn_globals_t {
     array(int)* logo_indices;
     int background_location;
     int background_dialog;
-	int color_background;
-	int color_disabled;
-	int color_txt;
-	int color_opt;
-	int color_chr;
-	int color_use;
-	int color_name;
-	int color_facebg;
+    int color_background;
+    int color_disabled;
+    int color_txt;
+    int color_opt;
+    int color_chr;
+    int color_use;
+    int color_name;
+    int color_facebg;
 
     bool explicit_flags;
     array(string_id)* flags;
@@ -666,42 +666,42 @@ yarn_globals_t* empty_globals( void ) {
     globals.logo_indices = managed_array(int);
     globals.background_location = -1;
     globals.background_dialog = -1;
-	globals.color_background = -1;
-	globals.color_disabled = -1;
-	globals.color_txt = -1;
-	globals.color_opt = -1;
-	globals.color_chr = -1;
-	globals.color_use = -1;
-	globals.color_name = -1;
-	globals.color_facebg = -1;
+    globals.color_background = -1;
+    globals.color_disabled = -1;
+    globals.color_txt = -1;
+    globals.color_opt = -1;
+    globals.color_chr = -1;
+    globals.color_use = -1;
+    globals.color_name = -1;
+    globals.color_facebg = -1;
     globals.explicit_flags = false;
     globals.flags = managed_array(string_id);
     globals.explicit_items = false;
     globals.items = managed_array(string_id);
-	return &globals;
+    return &globals;
 }
 
 
 void save_globals( buffer_t* out, yarn_globals_t* globals ) {
-	buffer_write_string( out, &globals->title, 1 );
-	buffer_write_string( out, &globals->author, 1 );
-	buffer_write_string( out, &globals->start, 1 );
-	buffer_write_string( out, &globals->palette, 1 );
+    buffer_write_string( out, &globals->title, 1 );
+    buffer_write_string( out, &globals->author, 1 );
+    buffer_write_string( out, &globals->start, 1 );
+    buffer_write_string( out, &globals->palette, 1 );
     buffer_write_string( out, &globals->alone_text, 1 );
-	buffer_write_string( out, &globals->font_description, 1 );
-	buffer_write_string( out, &globals->font_options, 1 );
-	buffer_write_string( out, &globals->font_characters, 1 );
-	buffer_write_string( out, &globals->font_items, 1 );
-	buffer_write_string( out, &globals->font_name, 1 );
+    buffer_write_string( out, &globals->font_description, 1 );
+    buffer_write_string( out, &globals->font_options, 1 );
+    buffer_write_string( out, &globals->font_characters, 1 );
+    buffer_write_string( out, &globals->font_items, 1 );
+    buffer_write_string( out, &globals->font_name, 1 );
 
     buffer_write_i32( out, &globals->display_filters->count, 1 );
     for( int i = 0; i < globals->display_filters->count; ++i ) {
         int value = (int) globals->display_filters->items[ i ];
-	    buffer_write_i32( out, &value, 1 );
+        buffer_write_i32( out, &value, 1 );
     }
 
     buffer_write_i32( out, &globals->logo_indices->count, 1 );
-	buffer_write_i32( out, globals->logo_indices->items, globals->logo_indices->count );
+    buffer_write_i32( out, globals->logo_indices->items, globals->logo_indices->count );
 
     buffer_write_i32( out, &globals->background_location, 1 );
     buffer_write_i32( out, &globals->background_dialog, 1 );
@@ -713,28 +713,28 @@ void save_globals( buffer_t* out, yarn_globals_t* globals ) {
     buffer_write_i32( out, &globals->color_use, 1 );
     buffer_write_i32( out, &globals->color_name, 1 );
     buffer_write_i32( out, &globals->color_facebg, 1 );
-    
+
     buffer_write_bool( out, &globals->explicit_flags, 1 );
     buffer_write_i32( out, &globals->flags->count, 1 );
-	buffer_write_string( out, globals->flags->items, globals->flags->count );
+    buffer_write_string( out, globals->flags->items, globals->flags->count );
 
     buffer_write_bool( out, &globals->explicit_items, 1 );
     buffer_write_i32( out, &globals->items->count, 1 );
-	buffer_write_string( out, globals->items->items, globals->items->count );
+    buffer_write_string( out, globals->items->items, globals->items->count );
 }
 
 
 void load_globals( buffer_t* in, yarn_globals_t* globals ) {
-	globals->title = read_string( in );
-	globals->author = read_string( in );
-	globals->start = read_string( in );
-	globals->palette = read_string( in );
-	globals->alone_text = read_string( in );
-	globals->font_description = read_string( in );
-	globals->font_options = read_string( in );
-	globals->font_characters = read_string( in );
-	globals->font_items = read_string( in );
-	globals->font_name = read_string( in );
+    globals->title = read_string( in );
+    globals->author = read_string( in );
+    globals->start = read_string( in );
+    globals->palette = read_string( in );
+    globals->alone_text = read_string( in );
+    globals->font_description = read_string( in );
+    globals->font_options = read_string( in );
+    globals->font_characters = read_string( in );
+    globals->font_items = read_string( in );
+    globals->font_name = read_string( in );
 
     globals->display_filters = managed_array(int);
     int display_filters_count = read_int( in );
@@ -752,14 +752,14 @@ void load_globals( buffer_t* in, yarn_globals_t* globals ) {
 
     globals->background_location = read_int( in );
     globals->background_dialog = read_int( in );
-	globals->color_background = read_int( in );
-	globals->color_disabled = read_int( in );
-	globals->color_txt = read_int( in );
-	globals->color_opt = read_int( in );
-	globals->color_chr = read_int( in );
-	globals->color_use = read_int( in );
-	globals->color_name = read_int( in );
-	globals->color_facebg = read_int( in );
+    globals->color_background = read_int( in );
+    globals->color_disabled = read_int( in );
+    globals->color_txt = read_int( in );
+    globals->color_opt = read_int( in );
+    globals->color_chr = read_int( in );
+    globals->color_use = read_int( in );
+    globals->color_name = read_int( in );
+    globals->color_facebg = read_int( in );
 
     globals->explicit_flags = read_bool( in );
     globals->flags = managed_array(string_id);
@@ -775,11 +775,11 @@ typedef struct yarn_assets_t {
     int palette_count;
     uint32_t palette[ 256 ];
 
-	pixelfont_t* font_description;
-	pixelfont_t* font_options;
-	pixelfont_t* font_characters;
-	pixelfont_t* font_items;
-	pixelfont_t* font_name;
+    pixelfont_t* font_description;
+    pixelfont_t* font_options;
+    pixelfont_t* font_characters;
+    pixelfont_t* font_items;
+    pixelfont_t* font_name;
 
     array(palrle_data_t*)* bitmaps;
 
@@ -797,11 +797,11 @@ yarn_assets_t* empty_assets( void ) {
     assets.palette_count = 0;
     memset( assets.palette, 0, sizeof( assets.palette ) );
 
-	assets.font_description = NULL;
-	assets.font_options = NULL;
-	assets.font_characters = NULL;
-	assets.font_items = NULL;
-	assets.font_name = NULL;
+    assets.font_description = NULL;
+    assets.font_options = NULL;
+    assets.font_characters = NULL;
+    assets.font_items = NULL;
+    assets.font_name = NULL;
 
     assets.bitmaps = managed_array(palrle_data_t*);
 
@@ -891,7 +891,7 @@ void load_assets( buffer_t* in, yarn_assets_t* assets ) {
         array_add( assets->bitmaps, &rle );
     }
 
-    
+
     buffer_read_u32( in, &assets->frame_pc_size, 1 );
     if( assets->frame_pc_size ) {
         assets->frame_pc = manage_alloc( malloc( assets->frame_pc_size ) );
@@ -907,41 +907,41 @@ void load_assets( buffer_t* in, yarn_assets_t* assets ) {
 
 
 typedef struct yarn_t {
-	yarn_globals_t globals;
+    yarn_globals_t globals;
     int start_location;
     int start_dialog;
-	
-	array(string_id)* flag_ids;
-	array(string_id)* item_ids;
-	array(string_id)* image_names;
+
+    array(string_id)* flag_ids;
+    array(string_id)* item_ids;
+    array(string_id)* image_names;
     array(string_id)* screen_names;
     array(string_id)* face_names;
 
-	array(yarn_location_t)* locations;
-	array(yarn_dialog_t)* dialogs;
-	array(yarn_character_t)* characters;
-    
+    array(yarn_location_t)* locations;
+    array(yarn_dialog_t)* dialogs;
+    array(yarn_character_t)* characters;
+
     yarn_assets_t assets;
 } yarn_t;
 
 
 yarn_t* empty_yarn( void ) {
     static yarn_t yarn;
-	yarn.globals = *empty_globals();
+    yarn.globals = *empty_globals();
     yarn.start_location = -1;
     yarn.start_dialog = -1;
 
-	yarn.flag_ids = managed_array(string_id);
-	yarn.item_ids = managed_array(string_id);
-	yarn.image_names = managed_array(string_id);
+    yarn.flag_ids = managed_array(string_id);
+    yarn.item_ids = managed_array(string_id);
+    yarn.image_names = managed_array(string_id);
     yarn.screen_names = managed_array(string_id);
     yarn.face_names = managed_array(string_id);
 
-	yarn.locations = managed_array(yarn_location_t);
-	yarn.dialogs = managed_array(yarn_dialog_t);
-	yarn.characters = managed_array(yarn_character_t);
+    yarn.locations = managed_array(yarn_location_t);
+    yarn.dialogs = managed_array(yarn_dialog_t);
+    yarn.characters = managed_array(yarn_character_t);
 
-	yarn.assets = *empty_assets();
+    yarn.assets = *empty_assets();
     return &yarn;
 }
 
@@ -951,35 +951,35 @@ void yarn_save( buffer_t* out, yarn_t* yarn ) {
 
     buffer_write_i32( out, &yarn->start_location, 1 );
     buffer_write_i32( out, &yarn->start_dialog, 1 );
-	
+
     buffer_write_i32( out, &yarn->flag_ids->count, 1 );
-	buffer_write_string( out, yarn->flag_ids->items, yarn->flag_ids->count );
+    buffer_write_string( out, yarn->flag_ids->items, yarn->flag_ids->count );
 
     buffer_write_i32( out, &yarn->item_ids->count, 1 );
-	buffer_write_string( out, yarn->item_ids->items, yarn->item_ids->count );
+    buffer_write_string( out, yarn->item_ids->items, yarn->item_ids->count );
 
     buffer_write_i32( out, &yarn->image_names->count, 1 );
-	buffer_write_string( out, yarn->image_names->items, yarn->image_names->count );
+    buffer_write_string( out, yarn->image_names->items, yarn->image_names->count );
 
     buffer_write_i32( out, &yarn->screen_names->count, 1 );
-	buffer_write_string( out, yarn->screen_names->items, yarn->screen_names->count );
+    buffer_write_string( out, yarn->screen_names->items, yarn->screen_names->count );
 
     buffer_write_i32( out, &yarn->face_names->count, 1 );
-	buffer_write_string( out, yarn->face_names->items, yarn->face_names->count );
+    buffer_write_string( out, yarn->face_names->items, yarn->face_names->count );
 
     buffer_write_i32( out, &yarn->locations->count, 1 );
     for( int i = 0; i < yarn->locations->count; ++i ) {
-	    save_location( out, &yarn->locations->items[ i ] );
+        save_location( out, &yarn->locations->items[ i ] );
     }
 
     buffer_write_i32( out, &yarn->dialogs->count, 1 );
     for( int i = 0; i < yarn->dialogs->count; ++i ) {
-	    save_dialog( out, &yarn->dialogs->items[ i ] );
+        save_dialog( out, &yarn->dialogs->items[ i ] );
     }
 
     buffer_write_i32( out, &yarn->characters->count, 1 );
     for( int i = 0; i < yarn->characters->count; ++i ) {
-	    save_character( out, &yarn->characters->items[ i ] );
+        save_character( out, &yarn->characters->items[ i ] );
     }
 
     save_assets( out, &yarn->assets );
@@ -992,18 +992,18 @@ void yarn_load( buffer_t* in, yarn_t* yarn ) {
     yarn->start_location = read_int( in );
     yarn->start_dialog = read_int( in );
 
-	yarn->flag_ids = managed_array(string_id);
+    yarn->flag_ids = managed_array(string_id);
     read_string_array( in, yarn->flag_ids );
-	yarn->item_ids = managed_array(string_id);
+    yarn->item_ids = managed_array(string_id);
     read_string_array( in, yarn->item_ids );
-	yarn->image_names = managed_array(string_id);
+    yarn->image_names = managed_array(string_id);
     read_string_array( in, yarn->image_names );
     yarn->screen_names = managed_array(string_id);
     read_string_array( in, yarn->screen_names  );
     yarn->face_names = managed_array(string_id);
     read_string_array( in, yarn->face_names );
 
-	yarn->locations = managed_array(yarn_location_t);
+    yarn->locations = managed_array(yarn_location_t);
     int locations_count = read_int( in );
     for( int i = 0; i < locations_count; ++i ) {
         yarn_location_t location;
@@ -1038,7 +1038,7 @@ void yarn_load( buffer_t* in, yarn_t* yarn ) {
 
 buffer_t* yarn_compile( char const* path ) {
     struct cstr_restore_point_t* str_restore = cstr_restore_point();
-    int mem_restore = memmgr_restore_point( &g_memmgr );   
+    int mem_restore = memmgr_restore_point( &g_memmgr );
 
     array(parser_global_t)* parser_globals = managed_array( parser_global_t );
     array(parser_section_t)* parser_sections = managed_array( parser_section_t );
@@ -1113,28 +1113,28 @@ buffer_t* yarn_compile( char const* path ) {
     }
 
     bool no_error = true;
-    paldither_palette_t* palette = manage_paldither( convert_palette( yarn.globals.palette ) ); 
-	if( !palette ) {
-		printf( "Failed to load palette file '%s'\n", yarn.globals.palette );
-		no_error = false;
-	}
+    paldither_palette_t* palette = manage_paldither( convert_palette( yarn.globals.palette ) );
+    if( !palette ) {
+        printf( "Failed to load palette file '%s'\n", yarn.globals.palette );
+        no_error = false;
+    }
     yarn.assets.palette_count = palette->color_count;
     memcpy( yarn.assets.palette, palette->colortable, palette->color_count * sizeof( *palette->colortable ) );
 
-	yarn.assets.font_description = manage_pixelfont( convert_font( yarn.globals.font_description ) );
-	yarn.assets.font_options = manage_pixelfont( convert_font( yarn.globals.font_options ) );
-	yarn.assets.font_characters = manage_pixelfont( convert_font( yarn.globals.font_characters ) );
-	yarn.assets.font_items = manage_pixelfont( convert_font( yarn.globals.font_items ) );
-	yarn.assets.font_name = manage_pixelfont( convert_font( yarn.globals.font_name ) );
+    yarn.assets.font_description = manage_pixelfont( convert_font( yarn.globals.font_description ) );
+    yarn.assets.font_options = manage_pixelfont( convert_font( yarn.globals.font_options ) );
+    yarn.assets.font_characters = manage_pixelfont( convert_font( yarn.globals.font_characters ) );
+    yarn.assets.font_items = manage_pixelfont( convert_font( yarn.globals.font_items ) );
+    yarn.assets.font_name = manage_pixelfont( convert_font( yarn.globals.font_name ) );
 
     for( int i = 0; i < yarn.screen_names->count; ++i ) {
         string_id screen_name = yarn.screen_names->items[ i ];
         palrle_data_t* bitmap = manage_palrle( convert_bitmap( screen_name, 320, 240, yarn.globals.palette, palette ) );
         array_add( yarn.assets.bitmaps, &bitmap );
         if( !bitmap ) {
-			printf( "Failed to load image: %s\n", screen_name );
-			no_error = false;
-		}
+            printf( "Failed to load image: %s\n", screen_name );
+            no_error = false;
+        }
 
     }
     for( int i = 0; i < yarn.image_names->count; ++i ) {
@@ -1142,9 +1142,9 @@ buffer_t* yarn_compile( char const* path ) {
         palrle_data_t* bitmap = manage_palrle( convert_bitmap( image_name, 192, 128, yarn.globals.palette, palette ) );
         array_add( yarn.assets.bitmaps, &bitmap );
         if( !bitmap ) {
-			printf( "Failed to load image: %s\n", image_name );
-			no_error = false;
-		}
+            printf( "Failed to load image: %s\n", image_name );
+            no_error = false;
+        }
 
     }
 
@@ -1153,9 +1153,9 @@ buffer_t* yarn_compile( char const* path ) {
         palrle_data_t* bitmap = manage_palrle( convert_bitmap( face_name, 90, 90, yarn.globals.palette, palette ) );
         array_add( yarn.assets.bitmaps, &bitmap );
         if( !bitmap ) {
-			printf( "Failed to load image: %s\n", face_name );
-			no_error = false;
-		}
+            printf( "Failed to load image: %s\n", face_name );
+            no_error = false;
+        }
 
     }
 

@@ -1865,7 +1865,7 @@ static LRESULT CALLBACK app_internal_wndproc( HWND hwnd, UINT message, WPARAM wp
                 app->GetRawInputDataPtr( (HRAWINPUT) lparam, RID_INPUT, &raw, &size, sizeof( RAWINPUTHEADER ) );
                 if( raw.header.dwType == RIM_TYPEMOUSE )
                     {
-                    if( ( raw.data.mouse.usFlags & 1 ) == MOUSE_MOVE_RELATIVE) 
+                    if( ( raw.data.mouse.usFlags & 1 ) == MOUSE_MOVE_RELATIVE)
                         {
                         float dx = (float) raw.data.mouse.lLastX;
                         float dy = (float) raw.data.mouse.lLastY;
@@ -3390,7 +3390,7 @@ int app_run( int (*app_proc)( app_t*, void* ), void* user_data, void* memctx, vo
     int result = 0xff;
     int display_count;
     int glres;
-          
+
     if( SDL_Init( SDL_INIT_EVERYTHING ) < 0 )
         {
 //        printf( "SDL could not initialize! SDL_Error: %s\n", SDL_GetError() );
