@@ -2,7 +2,13 @@
 ---
 ![yarnspin](images/yarnspin_logo.png)
 
-**Yarnspin** - A simple story-telling game engine
+**Yarnspin** is a simple story-telling engine, with its own built-in scripting language and graphics processing, turning hi-res photos into palettized low-res pixels.
+
+There is a custom script language, which allows you to define dialogs with options, and set up locations with descriptions and images. It comes with a thousand portrait images included, and you can of course add your own.
+
+Yarnspin games runs on Windows, Mac, Linux, and in browsers using web assembly.
+
+The documentation is pretty non-existing at the moment - there's just this readme - but it comes with an example "game" which is also a tutorial explaining the key concepts. There is also a small game made with Yarnspin, called No Sunshine, and it is open source and available here https://github.com/mattiasgustavsson/no_sunshine
 
 
 ## Building
@@ -47,8 +53,10 @@ SDL2 and GLEW are required - if you don't have them installed you can do so on U
 
 Using WAjic:
 ```
-  wasm\node wasm\wajicup.js -embed images/ images/ -rle source/yarnspin.c yarnspin.html
+  wasm\node wasm/wajicup.js -embed yarnspin.dat yarnspin.dat source/yarnspin.c yarnspin.html
 ```
+
+Note that you must have generated the `yarnspin.dat` file (by running the yarnspin executable once) before running this build command.
 
 A WebAssembly build environment is required. You can download it (for Windows) here: [wasm-env](https://github.com/mattiasgustavsson/dos-like/releases/tag/wasm-env).
 Unzip it so that the `wasm` folder in the zip file is at your repository root.
