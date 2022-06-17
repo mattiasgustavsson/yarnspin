@@ -798,6 +798,9 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
         } else if( CMP( global->keyword, "font_description" ) ) {
             if( global->data->count == 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) {
                 yarn->globals.font_description = cstr_trim( global->data->items[ 0 ] );
+                if( !file_exists( yarn->globals.font_description ) ) {
+                    printf( "%s(%d): font file not found '%s'\n", global->filename, global->line_number, yarn->globals.font_description );
+                }
             } else {
                 printf( "%s(%d): invalid font_description declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
                 no_error = false;
@@ -805,6 +808,9 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
         } else if( CMP( global->keyword, "font_options" ) ) {
             if( global->data->count == 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) {
                 yarn->globals.font_options = cstr_trim( global->data->items[ 0 ] );
+                if( !file_exists( yarn->globals.font_options ) ) {
+                    printf( "%s(%d): font file not found '%s'\n", global->filename, global->line_number, yarn->globals.font_options );
+                }
             } else {
                 printf( "%s(%d): invalid font_options declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
                 no_error = false;
@@ -812,6 +818,9 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
         } else if( CMP( global->keyword, "font_characters" ) ) {
             if( global->data->count == 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) {
                 yarn->globals.font_characters = cstr_trim( global->data->items[ 0 ] );
+                if( !file_exists( yarn->globals.font_characters) ) {
+                    printf( "%s(%d): font file not found '%s'\n", global->filename, global->line_number, yarn->globals.font_characters );
+                }
             } else {
                 printf( "%s(%d): invalid font_characters declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
                 no_error = false;
@@ -819,6 +828,9 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
         } else if( CMP( global->keyword, "font_items" ) ) {
             if( global->data->count == 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) {
                 yarn->globals.font_items = cstr_trim( global->data->items[ 0 ] );
+                if( !file_exists( yarn->globals.font_items ) ) {
+                    printf( "%s(%d): font file not found '%s'\n", global->filename, global->line_number, yarn->globals.font_items );
+                }
             } else {
                 printf( "%s(%d): invalid font_items declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
                 no_error = false;
@@ -826,6 +838,9 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
         } else if( CMP( global->keyword, "font_name" ) ) {
             if( global->data->count == 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) {
                 yarn->globals.font_name = cstr_trim( global->data->items[ 0 ] );
+                if( !file_exists( yarn->globals.font_name ) ) {
+                    printf( "%s(%d): font file not found '%s'\n", global->filename, global->line_number, yarn->globals.font_name );
+                }
             } else {
                 printf( "%s(%d): invalid font_name declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
                 no_error = false;
