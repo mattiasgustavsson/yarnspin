@@ -302,10 +302,13 @@ int main( int argc, char** argv ) {
                 printf( "Failed to compile game file\n" );
                 return EXIT_FAILURE;
             }
+
+            printf( "Compressing yarn file\n" );
             size_t size;
             void* data = compress_lzma( buffer_data( compiled_yarn ), buffer_size( compiled_yarn ), &size );
             uint32_t original_size = (uint32_t) buffer_size( compiled_yarn );
             buffer_destroy( compiled_yarn );
+
             FILE* fp = fopen( "yarnspin.dat", "wb" );
             char header[] = "YARNSPIN";
             uint32_t version = YARNSPIN_VERSION;
@@ -320,6 +323,7 @@ int main( int argc, char** argv ) {
             fwrite( header, 1, strlen( header ), fp );
             fclose( fp );
             free( data );
+            printf( "yarnspin.dat written\n" );
 
             char version_string[ 16 ];
             sprintf( version_string, "%d", (int) YARNSPIN_VERSION );

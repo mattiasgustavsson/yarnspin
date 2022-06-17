@@ -1113,6 +1113,7 @@ buffer_t* yarn_compile( char const* path ) {
     }
 
     bool no_error = true;
+    printf( "Processing palette\n" );
     paldither_palette_t* palette = manage_paldither( convert_palette( yarn.globals.palette ) );
     if( !palette ) {
         printf( "Failed to load palette file '%s'\n", yarn.globals.palette );
@@ -1121,12 +1122,14 @@ buffer_t* yarn_compile( char const* path ) {
     yarn.assets.palette_count = palette->color_count;
     memcpy( yarn.assets.palette, palette->colortable, palette->color_count * sizeof( *palette->colortable ) );
 
+    printf( "Processing fonts\n" );
     yarn.assets.font_description = manage_pixelfont( convert_font( yarn.globals.font_description ) );
     yarn.assets.font_options = manage_pixelfont( convert_font( yarn.globals.font_options ) );
     yarn.assets.font_characters = manage_pixelfont( convert_font( yarn.globals.font_characters ) );
     yarn.assets.font_items = manage_pixelfont( convert_font( yarn.globals.font_items ) );
     yarn.assets.font_name = manage_pixelfont( convert_font( yarn.globals.font_name ) );
 
+    printf( "Processing images\n" );
     for( int i = 0; i < yarn.screen_names->count; ++i ) {
         string_id screen_name = yarn.screen_names->items[ i ];
         palrle_data_t* bitmap = manage_palrle( convert_bitmap( screen_name, 320, 240, yarn.globals.palette, palette ) );
@@ -1148,6 +1151,7 @@ buffer_t* yarn_compile( char const* path ) {
 
     }
 
+    printf( "Processing faces\n" );
     for( int i = 0; i < yarn.face_names->count; ++i ) {
         string_id face_name = yarn.face_names->items[ i ];
         palrle_data_t* bitmap = manage_palrle( convert_bitmap( face_name, 90, 90, yarn.globals.palette, palette ) );
@@ -1159,6 +1163,7 @@ buffer_t* yarn_compile( char const* path ) {
 
     }
 
+    printf( "Processing frames\n" );
     for( int i = 0; i < yarn.globals.display_filters->count; ++i ) {
         if( yarn.globals.display_filters->items[ i ] == YARN_DISPLAY_FILTER_PC ) {
             file_t* file = file_load( "images/crtframe_pc.png", FILE_MODE_BINARY, NULL );
@@ -1184,6 +1189,7 @@ buffer_t* yarn_compile( char const* path ) {
         }
     }
 
+    printf( "Saving compiled yarn\n" );
     buffer_t* buffer = buffer_create();
     yarn_save( buffer, &yarn );
     memmgr_rollback( &g_memmgr, mem_restore );
