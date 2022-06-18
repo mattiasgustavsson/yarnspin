@@ -24,7 +24,8 @@ Everything that comes before the first section in a file is read as a `global`, 
 Sections comes in three flavours: location, dialog and character, but they are all declared as described above.
 
 
-### Locations
+### Location sections
+
 A location section can contain one or more image and text declarations, as well as options. Each declaration can optionally have a condition before it, and the declaration will only be included if the condition evaluates to true. Conditions can only test flags, and are written with the flag name before a question mark like this:
 ```
 my_flag ? txt: This text will only display if my_flag has been set
@@ -62,16 +63,54 @@ act: set my_flag
 act: clear other_flag
 act: toggle third_flag
 ```
-or go to another section, after the user clicks the mouse or press a key to dismiss the current one
+or go to another section, after the player clicks the mouse or press a key to dismiss the current one
 ```
 act: my_other_section
 ```
 
 The `act` statement can also be used to get or drop items
+```
+act: get Some item
+```
+or
+```
+act: drop Some item
+```
 
-### Locations
+After the img/txt/act declarations, a location section can have `use`, `chr` and `opt` declarations
 
-## Building
+`chr` declarations adds a character to the character list, and if the player clicks on it, we go to the section specified in its corresponding `act` statement. A `chr` declaration is always followed by an `act` statement with a section name.
+```
+chr: some_character
+act: talk_to_character
+```
+Note that `some_character` needs to be defined somewhere as a character section (see below) and that `talk_to_character` needs to be defined as either a location section or a dialog section
+
+`use` works similarly, but for items
+```
+use: Some item
+act: section_describing_what_happens
+```
+If the player does not currently have the item in his inventory, the use declaration is ignored.
+
+`opt` adds an option at the bottom of the screen, and also has a corresponding `act` declaration specifying a section to go to
+```
+opt: I want to go to the other section
+act: my_other_section
+```
+
+Note that `use`, `chr` and `opt` declarations can also have conditions specified before them, and the condition will control whether the following use/chr/opt declaration is active or not.
+
+
+### Dialog sections
+
+
+### Character sections
+
+
+### Globals
+
+## Building the code
 
 No build system is used, simply call the compiler from the commandline.
 
