@@ -11,6 +11,66 @@ Yarnspin games runs on Windows, Mac, Linux, and in browsers using web assembly.
 The documentation is pretty non-existing at the moment - there's just this readme - but it comes with an example "game" which is also a tutorial explaining the key concepts. There is also a small game made with Yarnspin, called No Sunshine, and it is open source and available here https://github.com/mattiasgustavsson/no_sunshine
 
 
+## Usage
+
+When you run `yarnspin.exe` it will compile all the scripts and assets into a single compressed `yarnspin.dat` file. You can then distribute `yarnspin.exe` and `yarnspin.dat`, and that is the complete game ready for distribution. If there is no `scripts` folder in the same location as `yarnspin.exe`, it won't attempt compilation.
+
+When compiling a yarn, it will load all files in the `scripts` folder and try to compile them. A script file can contain many `sections`, where a section is declared by putting three equal signs before and after its name - and names must be unique across all files. Like this:
+```
+=== my_section ===
+```
+Everything that comes before the first section in a file is read as a `global`, see below.
+
+Sections comes in three flavours: location, dialog and character, but they are all declared as described above.
+
+
+### Locations
+A location section can contain one or more image and text declarations, as well as options. Each declaration can optionally have a condition before it, and the declaration will only be included if the condition evaluates to true. Conditions can only test flags, and are written with the flag name before a question mark like this:
+```
+my_flag ? txt: This text will only display if my_flag has been set
+```
+You can check if a flag is not set by placing the word `not` before it
+```
+not my_flag ? txt: This text will only display if my_flag has NOT been set
+```
+You can check if any out of a list of flags are set, by listing multiple flags
+```
+my_flag other_flag third_flag ? txt: This text will only display if ANY of the three flags have been set
+```
+You can check if several flags are set by writing them as multiple condition statements
+```
+my_flag ? other_flag ? third_flag ? txt: This text will only display if all three flags have been set
+```
+Please note that when using `not` for multiple flags, the `not` is only apply for the single flag following it, not to the whole list of flags.
+
+A section can use `img` to display an image
+```
+img: picture_of_a_room.jpg
+```
+Note that all images must be in the `images` folder. If multiple images are specified, only one will actually be displayed - use condition statements to control which one.
+
+A section can use `txt` to display text, and it can have multiple txt statements to display multiple texts
+```
+txt: This text will be displayed.
+txt: And so will this.
+```
+Note that you can use conditions to control which texts are displayed.
+
+A section can use `act` to perform action, like setting, clearing or toggling a flag 
+```
+act: set my_flag
+act: clear other_flag
+act: toggle third_flag
+```
+or go to another section, after the user clicks the mouse or press a key to dismiss the current one
+```
+act: my_other_section
+```
+
+The `act` statement can also be used to get or drop items
+
+### Locations
+
 ## Building
 
 No build system is used, simply call the compiler from the commandline.
