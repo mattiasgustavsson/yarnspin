@@ -15,7 +15,7 @@ The documentation is pretty thin at the moment - there's just this readme, which
 
 When you run `yarnspin.exe` it will compile all the scripts and assets into a single compressed `yarnspin.dat` file. You can then distribute `yarnspin.exe` and `yarnspin.dat`, and that is the complete game ready for distribution. If there is no `scripts` folder in the same location as `yarnspin.exe`, it won't attempt compilation.
 
-When compiling a yarn, it will load all files in the `scripts` folder and try to compile them. A script file can contain many `sections`, where a section is declared by putting three equal signs before and after its name - and names must be unique across all files. Like this:
+When compiling a yarn, it will load all files, regardless of extension, in the `scripts` folder and try to compile them. It doesn't matter what you put in different files, all files will be loaded and processed in one go. A script file can contain many `sections`, where a section is declared by putting three equal signs before and after its name - and names must be unique across all files. Like this:
 ```
 === my_section ===
 ```
@@ -157,7 +157,7 @@ The section name `some_character` is used in location sections, in the `chr` sta
 
 When a character is added to a location using the `chr` statement, the `short` name is displayed in the list to the left on the screen.
 
-When a dialog is playing, the longer `name` is displayed above the portrait picture defined as `face`. All portrait images must be in the `faces` folder.
+When a dialog is playing, the longer `name` is displayed above the portrait picture defined as `face`. All portrait images must be in the `faces` folder. There are 1000 auto generated portrait images included, but you can of course make your own as well.
 
 
 ### Globals
@@ -166,34 +166,57 @@ Any declarations that appear before the first section definition in a file is a 
 
 The list of globals are:
 
-`title`
+```title```
 The name of this yarn - will be displayed in the title bar of the window of native builds.
 
-`author`
+```author```
+Your name, as the author of the yarn
+
+```start```
+Specifies which section the game starts in. Must be a defined dialog or location section.
+
+```items```
+Items, as used with `get`/`drop`/`use` declarations, doesn't have to be declared ahead of referring to them. But sometimes you might want to, as to avoid spelling mistakes and hard to find bugs. If you specify the `items` global, it must contain a comma separated list of ALL items referred to in any `get`/`drop`/`use` statements in your scripts, or you will get a compile error. Specifying `items` is optional, but if you do specify it, all items must be listed.
+
+```flags```
+Just as for items, you might want to explicitly pre-define all flags before using them in `set`/`clear`/`toggle` statements or conditions. The `flags` global is optional, but if present it must list all flags.
+
+```palette```
+This points to an image file in the `palettes` folder, which will be processed and used as the palette for the game. An image used as a palette must have at most 256 distinct colors, but may have less. To process images for the game, a look up table has to be generated the first time a palette is used, and this can be a slow operation, especially for palettes with many colors. But it only needs to be done once per palette, and only while you are writing your yarn - the final distribution contains just pre-processed, run-time ready data.
+
+```display_filters```
+Yarnspin has two different CRT emulation filters, emulating the look of either an old TV or an old PC monitor. This global allows you to specify which one to use, like `display_filters: tv` or `display_filters: pc`. You can turn the filter off as well, for crisp pixels: `display_filters: none`. It is also possible to specify a list of filters, in which case the player will be able to cycle through them, in the order specified, by pressing F9 in the game. Declaring multiple filters looks like this: `display_filters: tv, pc, none`.
+
+```logo```
+Specifies one or more image files, as a comma separated list, to display at the start of the game, before jumpin to the first section. Images needs to be in the `images` folder, and will be displayed in order, waiting for player input to dismiss each one.
+
+```alone_text```
+On the left of the screen is a list of characters present at the current location. If there are no characters in a location, the default is to display a text there instead that says `You are alone.`. Using this global, you can change what the text says, or disable it altogether by simply specifying `alone_text:`
+
+```font_description
+font_options
+font_characters
+font_items
+font_name```
+These globals specify font files to use for the various text areas in the game. Font files must all be stored in the `fonts` folder, and must be .ttf files containing pixel fonts. A selection of fonts have been included. If these globals are not specified, the default fonts will be used.
 
 
-`start`
-`items`
-`flags`
-`palette`
-`display_filters`
-`logo`
-`alone_text`
-`font_description`
-`font_options`
-`font_characters`
-`font_items`
-`font_name`
-`background_location`
-`background_dialog`
-`color_background`
-`color_disabled`
-`color_txt`
-`color_opt`
-`color_chr`
-`color_use`
-`color_name`
-`color_facebg`
+```background_location```
+Specifies an image file (present in the `images` folder) to use as a background when the game is displaying a location section. Check out the `images/yarnspin_location_template.gif` for a template file indicating the layout of the locations screen.
+
+```background_dialog```
+Specifies an image file (present in the `images` folder) to use as a background when the game is displaying a dialog section. Check out the `images/yarnspin_dialog_template.gif` for a template file indicating the layout of the dialog screen.
+
+
+```color_background
+color_disabled
+color_txt
+color_opt
+color_chr
+color_use
+color_name
+color_facebg```
+These globals controls the text display color for the various text areas in the game. They specify the index in the palette (0 to 255) of the color to use for each text. If not specified, defaults will be calculated and used.
 
 
 ## Building the code
