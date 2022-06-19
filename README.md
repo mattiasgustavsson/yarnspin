@@ -27,7 +27,7 @@ Note: as you read this documentation, make sure you have played through the tuto
 
 The tutorial game can be played here:
 
-    https://mattiasgustavsson/wasm/yarnspin
+https://mattiasgustavsson/wasm/yarnspin
     
 
 ### Location sections
