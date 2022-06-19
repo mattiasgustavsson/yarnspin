@@ -8,7 +8,7 @@ There is a custom script language, which allows you to define dialogs with optio
 
 Yarnspin games runs on Windows, Mac, Linux, and in browsers using web assembly.
 
-The documentation is pretty non-existing at the moment - there's just this readme - but it comes with an example "game" which is also a tutorial explaining the key concepts. There is also a small game made with Yarnspin, called No Sunshine, and it is open source and available here https://github.com/mattiasgustavsson/no_sunshine
+The documentation is pretty thin at the moment - there's just this readme, which is very much work-in-progress and likely incomplete - but it comes with an example "game" which is also a tutorial explaining the key concepts. There is also a small game made with Yarnspin, called No Sunshine, and it is open source and available here https://github.com/mattiasgustavsson/no_sunshine
 
 
 ## Usage
@@ -21,8 +21,14 @@ When compiling a yarn, it will load all files in the `scripts` folder and try to
 ```
 Everything that comes before the first section in a file is read as a `global`, see below.
 
-Sections comes in three flavours: location, dialog and character, but they are all declared as described above.
+Sections comes in three flavours: location, dialog and character, but they are all declared that same way.
 
+Note: as you read this documentation, make sure you have played through the tutorial game, which illustrates the concepts described here. It probably also helps to revisit it and look at its scripts as you read through the docs.
+
+The tutorial game can be played here:
+
+    https://mattiasgustavsson/wasm/yarnspin
+    
 
 ### Location sections
 
@@ -101,11 +107,56 @@ act: my_other_section
 
 Note that `use`, `chr` and `opt` declarations can also have conditions specified before them, and the condition will control whether the following use/chr/opt declaration is active or not.
 
+A section is determined to be a location section if it contains any of the declarations listed, and no other types of declarations.
+
 
 ### Dialog sections
 
+A dialog section can not use the `img`, `txt` or `chr` declarations, but it can use the `act` and `use` declarations as described for the location sections, including conditions. 
+
+The main part of the dialog are phrase declarations, which consists of a character name followed by some text:
+```
+some_character: Hello!
+some_character: Good to see you again
+```
+Note that `some_character` must have been declared somewhere as a character section (see below). The character section defines the displayed name of the character, and what image is used as its portrait.
+
+You can also use the pre-defined character `player` for lines that are spoken by the player
+```
+player: Hey, maybe you can help me?
+some_character: I certainly hope so!
+player: You are most kind.
+```
+Lines spoken by `player` will be displayed at the bottom of the screen and can be in a different font/color.
+
+There can be as many phrase declarations as you like, and they will be run through in sequence. After all have been displayed, you can have `use` declarations, working just like for location sections, and `say` declarations, which allows the player to choose what to say next. They work just like the `opt` declarations for location sections, but for dialogs.
+```
+some_character: How can I help you?
+
+say: I don't think you can...
+act: some_section
+
+say: I need a million dollars, right now!
+act: other_section
+```
+Just as for location sections, these can have conditions, and the `act` statement is a section (dialog or location) to jump to when the option is selected.
+
 
 ### Character sections
+
+Character sections are much simpler, and you can not jump to a character section with an `act` statement. A character section defines the name and appearance for a character only.
+
+```
+=== some_character ===
+name: The Abominable Snowman    
+short: Frosty
+face: cool_portrait.png
+```
+The section name `some_character` is used in location sections, in the `chr` statements, and in dialog sections in phrase declarations. The section name is not displayed anywhere, it is just for referring to the character.
+
+When a character is added to a location using the `chr` statement, the `short` name is displayed in the list to the left on the screen.
+
+When a dialog is playing, the longer `name` is displayed above the portrait picture defined as `face`. All portrait images must be in the `faces` folder`.
 
 
 ### Globals
@@ -121,6 +172,8 @@ From a Visual Studio Developer Command Prompt, do:
 ```
   cl source\yarnspin.c
 ```  
+
+For building the final release version, you probably want all optimizations enabled. There's a helper script (a windows bat file) in the `build` folder of the repo, which will build with full optimizations, and also include an application icon. It will also call the compiled exe to generate the `yarnspin.dat` data file, and then append the file to the end of the executable, giving you a single exe you can distribute which contains both code and data. No need to include the yarnspin.dat file. See the `build\build_win.bat` file for details.
 
 
 ### Mac
@@ -162,3 +215,5 @@ Unzip it so that the `wasm` folder in the zip file is at your repository root.
 
 The wasm build environment is a compact distribution of [node](https://nodejs.org/en/download/), [clang/wasm-ld](https://releases.llvm.org/download.html),
 [WAjic](https://github.com/schellingb/wajic) and [wasm system libraries](https://github.com/emscripten-core/emscripten/tree/yarnspin/system).
+
+For a final release, you probably want the web page it is embedded on to look a bit nicer - there is a helper build script `build\build_web.bat` which does this, specifying a template html file.
