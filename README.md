@@ -107,7 +107,7 @@ act: my_other_section
 
 Note that `use`, `chr` and `opt` declarations can also have conditions specified before them, and the condition will control whether the following use/chr/opt declaration is active or not.
 
-A section is determined to be a location section if it contains any of the declarations listed, and no other types of declarations.
+A section is determined to be a location section if it contains any of these declarations listed, and no other types of declarations.
 
 
 ### Dialog sections
@@ -141,6 +141,7 @@ act: other_section
 ```
 Just as for location sections, these can have conditions, and the `act` statement is a section (dialog or location) to jump to when the option is selected.
 
+A section is determined to be a dialog section if it contains any of the declarations listed for dialog sections, and no other types of declarations.
 
 ### Character sections
 
@@ -156,10 +157,44 @@ The section name `some_character` is used in location sections, in the `chr` sta
 
 When a character is added to a location using the `chr` statement, the `short` name is displayed in the list to the left on the screen.
 
-When a dialog is playing, the longer `name` is displayed above the portrait picture defined as `face`. All portrait images must be in the `faces` folder`.
+When a dialog is playing, the longer `name` is displayed above the portrait picture defined as `face`. All portrait images must be in the `faces` folder.
 
 
 ### Globals
+
+Any declarations that appear before the first section definition in a file is a global declaration. These control the overall appearance and behaviour of the game. Each global can be declared only once throughout all files, but it doesn't matter which globals are declared in what file.
+
+The list of globals are:
+
+`title`
+The name of this yarn - will be displayed in the title bar of the window of native builds.
+
+`author`
+
+
+`start`
+`items`
+`flags`
+`palette`
+`display_filters`
+`logo`
+`alone_text`
+`font_description`
+`font_options`
+`font_characters`
+`font_items`
+`font_name`
+`background_location`
+`background_dialog`
+`color_background`
+`color_disabled`
+`color_txt`
+`color_opt`
+`color_chr`
+`color_use`
+`color_name`
+`color_facebg`
+
 
 ## Building the code
 
