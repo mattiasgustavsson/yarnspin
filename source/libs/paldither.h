@@ -350,6 +350,7 @@ paldither_palette_t* paldither_palette_create( PALDITHER_U32 const* xbgr, int co
 
 paldither_palette_t* paldither_palette_create_from_data( void const* data, size_t size, void* memctx )
     {
+    (void) memctx;
     paldither_palette_t* palette = (paldither_palette_t*)PALDITHER_MALLOC( memctx, size );
     memcpy( palette, data, size );
     return palette;
@@ -358,6 +359,7 @@ paldither_palette_t* paldither_palette_create_from_data( void const* data, size_
 
 void paldither_palette_destroy( paldither_palette_t* palette, void* memctx )
     {
+    (void) memctx;
     PALDITHER_FREE( memctx, palette );
     }
 

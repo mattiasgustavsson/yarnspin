@@ -193,7 +193,9 @@ int generate_palette( uint32_t* image, int width, int height, uint32_t palette[ 
                 if( palette[ i ] == pixel )
                     goto skip;
             }
-            if( count >= 256 ) return 0;
+            if( count >= 256 ) {
+                return palettize_generate_palette_xbgr32( image, width, height, palette, 256, NULL );
+            }
             palette[ count ++ ] = pixel;
         skip:
             ;
@@ -541,6 +543,28 @@ void auto_contrast( uint32_t* pixels, int w, int h ) {
 
 
 void process_image( uint32_t* image, int width, int height, uint8_t* output, int outw, int outh, paldither_palette_t* palette ) {
+    if( width == outw && height == outh ) {
+        bool all_colors_match = true;
+        for( int i = 0; i < width * height; ++i ) {
+            uint32_t c = image[ i ] & 0xffffff;
+            bool color_found = false;
+            for( int j = 0; j < palette->color_count; ++j ) {
+                if( c == ( palette->colortable[ j ] & 0xffffff ) ) {
+                    color_found = true;
+                    output[ i ] = (uint8_t) j;
+                    break;
+                }
+            }
+            if( !color_found ) {
+                all_colors_match = false;
+                break;
+            }
+        }
+        if( all_colors_match ) {
+            return;
+        }
+    }
+
     auto_contrast( image, width, height );
 
     img_t img = img_from_abgr32( image, width, height );
@@ -635,8 +659,28 @@ void process_image( uint32_t* image, int width, int height, uint8_t* output, int
 }
 
 
-bool process_face( uint32_t* image, int width, int height, uint8_t* output, int outw, int outh, paldither_palette_t* palette ) {
-    (void)image; (void)width; (void)height; (void)output; (void)outw; (void)outh; (void)palette;
+void process_face( uint32_t* image, int width, int height, uint8_t* output, int outw, int outh, paldither_palette_t* palette ) {
+    if( width == outw && height == outh ) {
+        bool all_colors_match = true;
+        for( int i = 0; i < width * height; ++i ) {
+            uint32_t c = image[ i ] & 0xffffff;
+            bool color_found = false;
+            for( int j = 0; j < palette->color_count; ++j ) {
+                if( c == ( palette->colortable[ j ] & 0xffffff ) ) {
+                    color_found = true;
+                    output[ i ] = (uint8_t) j;
+                    break;
+                }
+            }
+            if( !color_found ) {
+                all_colors_match = false;
+                break;
+            }
+        }
+        if( all_colors_match ) {
+            return;
+        }
+    }
 
     img_t img = img_from_abgr32( image, width, height );
 
@@ -871,8 +915,6 @@ bool process_face( uint32_t* image, int width, int height, uint8_t* output, int 
             out[ x + outw * y ] = alpha | ( c & 0x00ffffff );
         }
     }
-
-    return true;
 }
 
 
@@ -904,14 +946,6 @@ paldither_palette_t* convert_palette( string palette_filename ) {
 }
 
 
-typedef struct bitmap_t {
-    uint32_t size_in_bytes;
-    uint16_t width;
-    uint16_t height;
-    uint8_t pixels[ 1 ]; // "open" array
-} bitmap_t;
-
-
 palrle_data_t* convert_bitmap( string image_filename, int width, int height, string palette_filename, paldither_palette_t* palette ) {
     bool is_face = false;
     if( cstr_starts( image_filename, "faces/" ) ) {
@@ -941,27 +975,26 @@ palrle_data_t* convert_bitmap( string image_filename, int width, int height, str
         if( !img ) {
             return NULL;
         }
-        if( w * h < width * height )
+        if( w * h < width * height ) {
             img = (stbi_uc*) realloc( img, width * height * 4 );
+        }
 
         int outw = width;
         int outh = height;
 
-        uint32_t size = 2 * outw * outh + sizeof( bitmap_t ) - 1;
-        bitmap_t* bitmap = (bitmap_t*) malloc( size );
-        bitmap->size_in_bytes = size;
-        bitmap->width = (uint16_t) outw;
-        bitmap->height = (uint16_t) outh;
+        uint8_t* pixels = (uint8_t*) malloc( 2 * outw * outh );
 
         if( is_face )
-            process_face( (uint32_t*) img, w, h, bitmap->pixels, outw, outh, palette );
+            process_face( (uint32_t*) img, w, h, pixels, outw, outh, palette );
         else
-            process_image( (uint32_t*) img, w, h, bitmap->pixels, outw, outh, palette );
+            process_image( (uint32_t*) img, w, h, pixels, outw, outh, palette );
 
-        uint8_t* mask = &bitmap->pixels[0] + outw * outh;
-        for( int y = 0; y < outh; ++y )
-            for( int x = 0; x < outw; ++x )
+        uint8_t* mask = pixels + outw * outh;
+        for( int y = 0; y < outh; ++y ) {
+            for( int x = 0; x < outw; ++x ) {
                 mask[ x + outw * y ] = ( ( (uint32_t*) img )[ x + outw * y ] & 0xff000000 ) ? 0xff : 0x00;
+            }
+        }
 
         create_path( processed_filename, 0 );
 
@@ -969,8 +1002,8 @@ palrle_data_t* convert_bitmap( string image_filename, int width, int height, str
 
         stbi_image_free( img );
 
-        palrle_data_t* rle = palrle_encode_mask( bitmap->pixels, mask, bitmap->width, bitmap->height, palette->colortable, palette->color_count, NULL );
-        free( bitmap );
+        palrle_data_t* rle = palrle_encode_mask( pixels, mask, outw, outh, palette->colortable, palette->color_count, NULL );
+        free( pixels );
         file_save_data( rle, rle->size, processed_filename, FILE_MODE_BINARY );
         return rle;
     }

@@ -31,6 +31,7 @@
 #include "libs/file.h"
 #include "libs/img.h"
 #include "libs/paldither.h"
+#include "libs/palettize.h"
 #include "libs/palrle.h"
 #include "libs/pixelfont.h"
 #include "libs/stb_image.h"
@@ -484,6 +485,9 @@ int main( int argc, char** argv ) {
 
 #define PALDITHER_IMPLEMENTATION
 #include "libs/paldither.h"
+
+#define PALETTIZE_IMPLEMENTATION
+#include "libs/palettize.h"
 
 #define PALRLE_IMPLEMENTATION
 #include "libs/palrle.h"
