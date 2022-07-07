@@ -36,7 +36,6 @@ typedef enum paldither_type_t
 
 typedef struct paldither_palette_t
     {
-    void* memctx;
     int color_count;
     PALDITHER_U32 colortable[ 256 ];
     } paldither_palette_t;
@@ -44,7 +43,7 @@ typedef struct paldither_palette_t
 paldither_palette_t* paldither_palette_create( PALDITHER_U32 const* xbgr, int count, size_t* palette_size, void* memctx );
 paldither_palette_t* paldither_palette_create_from_data( void const* data, size_t size, void* memctx );
 
-void paldither_palette_destroy( paldither_palette_t* palette );
+void paldither_palette_destroy( paldither_palette_t* palette, void* memctx );
 
 void paldither_palettize( PALDITHER_U32* abgr, int width, int height, paldither_palette_t const* palette,
     paldither_type_t dither_type, PALDITHER_U8* output );
@@ -296,7 +295,6 @@ paldither_palette_t* paldither_palette_create( PALDITHER_U32 const* xbgr, int co
         sizeof( int ) + nodither_mix_count * sizeof( paldither_mix_t ) +
         sizeof( nodither_map );
     paldither_palette_t* palette = (paldither_palette_t*) PALDITHER_MALLOC( memctx, size );
-    palette->memctx = memctx;
 
     palette->color_count = count;
     memcpy( palette->colortable, xbgr, sizeof( *xbgr ) * count );
@@ -353,15 +351,14 @@ paldither_palette_t* paldither_palette_create( PALDITHER_U32 const* xbgr, int co
 paldither_palette_t* paldither_palette_create_from_data( void const* data, size_t size, void* memctx )
     {
     paldither_palette_t* palette = (paldither_palette_t*)PALDITHER_MALLOC( memctx, size );
-    palette->memctx = memctx;
-    memcpy( &palette->color_count, data, size );
+    memcpy( palette, data, size );
     return palette;
     }
 
 
-void paldither_palette_destroy( paldither_palette_t* palette )
+void paldither_palette_destroy( paldither_palette_t* palette, void* memctx )
     {
-    PALDITHER_FREE( palette->memctx, palette );
+    PALDITHER_FREE( memctx, palette );
     }
 
 
