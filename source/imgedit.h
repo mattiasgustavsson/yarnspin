@@ -1045,7 +1045,7 @@ void imgedit_panel( imgedit_t* imgedit, imgedit_input_t* input ) {
     imgedit_box( imgedit, 0, 0, imgedit->screen_width, imgedit->panel_height, 0xff706860 );
 
     char const* tabs[] = { "Images", "Faces" };
-    imgedit->mode = imgedit_tabs( imgedit, 0, 0, imgedit->screen_width, 26, tabs, sizeof( tabs ) / sizeof( *tabs ), imgedit->mode, input );
+    imgedit->mode = (imgedit_mode_t) imgedit_tabs( imgedit, 0, 0, imgedit->screen_width, 26, tabs, sizeof( tabs ) / sizeof( *tabs ), imgedit->mode, input );
 
     panel->show_processed = imgedit_checkbox( imgedit, 10, 40, "Show processed", panel->show_processed, input );     
 
