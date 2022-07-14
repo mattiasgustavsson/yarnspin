@@ -257,6 +257,13 @@ color_facebg
 ```
 These globals controls the text display color for the various text areas in the game. They specify the index in the palette (0 to 255) of the color to use for each text. If not specified, defaults will be calculated and used.
 
+## Adjusting images
+
+Yarnspin has a built-in editor to make basic adjustment to your images and portraits, and preview how they will look after processing, as well as try them out with different palettes. You can run the image editor by launching yarnspin with the commandline parameters `-i` or `--images`, like this:
+
+```
+  yarnspin --images
+```
 
 ## Building the code
 
