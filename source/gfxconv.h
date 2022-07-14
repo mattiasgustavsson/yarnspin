@@ -23,6 +23,10 @@ float min( float x, float y ) {
     return x < y ? x : y;
 }
 
+float lerp( float a, float b, float t ) {
+    return a  + ( b - a ) * t;
+}
+
 
 img_rgba_t img_rgba( float r, float g, float b, float a ) {
     img_rgba_t rgba;
@@ -300,6 +304,24 @@ void sobel( img_t* img, float r ) {
 }
 
 
+void vignette( img_t* img, float power, float opcacity ) {
+    int width = img->width;
+    int height = img->height;
+    for( int y = 0; y < height; ++y ) {
+        for( int x = 0; x < width; ++x ) {
+            float u = (float) x / (float) width;
+            float v = (float) y / (float) height;
+            u *= 1.0f - (float) y / (float) height;
+            v *= 1.0f - (float) x / (float) width;
+            float vig = u * v * 15.0f;
+            vig = (float)pow( (double)vig, (double)power );
+            img_rgba_t c = img->pixels[ x + y * width ];
+            img->pixels[ x + y * width ] = img_rgba_lerp( c, img_rgba_mul( c, img_rgba( vig, vig, vig, 1.0f ) ), opcacity );
+        }
+    }
+}
+
+
 img_rgba_t sample_average( img_t* img, int x0, int y0, int x1, int y1 ) {
     img_rgba_t pixel=img_rgba( 0.0f, 0.0f, 0.0f, 0.0f );
     int count = 0;
@@ -322,16 +344,8 @@ img_t resize_image( img_t img, int new_width, int new_height ) {
         int scaled_height = fround( scale * img.height );
 
         img_t temp = img_create( scaled_width, scaled_height );
-        for( int y = 0; y < temp.height; ++y ) {
-            int y0 = (int)( ( y / (float) temp.height ) * img.height );
-            int y1 = (int)( ( ( y + 1 ) / (float) temp.height ) * img.height );
-            for( int x = 0; x < temp.width; ++x ) {
-                int x0 = (int)( ( x / (float) temp.width ) * img.width );
-                int x1 = (int)( ( ( x + 1 ) / (float) temp.width ) * img.width );
-                img_rgba_t pixel = sample_average( &img, x0, y0, x1, y1 );
-                set_pixel( &temp, x, y, pixel );
-            }
-        }
+        stbir_resize_float( (float*)img.pixels, img.width, img.height, sizeof( float ) * 4 * img.width, 
+            (float*)temp.pixels, temp.width, temp.height, sizeof( float ) * 4 * temp.width, 4 );
 
         return temp;
     }
@@ -390,108 +404,18 @@ img_t crop( img_t img, int new_width, int new_height ) {
 }
 
 
-void auto_levels( uint32_t* pixels, int w, int h ) {
-    int histogram_r[ 256 ] = { 0 };
-    int histogram_g[ 256 ] = { 0 };
-    int histogram_b[ 256 ] = { 0 };
-    int histogram_total = 0;
-
-    for( int i = 0; i < w * h; ++i ) {
-        int r = (int)( ( pixels[ i ] & 0x000000ff ) );
-        int g = (int)( ( pixels[ i ] & 0x0000ff00 ) >> 8 );
-        int b = (int)( ( pixels[ i ] & 0x00ff0000 ) >> 16 );
-        int a = (int)( ( pixels[ i ] & 0xff000000 ) >> 24 );
-        if( a > 0 ) {
-            ++histogram_r[ r ];
-            ++histogram_g[ g ];
-            ++histogram_b[ b ];
-            ++histogram_total;
-        }
-    }
-
-    int r_dark_count = ( 5 * histogram_total ) / 10000; // 0.05%
-    int g_dark_count = r_dark_count;
-    int b_dark_count = r_dark_count;
-    int r_bright_count = r_dark_count;
-    int g_bright_count = r_dark_count;
-    int b_bright_count = r_dark_count;
-    int r_dark = 255;
-    int g_dark = 255;
-    int b_dark = 255;
-    int r_bright = 0;
-    int g_bright = 0;
-    int b_bright = 0;
-    for( int i = 0; i < 256; ++i ) {
-        if( r_dark_count > 0 ) {
-            r_dark_count -= histogram_r[ i ];
-            if( r_dark_count <= 0 ) r_dark = i;
-        }
-        if( r_bright_count > 0 ) {
-            r_bright_count -= histogram_r[ 255 - i ];
-            if( r_bright_count <= 0 )
-                r_bright = 255 - i;
-        }
-        if( g_dark_count > 0 ) {
-            g_dark_count -= histogram_g[ i ];
-            if( g_dark_count <= 0 ) g_dark = i;
-        }
-        if( g_bright_count > 0 ) {
-            g_bright_count -= histogram_g[ 255 - i ];
-            if( g_bright_count <= 0 )
-                g_bright = 255 - i;
-        }
-        if( b_dark_count > 0 ) {
-            b_dark_count -= histogram_b[ i ];
-            if( b_dark_count <= 0 ) b_dark = i;
-        }
-        if( b_bright_count > 0 ) {
-            b_bright_count -= histogram_b[ 255 - i ];
-            if( b_bright_count <= 0 )
-                b_bright = 255 - i;
-        }
-    }
-
-    int range_r = r_bright - r_dark;
-    int range_g = g_bright - g_dark;
-    int range_b = b_bright - b_dark;
-    if( range_r < 1 ) range_r = 255;
-    if( range_g < 1 ) range_g = 255;
-    if( range_b < 1 ) range_b = 255;
-
-
-    for( int i = 0; i < w * h; ++i ) {
-        int r = (int)( ( pixels[ i ] & 0x000000ff ) );
-        int g = (int)( ( pixels[ i ] & 0x0000ff00 ) >> 8 );
-        int b = (int)( ( pixels[ i ] & 0x00ff0000 ) >> 16 );
-        int a = (int)( ( pixels[ i ] & 0xff000000 ) >> 24 );
-        r = r - r_dark;
-        g = g - g_dark;
-        b = b - b_dark;
-        if( r < 0 ) r = 0;
-        if( g < 0 ) g = 0;
-        if( b < 0 ) b = 0;
-        r = ( r << 8 ) / range_r;
-        g = ( g << 8 ) / range_g;
-        b = ( b << 8 ) / range_b;
-        if( r > 255 ) r = 255;
-        if( g > 255 ) g = 255;
-        if( b > 255 ) b = 255;
-
-        pixels[ i ] = (uint32_t)( ( a << 24 ) | ( b << 16 ) | ( g << 8 ) | r );
-    }
-}
-
-
-void auto_contrast( uint32_t* pixels, int w, int h ) {
+void auto_contrast( img_t* img, float strength ) {
     int histogram[ 256 ] = { 0 };
     int histogram_total = 0;
-    for( int i = 0; i < w * h; ++i ) {
-        int r = (int)( ( pixels[ i ] & 0x000000ff ) );
-        int g = (int)( ( pixels[ i ] & 0x0000ff00 ) >> 8 );
-        int b = (int)( ( pixels[ i ] & 0x00ff0000 ) >> 16 );
-        int a = (int)( ( pixels[ i ] & 0xff000000 ) >> 24 );
+    for( int i = 0; i < img->width * img->height; ++i ) {
+        img_rgba_t c = img->pixels[ i ];
+        int r = (int)( ( c.r * 255.0f ) );
+        int g = (int)( ( c.g * 255.0f ) );
+        int b = (int)( ( c.b * 255.0f ) );
+        int a = (int)( ( c.a * 255.0f ) );
         if( a > 0 ) {
-            int luma = ( ( 54 * r + 183 * g + 19 * b + 127 ) >> 8 );
+            int luma = ( ( 54 * r + 183 * g + 19 * b ) >> 8 );
+            luma = luma < 0 ? 0 : luma > 255 ? 255 : luma;
             ++histogram[ luma ];
             ++histogram_total;
         }
@@ -513,36 +437,132 @@ void auto_contrast( uint32_t* pixels, int w, int h ) {
         }
     }
 
-    int range = (int)( bright - dark );
-    if( range < 0 ) return;
-
-    //range = 255 - ( ( ( 255 - range ) * ( 255 - range ) ) >> 8 );
-    if( range == 0 || range == 255 ) return;
-
-    for( int i = 0; i < w * h; ++i ) {
-        int r = (int)( ( pixels[ i ] & 0x000000ff ) );
-        int g = (int)( ( pixels[ i ] & 0x0000ff00 ) >> 8 );
-        int b = (int)( ( pixels[ i ] & 0x00ff0000 ) >> 16 );
-        int a = (int)( ( pixels[ i ] & 0xff000000 ) >> 24 );
-        r = r - (int) dark;
-        g = g - (int) dark;
-        b = b - (int) dark;
-        if( r < 0 ) r = 0;
-        if( g < 0 ) g = 0;
-        if( b < 0 ) b = 0;
-        r = ( r << 8 ) / range;
-        g = ( g << 8 ) / range;
-        b = ( b << 8 ) / range;
-        if( r > 255 ) r = 255;
-        if( g > 255 ) g = 255;
-        if( b > 255 ) b = 255;
-
-        pixels[ i ] = (uint32_t)( ( a << 24 ) | ( b << 16 ) | ( g << 8 ) | r );
+    if( bright - dark <= 0 ) return;
+    float range = ( ( bright - dark ) / 255.0f );
+    float offset = dark / 255.0f;
+    for( int i = 0; i < img->width * img->height; ++i ) {
+        img_rgba_t p = img->pixels[ i ];
+        p.r = ( p.r - offset ) / range;
+        p.g = ( p.g - offset ) / range;
+        p.b = ( p.b - offset ) / range;
+        img->pixels[ i ] = img_rgba_lerp( img->pixels[ i ], p, strength );
     }
 }
 
 
-void process_image( uint32_t* image, int width, int height, uint8_t* output, int outw, int outh, paldither_palette_t* palette ) {
+unsigned char transparency_dither[ 4 * 4 * 7 ] = {
+    0,0,0,0,
+    0,0,0,0,
+    0,0,0,0,
+    0,0,0,0,
+
+    0,0,0,0,
+    0,0,0,1,
+    0,1,0,0,
+    0,0,0,1,
+
+    1,0,1,0,
+    0,1,0,0,
+    1,0,1,0,
+    0,0,0,1,
+
+    1,0,1,0,
+    0,1,0,1,
+    1,0,1,0,
+    0,1,0,1,
+
+    1,0,1,0,
+    1,1,0,1,
+    1,0,1,0,
+    0,1,1,1,
+
+    1,1,0,1,
+    0,1,1,1,
+    1,1,1,1,
+    1,1,1,1,
+
+    1,1,1,1,
+    1,1,1,1,
+    1,1,1,1,
+    1,1,1,1,
+};
+
+
+
+typedef struct process_settings_t {
+    bool use_portrait_processor;
+    bool bayer_dither;
+    float brightness;
+    float contrast;
+    float saturation;
+    float auto_contrast;
+    float sharpen_radius;
+    float sharpen_strength;
+    float vignette_size;
+    float vignette_opacity;
+} process_settings_t;
+
+
+bool load_settings( process_settings_t* settings, char const* filename ) {
+    file_t* file = file_load( filename, FILE_MODE_TEXT, NULL );
+    if( !file ) {
+        return false;
+    }
+
+    ini_t* ini = ini_load( file->data, NULL );
+    file_destroy( file );
+    if( !ini ) {
+        return false;
+    }
+    memset( settings, 0, sizeof( *settings ) );
+    
+    int use_portrait_processor = ini_find_property( ini, INI_GLOBAL_SECTION, "use_portrait_processor", -1 );
+    int bayer_dither = ini_find_property( ini, INI_GLOBAL_SECTION, "bayer_dither", -1 );
+    int brightness = ini_find_property( ini, INI_GLOBAL_SECTION, "brightness", -1 );
+    int contrast = ini_find_property( ini, INI_GLOBAL_SECTION, "contrast", -1 );
+    int saturation = ini_find_property( ini, INI_GLOBAL_SECTION, "saturation", -1 );
+    int auto_contrast = ini_find_property( ini, INI_GLOBAL_SECTION, "auto_contrast", -1 );
+    int sharpen_radius = ini_find_property( ini, INI_GLOBAL_SECTION, "sharpen_radius", -1 );
+    int sharpen_strength = ini_find_property( ini, INI_GLOBAL_SECTION, "sharpen_strength", -1 );
+    int vignette_size = ini_find_property( ini, INI_GLOBAL_SECTION, "vignette_size", -1 );
+    int vignette_opacity = ini_find_property( ini, INI_GLOBAL_SECTION, "vignette_opacity", -1 );
+
+    if( use_portrait_processor != INI_NOT_FOUND )
+        settings->use_portrait_processor = cstr_is_equal( ini_property_value( ini, INI_GLOBAL_SECTION, use_portrait_processor ), "true" );
+   
+    if( bayer_dither != INI_NOT_FOUND )
+        settings->bayer_dither = cstr_is_equal( ini_property_value( ini, INI_GLOBAL_SECTION, bayer_dither ), "true" );
+    
+    if( brightness != INI_NOT_FOUND )
+        settings->brightness = (float) atof( ini_property_value( ini, INI_GLOBAL_SECTION, brightness ) );
+    
+    if( contrast != INI_NOT_FOUND )
+        settings->contrast = (float) atof( ini_property_value( ini, INI_GLOBAL_SECTION, contrast ) );
+    
+    if( saturation != INI_NOT_FOUND )
+        settings->saturation = (float) atof( ini_property_value( ini, INI_GLOBAL_SECTION, saturation ) );
+    
+    if( auto_contrast != INI_NOT_FOUND )
+        settings->auto_contrast = (float) atof( ini_property_value( ini, INI_GLOBAL_SECTION, auto_contrast ) );
+    
+    if( sharpen_radius != INI_NOT_FOUND )
+        settings->sharpen_radius = (float) atof( ini_property_value( ini, INI_GLOBAL_SECTION, sharpen_radius ) );
+    
+    if( sharpen_strength != INI_NOT_FOUND )
+        settings->sharpen_strength = (float) atof( ini_property_value( ini, INI_GLOBAL_SECTION, sharpen_strength ) );
+    
+    if( vignette_size != INI_NOT_FOUND )
+        settings->vignette_size = (float) atof( ini_property_value( ini, INI_GLOBAL_SECTION, vignette_size ) );
+    
+    if( vignette_opacity != INI_NOT_FOUND )
+        settings->vignette_opacity = (float) atof( ini_property_value( ini, INI_GLOBAL_SECTION, vignette_opacity ) );
+
+    ini_destroy( ini );
+    return true;
+}
+
+
+void process_image( uint32_t* image, int width, int height, uint8_t* output, int outw, int outh, paldither_palette_t* palette, process_settings_t* settings ) {
     if( width == outw && height == outh ) {
         bool all_colors_match = true;
         for( int i = 0; i < width * height; ++i ) {
@@ -565,10 +585,8 @@ void process_image( uint32_t* image, int width, int height, uint8_t* output, int
         }
     }
 
-    auto_contrast( image, width, height );
 
-    img_t img = img_from_abgr32( image, width, height );
-
+    img_t img = img_from_abgr32( image, width, height );    
     if( img.width != outw || img.height != outh ) {
         img_t sized_img = resize_image( img, outw, outh );
         img_t cropped_img = crop( sized_img, outw, outh );
@@ -577,14 +595,31 @@ void process_image( uint32_t* image, int width, int height, uint8_t* output, int
         img = cropped_img;
     }
 
+    if( settings ) {
+        auto_contrast( &img, settings->auto_contrast );
+        img_adjust_saturation( &img, lerp( -0.5f, 0.5f, settings->saturation )  );
+        img_adjust_contrast( &img, lerp( 0.1f, 1.9f, settings->contrast ) );
+        img_adjust_brightness( &img, lerp( -0.5f, 0.5f, settings->brightness ) );
+        vignette( &img, settings->vignette_size * 1.5f, settings->vignette_opacity );
+        img_sharpen( &img, settings->sharpen_radius, settings->sharpen_strength );
+    } else {
+        auto_contrast( &img, 1.0f );
+        img_sharpen( &img, 0.15f, 1.0f );
+    } 
+
+
     img_adjust_contrast( &img, 1.2f );
-    img_adjust_brightness( &img, 0.00f );
     img_adjust_saturation( &img, 0.15f );
-    //sharpen( &img, 0.35f, 0.5f );
-    img_sharpen( &img, 0.15f, 1.0f );
+
     for( int y = 0; y < img.height; ++y ) {
-        for( int x = 0; x < img.width; ++x ) {
-            set_pixel( &img, x, y, img_rgba_saturate( get_pixel( &img, x, y ) ) );
+        for( int x = 0; x < img.width; ++x )     {
+            img_rgba_t c = get_pixel( &img, x, y );
+            float w = 1.0f - ( 1.0f - c.a ) * ( 1.0f - c.a );
+            c.a = w;
+            c.r = c.r - ( 1.0f - c.a );
+            c.g = c.g - ( 1.0f - c.a );
+            c.b = c.b - ( 1.0f - c.a );
+            set_pixel( &img, x, y, c );
         }
     }
 
@@ -592,51 +627,17 @@ void process_image( uint32_t* image, int width, int height, uint8_t* output, int
     img_to_argb32( &img, out );
     img_free( &img );
 
-    paldither_palettize( out, outw, outh, palette, PALDITHER_TYPE_DEFAULT, output );
-
-    unsigned char dither_pattern[ 4 * 4 * 7 ] = {
-        0,0,0,0,
-        0,0,0,0,
-        0,0,0,0,
-        0,0,0,0,
-
-        0,0,0,0,
-        0,0,0,1,
-        0,1,0,0,
-        0,0,0,1,
-
-        1,0,1,0,
-        0,1,0,0,
-        1,0,1,0,
-        0,0,0,1,
-
-        1,0,1,0,
-        0,1,0,1,
-        1,0,1,0,
-        0,1,0,1,
-
-        1,0,1,0,
-        1,1,0,1,
-        1,0,1,0,
-        0,1,1,1,
-
-        1,1,0,1,
-        0,1,1,1,
-        1,1,1,1,
-        1,1,1,1,
-
-        1,1,1,1,
-        1,1,1,1,
-        1,1,1,1,
-        1,1,1,1,
-    };
+    paldither_type_t dither = PALDITHER_TYPE_DEFAULT;
+    if( settings && settings->bayer_dither ) {
+        dither = PALDITHER_TYPE_BAYER;
+    }
+    paldither_palettize( out, outw, outh, palette, dither, output );
 
     for( int y = 0; y < outh; ++y ) {
         for( int x = 0; x < outw; ++x )  {
-            uint32_t c = out[ x + outw * y ];
-            uint32_t b = 0x0;
-            uint32_t a = ( c >> 24 );
-            c = c |  0xff000000;
+            uint32_t c = palette->colortable[ output[ x + outw * y ] ];
+            uint32_t b = c & 0xffffff;
+            uint32_t a = ( out[ x + outw * y ] ) >> 24;
             c = ( c & 0xffffff ) | 0xff000000;
             if( a < 4 ) {
                 c = b;
@@ -647,7 +648,7 @@ void process_image( uint32_t* image, int width, int height, uint8_t* output, int
                 a = ( a * 5 ) / ( 256 - 4 - 128 ) + 2;
                 if( a < 2 ) a = 2;
                 if( a > 6 ) a = 6;
-                unsigned char d = dither_pattern[ 4 * 4 * a + ( x & 3 ) + ( y & 3 ) * 4 ];
+                unsigned char d = transparency_dither[ 4 * 4 * a + ( x & 3 ) + ( y & 3 ) * 4 ];
                 if( d == 0 )
                     c = b;
                 else
@@ -659,7 +660,7 @@ void process_image( uint32_t* image, int width, int height, uint8_t* output, int
 }
 
 
-void process_face( uint32_t* image, int width, int height, uint8_t* output, int outw, int outh, paldither_palette_t* palette ) {
+void process_face( uint32_t* image, int width, int height, uint8_t* output, int outw, int outh, paldither_palette_t* palette, process_settings_t* settings ) {
     if( width == outw && height == outh ) {
         bool all_colors_match = true;
         for( int i = 0; i < width * height; ++i ) {
@@ -681,7 +682,7 @@ void process_face( uint32_t* image, int width, int height, uint8_t* output, int 
             return;
         }
     }
-
+    
     img_t img = img_from_abgr32( image, width, height );
 
     if( img.width != outw || img.height != outh ) {
@@ -691,6 +692,15 @@ void process_face( uint32_t* image, int width, int height, uint8_t* output, int 
         img_free( &img );
         img = cropped_img;
     }
+
+    if( settings ) {
+        auto_contrast( &img, settings->auto_contrast );
+        img_adjust_saturation( &img, lerp( -0.5f, 0.5f, settings->saturation )  );
+        img_adjust_contrast( &img, lerp( 0.1f, 1.9f, settings->contrast ) );
+        img_adjust_brightness( &img, lerp( -0.5f, 0.5f, settings->brightness ) );
+        vignette( &img, settings->vignette_size * 1.5f, settings->vignette_opacity );
+        img_sharpen( &img, settings->sharpen_radius, settings->sharpen_strength );
+    } 
 
     int extrahigh = 0;
     int extrahigh_low = 0;
@@ -850,52 +860,18 @@ void process_face( uint32_t* image, int width, int height, uint8_t* output, int 
     img_free( &sobel_img2 );
     img_free( &sobel_img3 );
 
-    paldither_palettize( out, outw, outh, palette, PALDITHER_TYPE_DEFAULT, output );
+    paldither_type_t dither = PALDITHER_TYPE_DEFAULT;
+    if( settings && settings->bayer_dither ) {
+        dither = PALDITHER_TYPE_BAYER;
+    }
+    paldither_palettize( out, outw, outh, palette, dither, output );
 
-
-    unsigned char dither_pattern[ 4 * 4 * 7 ] = {
-        0,0,0,0,
-        0,0,0,0,
-        0,0,0,0,
-        0,0,0,0,
-
-        0,0,0,0,
-        0,0,0,1,
-        0,1,0,0,
-        0,0,0,1,
-
-        1,0,1,0,
-        0,1,0,0,
-        1,0,1,0,
-        0,0,0,1,
-
-        1,0,1,0,
-        0,1,0,1,
-        1,0,1,0,
-        0,1,0,1,
-
-        1,0,1,0,
-        1,1,0,1,
-        1,0,1,0,
-        0,1,1,1,
-
-        1,1,0,1,
-        0,1,1,1,
-        1,1,1,1,
-        1,1,1,1,
-
-        1,1,1,1,
-        1,1,1,1,
-        1,1,1,1,
-        1,1,1,1,
-    };
 
     for( int y = 0; y < outh; ++y ) {
-        for( int x = 0; x < outw; ++x ) {
-            uint32_t alpha = out[ x + outw * y ] & 0xff000000;
-            uint32_t c = out[ x + outw * y ];
-            uint32_t b = 0xff262626;
-            uint32_t a = ( c >> 24 );
+        for( int x = 0; x < outw; ++x )  {
+            uint32_t c = palette->colortable[ output[ x + outw * y ] ];
+            uint32_t b = c & 0xffffff;
+            uint32_t a = ( out[ x + outw * y ] ) >> 24;
             c = ( c & 0xffffff ) | 0xff000000;
             if( a < 4 ) {
                 c = b;
@@ -906,19 +882,19 @@ void process_face( uint32_t* image, int width, int height, uint8_t* output, int 
                 a = ( a * 5 ) / ( 256 - 4 - 128 ) + 2;
                 if( a < 2 ) a = 2;
                 if( a > 6 ) a = 6;
-                unsigned char d = dither_pattern[ 4 * 4 * a + ( x & 3 ) + ( y & 3 ) * 4 ];
+                unsigned char d = transparency_dither[ 4 * 4 * a + ( x & 3 ) + ( y & 3 ) * 4 ];
                 if( d == 0 )
                     c = b;
                 else
                     c = c;
             }
-            out[ x + outw * y ] = alpha | ( c & 0x00ffffff );
+            out[ x + outw * y ] = c;
         }
     }
 }
 
 
-paldither_palette_t* convert_palette( string palette_filename ) {
+paldither_palette_t* convert_palette( string palette_filename, size_t* palette_size ) {
     uint32_t colortable[ 256 ];
     int colortable_count = palette_from_file( palette_filename, colortable );
     if( colortable_count <= 0 ) return NULL;
@@ -930,6 +906,9 @@ paldither_palette_t* convert_palette( string palette_filename ) {
         file_t* file = file_load( palette_lookup_file, FILE_MODE_BINARY, NULL );
         if( file ) {
             ditherpal = paldither_palette_create_from_data( file->data, file->size, NULL );
+            if( palette_size ) {
+                *palette_size = file->size;
+            }
             file_destroy( file );
         }
     }
@@ -937,7 +916,9 @@ paldither_palette_t* convert_palette( string palette_filename ) {
     if( !ditherpal ) {
         size_t pal_size;
         ditherpal = paldither_palette_create( colortable, colortable_count, &pal_size, NULL );
-
+        if( palette_size ) {
+            *palette_size = pal_size;
+        }
         create_path( palette_lookup_file, 0 );
         file_save_data( &ditherpal->color_count, pal_size, palette_lookup_file, FILE_MODE_BINARY );
     }
@@ -968,13 +949,15 @@ palrle_data_t* convert_bitmap( string image_filename, int width, int height, str
     if( !file_exists( processed_filename ) || !file_exists( intermediate_processed_filename ) ||
         g_cache_version != YARNSPIN_VERSION ||
         file_more_recent( cstr_cat( is_face ? "faces/" : "images/", image_filename ), processed_filename ) ||
-        file_more_recent( cstr_cat( is_face ? "faces/" : "images/", image_filename ), intermediate_processed_filename ) ) {
+        file_more_recent( cstr_cat( is_face ? "faces/" : "images/", image_filename ), intermediate_processed_filename ) ||
+        file_more_recent( is_face ? "faces/settings.ini" : "images/settings.ini", processed_filename ) ) {
 
         int w, h, c;
         stbi_uc* img = stbi_load( cstr_cat( is_face ? "faces/" : "images/", image_filename ), &w, &h, &c, 4 );
         if( !img ) {
             return NULL;
         }
+
         if( w * h < width * height ) {
             img = (stbi_uc*) realloc( img, width * height * 4 );
         }
@@ -984,10 +967,16 @@ palrle_data_t* convert_bitmap( string image_filename, int width, int height, str
 
         uint8_t* pixels = (uint8_t*) malloc( 2 * outw * outh );
 
-        if( is_face )
-            process_face( (uint32_t*) img, w, h, pixels, outw, outh, palette );
-        else
-            process_image( (uint32_t*) img, w, h, pixels, outw, outh, palette );
+        process_settings_t settings;
+        bool have_settings = load_settings( &settings, is_face ? "faces/settings.ini" : "images/settings.ini" );
+
+        bool use_portrait_processor = is_face;
+        if( have_settings ) use_portrait_processor = settings.use_portrait_processor;
+        if( use_portrait_processor ) {
+            process_face( (uint32_t*) img, w, h, pixels, outw, outh, palette, have_settings ? &settings : NULL );
+        } else {
+            process_image( (uint32_t*) img, w, h, pixels, outw, outh, palette, have_settings ? &settings : NULL );
+        }
 
         uint8_t* mask = pixels + outw * outh;
         for( int y = 0; y < outh; ++y ) {

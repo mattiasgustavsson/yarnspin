@@ -200,6 +200,7 @@ img_rgba_t img_sample_clamp( img_t* img, float u, float v ) {
 
 
 void img_adjust_brightness( img_t* img, float value ) {
+    if( value == 0.0f ) return;
     for( int i = 0; i < img->width * img->height; ++i ) {
         img_rgba_t* p = &img->pixels[ i ];
         p->r = p->r + value;
@@ -209,6 +210,7 @@ void img_adjust_brightness( img_t* img, float value ) {
 }
 
 void img_adjust_contrast( img_t* img, float value ) {
+    if( value == 0.0f ) return;
     for( int i = 0; i < img->width * img->height; ++i ) {
         img_rgba_t* p = &img->pixels[ i ];
         p->r = ( p->r - 0.5f ) * value + 0.5f;
@@ -299,6 +301,7 @@ img_rgba_t img_hsva_to_rgba( img_hsva_t hsv ) {
 
 
 void img_adjust_saturation( img_t* img, float value ) {
+    if( value == 0.0f ) return;
     for( int i = 0; i < img->width * img->height; ++i ) {
         img_rgba_t* p = &img->pixels[ i ];
         img_hsva_t hsv = img_rgba_to_hsva( *p );

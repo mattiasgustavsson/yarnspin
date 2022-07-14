@@ -30,13 +30,17 @@
 #include "libs/frametimer.h"
 #include "libs/file.h"
 #include "libs/img.h"
+#include "libs/ini.h"
 #include "libs/paldither.h"
 #include "libs/palettize.h"
 #include "libs/palrle.h"
 #include "libs/pixelfont.h"
 #include "libs/stb_image.h"
+#include "libs/stb_image_resize.h"
 #include "libs/stb_image_write.h"
 #include "libs/stb_truetype.h"
+#include "libs/sysfont.h"
+#include "libs/thread.h"
 
 
 // Version number stored in the file .cache\VERSION, read at start of program
@@ -279,6 +283,13 @@ int app_proc( app_t* app, void* user_data ) {
 }
 
 
+#ifndef __wasm__
+    #include "imgedit.h"
+    void threads_init( void );
+#endif
+
+
+
 int main( int argc, char** argv ) {
     (void) argc, (void ) argv;
 
@@ -288,6 +299,14 @@ int main( int argc, char** argv ) {
         flag |= _CRTDBG_LEAK_CHECK_DF; // Turn on leak-checking bit
         _CrtSetDbgFlag( flag ); // Set flag to the new value
         //_CrtSetBreakAlloc( 0 ); // Can be manually commented back in to break at a certain allocation
+    #endif
+
+    // if -i or --images parameter were specified, run image editor
+    #ifndef __wasm__
+        if( argc == 2 && ( strcmp( argv[ 1 ], "-i" ) == 0 || strcmp( argv[ 1 ], "--images" ) == 0 ) ) {
+            threads_init();
+            return app_run( imgedit_proc, NULL, NULL, NULL, NULL );
+        }
     #endif
 
     #ifndef __wasm__
@@ -480,6 +499,9 @@ int main( int argc, char** argv ) {
 #define IMG_IMPLEMENTATION
 #include "libs/img.h"
 
+#define INI_IMPLEMENTATION
+#include "libs/ini.h"
+
 #define LZMA_IMPLEMENTATION
 #include "libs/lzma.h"
 
@@ -498,8 +520,6 @@ int main( int argc, char** argv ) {
 
 #pragma warning( push )
 #pragma warning( disable: 4255 )
-#pragma warning( disable: 4296 )
-#pragma warning( disable: 4365 )
 #pragma warning( disable: 4668 )
 #define STB_IMAGE_IMPLEMENTATION
 #if defined( _WIN32 ) && ( defined( __clang__ ) || defined( __TINYC__ ) )
@@ -509,10 +529,11 @@ int main( int argc, char** argv ) {
 #undef STB_IMAGE_IMPLEMENTATION
 #pragma warning( pop )
 
+#define STB_IMAGE_RESIZE_IMPLEMENTATION
+#include "libs/stb_image_resize.h"
+
 #pragma warning( push )
 #pragma warning( disable: 4204 )
-#pragma warning( disable: 4244 ) // conversion from 'int' to 'short', possible loss of data
-#pragma warning( disable: 4365 )
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "libs/stb_image_write.h"
 #pragma warning( pop )
@@ -520,6 +541,35 @@ int main( int argc, char** argv ) {
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "libs/stb_truetype.h"
 
+#pragma warning( push )
+#pragma warning( disable: 4456 )
+#pragma warning( disable: 4457 )
+#define SYSFONT_IMPLEMENTATION
+#include "libs/sysfont.h"
+#pragma warning( pop )
+
+#ifndef __wasm__
+    #if defined( __TINYC__ )
+        typedef struct _RTL_CONDITION_VARIABLE { PVOID Ptr; } RTL_CONDITION_VARIABLE, *PRTL_CONDITION_VARIABLE;
+        typedef RTL_CONDITION_VARIABLE CONDITION_VARIABLE, *PCONDITION_VARIABLE;
+        static VOID (*InitializeConditionVariable)( PCONDITION_VARIABLE );
+        static VOID (*WakeConditionVariable)( PCONDITION_VARIABLE );
+        static BOOL (*SleepConditionVariableCS)( PCONDITION_VARIABLE, PCRITICAL_SECTION, DWORD );
+    #endif
+
+        
+    #define THREAD_IMPLEMENTATION
+    #include "libs/thread.h"
+
+    void threads_init( void ) {
+        #if defined( __TINYC__ )
+            HMODULE kernel = LoadLibrary( "kernel32" );
+            InitializeConditionVariable = GetProcAddress( kernel, "InitializeConditionVariable");
+            WakeConditionVariable = GetProcAddress( kernel, "WakeConditionVariable");
+            SleepConditionVariableCS = GetProcAddress( kernel, "SleepConditionVariableCS");
+        #endif
+    }
+#endif
 
 #include <sys/stat.h>
 

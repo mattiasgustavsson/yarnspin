@@ -371,7 +371,7 @@ int palettize_generate_palette_xbgr32( PALETTIZE_U32 const* xbgr, int width, int
 
     return count;
 
-skip:
+skip: ;
     size_t malloc_size =  sizeof( palettize_internal_rgb_t ) * ( pixel_count + palette_size );
     malloc_size += sizeof( palettize_internal_bucket_t ) * palette_size;
 	palettize_internal_rgb_t* data = (palettize_internal_rgb_t*) PALETTIZE_MALLOC( memctx, malloc_size );
@@ -482,7 +482,7 @@ int palettize_generate_palette_rgb16( PALETTIZE_U16 const* rgb, int width, int h
 
     return count;
 
-skip:
+skip: ;
     size_t malloc_size =  sizeof( palettize_internal_rgb_t ) * ( pixel_count + palette_size );
     malloc_size += sizeof( palettize_internal_bucket_t ) * palette_size;
 	palettize_internal_rgb_t* data = (palettize_internal_rgb_t*) PALETTIZE_MALLOC( memctx, malloc_size );
@@ -585,7 +585,7 @@ int palettize_generate_rgb16_palette_xbgr32( PALETTIZE_U32 const* xbgr, int widt
 
     return count;
 
-skip:
+skip: ;
     size_t malloc_size =  sizeof( palettize_internal_rgb_t ) * ( pixel_count + palette_size );
     malloc_size += sizeof( palettize_internal_bucket_t ) * palette_size;
 	palettize_internal_rgb_t* data = (palettize_internal_rgb_t*) PALETTIZE_MALLOC( memctx,  malloc_size );

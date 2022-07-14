@@ -1051,7 +1051,6 @@ buffer_t* yarn_compile( char const* path ) {
         printf( "Could not find 'scripts' folder\n" );
         memmgr_rollback( &g_memmgr, mem_restore );
         cstr_rollback( str_restore );
-        dir_close( dir );
         return NULL;
     }
 
@@ -1114,7 +1113,7 @@ buffer_t* yarn_compile( char const* path ) {
 
     bool no_error = true;
     printf( "Processing palette\n" );
-    paldither_palette_t* palette = manage_paldither( convert_palette( yarn.globals.palette ) );
+    paldither_palette_t* palette = manage_paldither( convert_palette( yarn.globals.palette, NULL ) );
     if( !palette ) {
         printf( "Failed to load palette file '%s'\n", yarn.globals.palette );
         no_error = false;

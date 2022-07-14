@@ -1658,6 +1658,8 @@ static LRESULT CALLBACK app_internal_wndproc( HWND hwnd, UINT message, WPARAM wp
         case WM_LBUTTONDBLCLK:
             input_event.type = APP_INPUT_DOUBLE_CLICK; input_event.data.key = APP_KEY_LBUTTON;
             app_internal_add_input_event( app, &input_event );
+            input_event.type = APP_INPUT_KEY_DOWN; input_event.data.key = APP_KEY_LBUTTON;
+            app_internal_add_input_event(app, &input_event);
             break;
         case WM_RBUTTONDOWN:
             input_event.type = APP_INPUT_KEY_DOWN; input_event.data.key = APP_KEY_RBUTTON;
@@ -1670,6 +1672,8 @@ static LRESULT CALLBACK app_internal_wndproc( HWND hwnd, UINT message, WPARAM wp
         case WM_RBUTTONDBLCLK:
             input_event.type = APP_INPUT_DOUBLE_CLICK; input_event.data.key = APP_KEY_RBUTTON;
             app_internal_add_input_event( app, &input_event );
+            input_event.type = APP_INPUT_KEY_DOWN; input_event.data.key = APP_KEY_RBUTTON;
+            app_internal_add_input_event(app, &input_event);
             break;
         case WM_MBUTTONDOWN:
             input_event.type = APP_INPUT_KEY_DOWN; input_event.data.key = APP_KEY_MBUTTON;
@@ -1682,6 +1686,8 @@ static LRESULT CALLBACK app_internal_wndproc( HWND hwnd, UINT message, WPARAM wp
         case WM_MBUTTONDBLCLK:
             input_event.type = APP_INPUT_DOUBLE_CLICK; input_event.data.key = APP_KEY_MBUTTON;
             app_internal_add_input_event( app, &input_event );
+            input_event.type = APP_INPUT_KEY_DOWN; input_event.data.key = APP_KEY_MBUTTON;
+            app_internal_add_input_event(app, &input_event);
             break;
         case WM_XBUTTONDOWN:
             input_event.type = APP_INPUT_KEY_DOWN; input_event.data.key = HIWORD( wparam ) == 1 ? APP_KEY_XBUTTON1 :APP_KEY_XBUTTON2;
@@ -1694,6 +1700,8 @@ static LRESULT CALLBACK app_internal_wndproc( HWND hwnd, UINT message, WPARAM wp
         case WM_XBUTTONDBLCLK:
             input_event.type = APP_INPUT_DOUBLE_CLICK; input_event.data.key = HIWORD( wparam ) == 1 ? APP_KEY_XBUTTON1 :APP_KEY_XBUTTON2;
             app_internal_add_input_event( app, &input_event );
+            input_event.type = APP_INPUT_KEY_DOWN; input_event.data.key = HIWORD( wparam ) == 1 ? APP_KEY_XBUTTON1 :APP_KEY_XBUTTON2;
+            app_internal_add_input_event(app, &input_event);
             break;
         case WM_SYSKEYDOWN:
         case WM_KEYDOWN:
@@ -2903,33 +2911,17 @@ void app_window_size( app_t* app, int width, int height )
 
 int app_window_width( app_t* app )
     {
-    int width = app->windowed_w;
-    if( app->screenmode == APP_SCREENMODE_WINDOW )
-        {
-        WINDOWPLACEMENT placement;
-        placement.length = sizeof( placement );
-        GetWindowPlacement( app->hwnd, &placement );
-        width = placement.rcNormalPosition.right - placement.rcNormalPosition.left;
-        }
-    RECT r = app_internal_rect( 0, 0, 0, 0 );
-    AdjustWindowRect( &r, APP_WINDOWED_WS_STYLE | WS_VISIBLE, FALSE );
-    return width - ( r.right - r.left );
+    RECT r;
+    GetClientRect( app->hwnd, &r );
+    return r.right - r.left;
     }
 
 
 int app_window_height( app_t* app )
     {
-    int height = app->windowed_h;
-    if( app->screenmode == APP_SCREENMODE_WINDOW )
-        {
-        WINDOWPLACEMENT placement;
-        placement.length = sizeof( placement );
-        GetWindowPlacement( app->hwnd, &placement );
-        height = placement.rcNormalPosition.bottom - placement.rcNormalPosition.top;
-        }
-    RECT r = app_internal_rect( 0, 0, 0, 0 );
-    AdjustWindowRect( &r, APP_WINDOWED_WS_STYLE | WS_VISIBLE, FALSE );
-    return height - ( r.bottom - r.top );
+    RECT r;
+    GetClientRect( app->hwnd, &r );
+    return r.bottom - r.top;
     }
 
 
