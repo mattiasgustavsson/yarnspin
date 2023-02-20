@@ -65,7 +65,7 @@ void imgedit_load_img( imgedit_image_t* img ) {
 }
 
 
-void imgedit_list_images( array_param(imgedit_image_t)* images, cstr_t folder ) {
+void imgedit_list_images( array_param(imgedit_image_t)* images, cstr_t folder, float resolution_scale ) {
     dir_t* dir = dir_open( folder );
     if( !dir ) {
         printf( "Could not find '%s' folder\n", folder );
@@ -87,8 +87,8 @@ void imgedit_list_images( array_param(imgedit_image_t)* images, cstr_t folder ) 
             img.orig_width = 0;
             img.orig_height = 0;
             img.orig_pixels = NULL;
-            img.sized_width = mode_faces ? 90 : 192;
-            img.sized_height = mode_faces ? 90 : 128;
+            img.sized_width = (int)( ( mode_faces ? 90 : 192 ) * resolution_scale ) ;
+            img.sized_height = (int)( ( mode_faces ? 90 : 128 ) * resolution_scale );
             img.sized_pixels = NULL;
             img.processed = NULL;
             img.prev_processed = NULL;
@@ -288,6 +288,8 @@ typedef enum imgedit_mode_t {
 
 
 typedef struct imgedit_t {
+    int resolution;
+
     array_param(cstr_t)* palettes;
     int selected_palette;
     paldither_palette_t* palette;
@@ -566,10 +568,12 @@ void imgedit_images( imgedit_t* imgedit, app_input_t input ) {
     }
 
     imgedit->panels[ imgedit->mode ].scroll += (int)( scroll_delta * 100.0f );
-    int hcount = imgedit->screen_width / ( ( imgedit->mode == IMGEDIT_MODE_FACES ? 91 : 193 ) * imgedit->panels[ imgedit->mode ].scale );
+    int w =  imgedit->mode == IMGEDIT_MODE_FACES ? 90 : 192;
+    int h =  imgedit->mode == IMGEDIT_MODE_FACES ? 90 : 128;
+    int hcount = imgedit->screen_width / ( ( w + 1 ) * imgedit->panels[ imgedit->mode ].scale );
     hcount = hcount <= 0 ? 1 : hcount; 
     int vcount = ( imglist->count + hcount - 1  ) / hcount;
-    int max_scroll = vcount * ( ( imgedit->mode == IMGEDIT_MODE_FACES ? 91 : 129 )* imgedit->panels[ imgedit->mode ].scale ) - ( imgedit->screen_height - imgedit->panel_height ) + 8;
+    int max_scroll = vcount * ( ( h + 1 )* imgedit->panels[ imgedit->mode ].scale ) - ( imgedit->screen_height - imgedit->panel_height ) + 8;
     imgedit->panels[ imgedit->mode ].scroll = imgedit->panels[ imgedit->mode ].scroll > 0 ? imgedit->panels[ imgedit->mode ].scroll : 0;
     imgedit->panels[ imgedit->mode ].scroll = imgedit->panels[ imgedit->mode ].scroll <= max_scroll ? imgedit->panels[ imgedit->mode ].scroll : max_scroll;
 
@@ -1067,6 +1071,9 @@ void imgedit_panel( imgedit_t* imgedit, imgedit_input_t* input ) {
     panel->pending_settings.vignette_size = imgedit_slider( imgedit, 900, 80, 250, "Vignette Scale", &panel->sliders[ 6 ], panel->pending_settings.vignette_size, input );
     panel->pending_settings.vignette_opacity = imgedit_slider( imgedit, 900, 100, 250, "Vignette Strength", &panel->sliders[ 7 ], panel->pending_settings.vignette_opacity, input );
 
+    char const* resolutions[] = { "Low", "Medium", "High", };
+    imgedit->resolution = imgedit_radiobuttons( imgedit, 1180, 40, resolutions, sizeof( resolutions ) / sizeof( *resolutions ), imgedit->resolution, input );
+   
     imgedit_text( imgedit, 230, 5, "Palette", 0xffffffff );
     int new_selected_palette = imgedit_dropdown( imgedit, 300, 2, array_item( imgedit->palettes, 0 ), array_count( imgedit->palettes ), &imgedit->dropdowns[ 0 ], imgedit->selected_palette, !imgedit->converting_palette, &dropdown_input );     
     if( imgedit->converting_palette ) {
@@ -1126,8 +1133,6 @@ void imgedit_panel( imgedit_t* imgedit, imgedit_input_t* input ) {
 
 
 int imgedit_proc( app_t* app, void* user_data ) {       
-    (void) user_data;
-
     file_t* version_file = file_load( ".cache/VERSION", FILE_MODE_TEXT, NULL );
     if( version_file ) {
         g_cache_version = atoi( (char const*) version_file->data );
@@ -1138,7 +1143,8 @@ int imgedit_proc( app_t* app, void* user_data ) {
     app_screenmode( app, APP_SCREENMODE_WINDOW );
     app_title( app, "Yarnspin Image Editor" );
 
-    imgedit_t imgedit = { NULL };
+    imgedit_t imgedit = { 0 };
+    imgedit.resolution = *(int*)user_data;
 
     imgedit.palettes = array_create( cstr_t );
     imgedit_list_palettes( imgedit.palettes );
@@ -1147,11 +1153,13 @@ int imgedit_proc( app_t* app, void* user_data ) {
         return EXIT_FAILURE;
     }
 
+    float resolution_scale = imgedit.resolution == 1 ? 1.5f : imgedit.resolution == 2 ? 2.0f : 1.0f;
+
     imgedit.images = array_create( imgedit_image_t );
-    imgedit_list_images( imgedit.images, "images" );
+    imgedit_list_images( imgedit.images, "images", resolution_scale );
 
     imgedit.faces = array_create( imgedit_image_t );
-    imgedit_list_images( imgedit.faces, "faces" );
+    imgedit_list_images( imgedit.faces, "faces", resolution_scale );
 
     if( array_count( imgedit.images ) == 0 && array_count( imgedit.faces ) == 0 ) {
         printf( "No image files found in folders 'images' or 'faces'\n" );
@@ -1209,6 +1217,7 @@ int imgedit_proc( app_t* app, void* user_data ) {
     thread_mutex_init( &imgedit.mutex );
     thread_ptr_t process_thread = thread_create( imgedit_process_thread, &imgedit, THREAD_STACK_SIZE_DEFAULT );
 
+    int prev_resolution = imgedit.resolution;
     bool shift = false;
     bool ctrl = false;
     bool lbutton = false;
@@ -1283,6 +1292,10 @@ int imgedit_proc( app_t* app, void* user_data ) {
         thread_mutex_unlock( &imgedit.mutex );
       
         app_present( app, imgedit.screen, imgedit.screen_width, imgedit.screen_height, 0xffffff, 0x000000 );
+        
+        if( prev_resolution != imgedit.resolution ) {
+            break;
+        }
     }
 
     thread_atomic_int_store( &imgedit.exit_process_thread, 1 );
@@ -1329,5 +1342,6 @@ int imgedit_proc( app_t* app, void* user_data ) {
     paldither_palette_destroy( imgedit.palette, NULL );
     free( imgedit.screen );
     memmgr_clear( &g_memmgr );
-    return 0;
+    *(int*)user_data = imgedit.resolution;
+    return EXIT_SUCCESS;
 }

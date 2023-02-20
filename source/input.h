@@ -16,7 +16,7 @@ void input_init( struct input_t* input, app_t* app ) {
 }
 
 
-void input_update(  struct input_t* input, crtemu_pc_t* crtemu_pc, crtemu_t* crtemu ) {
+void input_update(  struct input_t* input, int screen_width, int screen_height, crtemu_pc_t* crtemu_pc, crtemu_t* crtemu ) {
     for( int i = 0; i < 256; ++i ) {
         input->prev_[ i ] = input->curr_[ i ];
         input->curr_[ i ] = false;
@@ -29,13 +29,22 @@ void input_update(  struct input_t* input, crtemu_pc_t* crtemu_pc, crtemu_t* crt
             input->mouse_x = in.events[ i ].data.mouse_pos.x;
             input->mouse_y = in.events[ i ].data.mouse_pos.y;
             if( crtemu_pc ) {
-                crtemu_pc_coordinates_window_to_bitmap( crtemu_pc, 320, 240, &input->mouse_x, &input->mouse_y );
+                crtemu_pc_coordinates_window_to_bitmap( crtemu_pc, screen_width, screen_height, &input->mouse_x, &input->mouse_y );
             } else if( crtemu ) {
-                crtemu_coordinates_window_to_bitmap( crtemu, 364, 306, &input->mouse_x, &input->mouse_y );
-                input->mouse_x -= 22;
-                input->mouse_y -= 33;
+                int border_x = 22;
+                int border_y = 33;
+                if( screen_width == 480 ) {
+                    border_x = 33;
+                    border_y = 48;
+                } else if( screen_width == 640 ) {
+                    border_x = 44;
+                    border_y = 66;
+                }
+                crtemu_coordinates_window_to_bitmap( crtemu, screen_width + border_x * 2, screen_height + border_y * 2, &input->mouse_x, &input->mouse_y );
+                input->mouse_x -= border_x;
+                input->mouse_y -= border_y;
             } else {
-                app_coordinates_window_to_bitmap( input->app_, 320, 240, &input->mouse_x, &input->mouse_y );
+                app_coordinates_window_to_bitmap( input->app_, screen_width, screen_height, &input->mouse_x, &input->mouse_y );
             }
         } else if( in.events[ i ].type == APP_INPUT_KEY_DOWN ) {
             input->curr_[ in.events[ i ].data.key ] = true;

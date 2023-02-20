@@ -884,6 +884,20 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
                     array_add( yarn->globals.logo_indices, &image_index );
                 }
             }
+        } else if( CMP( global->keyword, "resolution" ) ) {
+            for( int j = 0; j < global->data->count; ++j ) {
+                string_id id = cstr_trim( global->data->items[ j ] );
+                if( CMP( id, "low" ) ) {
+                    yarn->globals.resolution = YARN_RESOLUTION_LOW;
+                } else if( CMP( id, "medium" ) ) {
+                    yarn->globals.resolution = YARN_RESOLUTION_MEDIUM;
+                } else if( CMP( id, "high" ) ) {
+                    yarn->globals.resolution = YARN_RESOLUTION_HIGH;
+                } else {
+                    printf( "%s(%d): invalid resolution declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
+                    no_error = false;
+                }
+            }
         } else if( CMP( global->keyword, "display_filters" ) ) {
             for( int j = 0; j < global->data->count; ++j ) {
                 string_id id = cstr_trim( global->data->items[ j ] );

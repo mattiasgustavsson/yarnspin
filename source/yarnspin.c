@@ -167,23 +167,26 @@ int app_proc( app_t* app, void* user_data ) {
     frametimer_t* frametimer = frametimer_create( NULL );
     frametimer_lock_rate( frametimer, 60 );
 
-    static uint8_t canvas[ 320 * 240 ];
+    static uint8_t canvas[ 640 * 480 ];
     memset( canvas, 0, sizeof( canvas) );
 
     crtemu_pc_t* crtemu_pc = NULL;
     crtemu_t* crtemu = NULL;
 
+    int screen_width = yarn->globals.resolution == YARN_RESOLUTION_LOW ? 320 : yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? 480 : 640;
+    int screen_height = yarn->globals.resolution == YARN_RESOLUTION_LOW ? 240 : yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? 360 : 480;
+
     // run game
     input_t input;
     input_init( &input, app );
     game_t game;
-    game_init( &game, yarn, &input, canvas, 320, 240 );
+    game_init( &game, yarn, &input, canvas, screen_width, screen_height );
 
     // main loop
     APP_U64 time = 0;
     while( app_yield( app ) != APP_STATE_EXIT_REQUESTED && !game.exit_flag ) {
         frametimer_update( frametimer );
-        input_update( &input, crtemu_pc, crtemu );
+        input_update( &input, screen_width, screen_height, crtemu_pc, crtemu );
         game_update( &game );
 
         if( input_was_key_pressed( &input, APP_KEY_F11 ) ) {
@@ -205,7 +208,7 @@ int app_proc( app_t* app, void* user_data ) {
                 ( ( ( ( ( (a)        ) & 0xffU ) * ( ( (b)        ) & 0xffU ) ) >> 8U )        ) )
         bg = RGBMUL32( fade, bg );
 
-        static uint32_t screen[ 364* 306 ];
+        static uint32_t screen[ ( 640 + 88 ) * ( 480 + 132 ) ];
         time += 1000000 / 60;
 
         if( display_filter == YARN_DISPLAY_FILTER_PC && crtemu_pc == NULL ) {
@@ -242,24 +245,26 @@ int app_proc( app_t* app, void* user_data ) {
         }
 
         if( crtemu_pc ) {
-            for( int i = 0; i < 320 * 240; ++i ) {
+            for( int i = 0; i < screen_width * screen_height; ++i ) {
                 screen[ i ] = yarn->assets.palette[ canvas[ i ] ];
             }
-            crtemu_pc_present( crtemu_pc, time, screen, 320, 240, fade, bg );
+            crtemu_pc_present( crtemu_pc, time, screen, screen_width, screen_height, fade, bg );
             app_present( app, NULL, 1, 1, 0xffffff, 0x000000 );
         } else if( crtemu ) {
-            for( int y = 0; y < 240; ++y ) {
-                for( int x = 0; x < 320; ++x ) {
-                    screen[ ( 22 + x ) + ( 33 + y ) * 364 ] = yarn->assets.palette[ canvas[ x + y * 320 ] ];
+            int offset_x = yarn->globals.resolution == YARN_RESOLUTION_LOW ? 22 : yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? 33 : 44;
+            int offset_y = yarn->globals.resolution == YARN_RESOLUTION_LOW ? 33 : yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? 48 : 66;
+            for( int y = 0; y < screen_height; ++y ) {
+                for( int x = 0; x < screen_width; ++x ) {
+                    screen[ ( offset_x + x ) + ( offset_y + y ) * ( screen_width + 2 * offset_x ) ] = yarn->assets.palette[ canvas[ x + y * screen_width ] ];
                 }
             }
-            crtemu_present( crtemu, time, screen, 364, 306, fade, bg );
+            crtemu_present( crtemu, time, screen, screen_width + 2 * offset_x, screen_height + 2 * offset_y, fade, bg );
             app_present( app, NULL, 1, 1, 0xffffff, 0x000000 );
         } else {
-            for( int i = 0; i < 320 * 240; ++i ) {
+            for( int i = 0; i < screen_width * screen_height; ++i ) {
                 screen[ i ] = yarn->assets.palette[ canvas[ i ] ];
             }
-            app_present( app, screen, 320, 240, fade, bg );
+            app_present( app, screen, screen_width, screen_height, fade, bg );
         }
     }
 
@@ -305,7 +310,17 @@ int main( int argc, char** argv ) {
     #ifndef __wasm__
         if( argc == 2 && ( strcmp( argv[ 1 ], "-i" ) == 0 || strcmp( argv[ 1 ], "--images" ) == 0 ) ) {
             threads_init();
-            return app_run( imgedit_proc, NULL, NULL, NULL, NULL );
+            int resolution = 0;
+            int prev_resolution = resolution;
+            int result = EXIT_SUCCESS;
+            for( ; ; ) {
+                result = app_run( imgedit_proc, &resolution, NULL, NULL, NULL );
+                if( prev_resolution == resolution ) {
+                    break;
+                }
+                prev_resolution = resolution;
+            } 
+            return result;
         }
     #endif
 

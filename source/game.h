@@ -239,11 +239,17 @@ void cls( game_t* game ) {
 
 
 void draw( game_t* game, palrle_data_t* bmp, int x, int y ) {
+    x += game->yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? x / 2 : game->yarn->globals.resolution == YARN_RESOLUTION_HIGH ? x : 0;
+    y += game->yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? y / 2 : game->yarn->globals.resolution == YARN_RESOLUTION_HIGH ? y : 0;
     palrle_blit( bmp, x, y, game->screen, game->screen_width, game->screen_height );
 }
 
 
 void box( game_t* game, int x, int y, int w, int h, int c ) {
+    x += game->yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? x / 2 : game->yarn->globals.resolution == YARN_RESOLUTION_HIGH ? x : 0;
+    y += game->yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? y / 2 : game->yarn->globals.resolution == YARN_RESOLUTION_HIGH ? y : 0;
+    w += game->yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? w / 2 : game->yarn->globals.resolution == YARN_RESOLUTION_HIGH ? w : 0;
+    h += game->yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? h / 2 : game->yarn->globals.resolution == YARN_RESOLUTION_HIGH ? h : 0;
     for( int iy = 0; iy < h; ++iy ) {
         for( int ix = 0; ix < w; ++ix ) {
             int xp = x + ix;
@@ -257,6 +263,8 @@ void box( game_t* game, int x, int y, int w, int h, int c ) {
 
 
 pixelfont_bounds_t center( game_t* game, pixelfont_t* font, string str, int x, int y, int color ) {
+    x += game->yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? x / 2 : game->yarn->globals.resolution == YARN_RESOLUTION_HIGH ? x : 0;
+    y += game->yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? y / 2 : game->yarn->globals.resolution == YARN_RESOLUTION_HIGH ? y : 0;
     pixelfont_bounds_t bounds;
     pixelfont_blit( font, x, y, str, (uint8_t)color, game->screen, game->screen_width, game->screen_height,
         PIXELFONT_ALIGN_CENTER, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, &bounds );
@@ -265,6 +273,9 @@ pixelfont_bounds_t center( game_t* game, pixelfont_t* font, string str, int x, i
 
 
 pixelfont_bounds_t center_wrap( game_t* game, pixelfont_t* font, string str, int x, int y, int color, int wrap_width ) {
+    x += game->yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? x / 2 : game->yarn->globals.resolution == YARN_RESOLUTION_HIGH ? x : 0;
+    y += game->yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? y / 2 : game->yarn->globals.resolution == YARN_RESOLUTION_HIGH ? y : 0;
+    wrap_width += game->yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? wrap_width / 2 : game->yarn->globals.resolution == YARN_RESOLUTION_HIGH ? wrap_width : 0;
     pixelfont_bounds_t bounds;
     x -= wrap_width / 2;
     pixelfont_blit( font, x, y, str, (uint8_t)color, game->screen, game->screen_width, game->screen_height,
@@ -275,6 +286,8 @@ pixelfont_bounds_t center_wrap( game_t* game, pixelfont_t* font, string str, int
 
 
 pixelfont_bounds_t text( game_t* game, pixelfont_t* font, string str, int x, int y, int color ) {
+    x += game->yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? x / 2 : game->yarn->globals.resolution == YARN_RESOLUTION_HIGH ? x : 0;
+    y += game->yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? y / 2 : game->yarn->globals.resolution == YARN_RESOLUTION_HIGH ? y : 0;
     pixelfont_bounds_t bounds;
     pixelfont_blit( font, x, y, str, (uint8_t)color, game->screen, game->screen_width, game->screen_height,
         PIXELFONT_ALIGN_LEFT, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, &bounds );
@@ -283,6 +296,9 @@ pixelfont_bounds_t text( game_t* game, pixelfont_t* font, string str, int x, int
 
 
 void wrap( game_t* game, pixelfont_t* font, string str, int x, int y, int color, int wrap_width ) {
+    x += game->yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? x / 2 : game->yarn->globals.resolution == YARN_RESOLUTION_HIGH ? x : 0;
+    y += game->yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? y / 2 : game->yarn->globals.resolution == YARN_RESOLUTION_HIGH ? y : 0;
+    wrap_width += game->yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? wrap_width / 2 : game->yarn->globals.resolution == YARN_RESOLUTION_HIGH ? wrap_width : 0;
     pixelfont_blit( font, x, y, str, (uint8_t)color, game->screen, game->screen_width, game->screen_height,
         PIXELFONT_ALIGN_LEFT, wrap_width, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF,
         NULL );
@@ -290,6 +306,9 @@ void wrap( game_t* game, pixelfont_t* font, string str, int x, int y, int color,
 
 
 void wrap_limit( game_t* game, pixelfont_t* font, string str, int x, int y, int color, int wrap_width, int limit ) {
+    x += game->yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? x / 2 : game->yarn->globals.resolution == YARN_RESOLUTION_HIGH ? x : 0;
+    y += game->yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? y / 2 : game->yarn->globals.resolution == YARN_RESOLUTION_HIGH ? y : 0;
+    wrap_width += game->yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? wrap_width / 2 : game->yarn->globals.resolution == YARN_RESOLUTION_HIGH ? wrap_width : 0;
     pixelfont_blit( font, x, y, str, (uint8_t)color, game->screen, game->screen_width, game->screen_height,
         PIXELFONT_ALIGN_LEFT, wrap_width, 0, 0, limit, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF,
         PIXELFONT_UNDERLINE_OFF, NULL );
@@ -474,6 +493,9 @@ gamestate_t location_update( game_t* game ) {
 
     int mouse_x = input_get_mouse_x( game->input );
     int mouse_y = input_get_mouse_y( game->input );
+    float mouse_scale = game->yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? 1.5f : game->yarn->globals.resolution == YARN_RESOLUTION_HIGH ? 2.0f : 1.0f;
+    mouse_x = (int)( mouse_x / mouse_scale );
+    mouse_y = (int)( mouse_y / mouse_scale );
 
     if( game->queued_dialog >= 0 && ( was_key_pressed( game, APP_KEY_LBUTTON ) || was_key_pressed( game, APP_KEY_SPACE ) ) ) {
         game->state.current_location = -1;
@@ -506,7 +528,6 @@ gamestate_t location_update( game_t* game ) {
     if( game->state.current_image >= 0 ) {
         draw( game, yarn->assets.bitmaps->items[ game->state.current_image ], 64, 10 );
     }
-
 
     // txt:
     string txt = "";
