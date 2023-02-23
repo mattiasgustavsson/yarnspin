@@ -567,9 +567,11 @@ void imgedit_images( imgedit_t* imgedit, app_input_t input ) {
         imglist = ARRAY_CAST( imgedit->faces );
     }
 
+    float resolution_scale = imgedit->resolution == 1 ? 1.5f : imgedit->resolution == 2 ? 2.0f : 1.0f;
+    int w = (int)( ( imgedit->mode == IMGEDIT_MODE_FACES ? 90 : 192 ) * resolution_scale );
+    int h = (int)( ( imgedit->mode == IMGEDIT_MODE_FACES ? 90 : 128 ) * resolution_scale );
+
     imgedit->panels[ imgedit->mode ].scroll += (int)( scroll_delta * 100.0f );
-    int w =  imgedit->mode == IMGEDIT_MODE_FACES ? 90 : 192;
-    int h =  imgedit->mode == IMGEDIT_MODE_FACES ? 90 : 128;
     int hcount = imgedit->screen_width / ( ( w + 1 ) * imgedit->panels[ imgedit->mode ].scale );
     hcount = hcount <= 0 ? 1 : hcount; 
     int vcount = ( imglist->count + hcount - 1  ) / hcount;

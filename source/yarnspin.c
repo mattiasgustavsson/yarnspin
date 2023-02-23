@@ -242,6 +242,7 @@ int app_proc( app_t* app, void* user_data ) {
         if( display_filter == YARN_DISPLAY_FILTER_NONE && crtemu != NULL ) {
                 crtemu_destroy( crtemu );
                 crtemu = NULL;
+                memset( screen, 0, sizeof( screen ) );
         }
 
         if( crtemu_pc ) {
@@ -261,10 +262,14 @@ int app_proc( app_t* app, void* user_data ) {
             crtemu_present( crtemu, time, screen, screen_width + 2 * offset_x, screen_height + 2 * offset_y, fade, bg );
             app_present( app, NULL, 1, 1, 0xffffff, 0x000000 );
         } else {
-            for( int i = 0; i < screen_width * screen_height; ++i ) {
-                screen[ i ] = yarn->assets.palette[ canvas[ i ] ];
+            int offset_x = yarn->globals.resolution == YARN_RESOLUTION_LOW ? 22 : yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? 33 : 44;
+            int offset_y = yarn->globals.resolution == YARN_RESOLUTION_LOW ? 33 : yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? 48 : 66;
+            for( int y = 0; y < screen_height; ++y ) {
+                for( int x = 0; x < screen_width; ++x ) {
+                    screen[ ( offset_x + x ) + ( offset_y + y ) * ( screen_width + 2 * offset_x ) ] = yarn->assets.palette[ canvas[ x + y * screen_width ] ];
+                }
             }
-            app_present( app, screen, screen_width, screen_height, fade, bg );
+            app_present( app, screen, screen_width + 2 * offset_x, screen_height + 2 * offset_y, fade, bg );
         }
     }
 

@@ -268,6 +268,8 @@ pixelfont_bounds_t center( game_t* game, pixelfont_t* font, string str, int x, i
     pixelfont_bounds_t bounds;
     pixelfont_blit( font, x, y, str, (uint8_t)color, game->screen, game->screen_width, game->screen_height,
         PIXELFONT_ALIGN_CENTER, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, &bounds );
+    bounds.width -= game->yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? bounds.width / 3 : game->yarn->globals.resolution == YARN_RESOLUTION_HIGH ? bounds.width / 2 : 0;
+    bounds.height -= game->yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? bounds.height / 3 : game->yarn->globals.resolution == YARN_RESOLUTION_HIGH ? bounds.height / 2 : 0;
     return bounds;
 }
 
@@ -281,6 +283,8 @@ pixelfont_bounds_t center_wrap( game_t* game, pixelfont_t* font, string str, int
     pixelfont_blit( font, x, y, str, (uint8_t)color, game->screen, game->screen_width, game->screen_height,
         PIXELFONT_ALIGN_CENTER, wrap_width, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF,
         &bounds );
+    bounds.width -= game->yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? bounds.width / 3 : game->yarn->globals.resolution == YARN_RESOLUTION_HIGH ? bounds.width / 2 : 0;
+    bounds.height -= game->yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? bounds.height / 3 : game->yarn->globals.resolution == YARN_RESOLUTION_HIGH ? bounds.height / 2 : 0;
     return bounds;
 }
 
@@ -291,6 +295,8 @@ pixelfont_bounds_t text( game_t* game, pixelfont_t* font, string str, int x, int
     pixelfont_bounds_t bounds;
     pixelfont_blit( font, x, y, str, (uint8_t)color, game->screen, game->screen_width, game->screen_height,
         PIXELFONT_ALIGN_LEFT, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, &bounds );
+    bounds.width -= game->yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? bounds.width / 3 : game->yarn->globals.resolution == YARN_RESOLUTION_HIGH ? bounds.width / 2 : 0;
+    bounds.height -= game->yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? bounds.height / 3 : game->yarn->globals.resolution == YARN_RESOLUTION_HIGH ? bounds.height / 2 : 0;
     return bounds;
 }
 
@@ -312,6 +318,11 @@ void wrap_limit( game_t* game, pixelfont_t* font, string str, int x, int y, int 
     pixelfont_blit( font, x, y, str, (uint8_t)color, game->screen, game->screen_width, game->screen_height,
         PIXELFONT_ALIGN_LEFT, wrap_width, 0, 0, limit, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF,
         PIXELFONT_UNDERLINE_OFF, NULL );
+}
+
+
+int font_height( game_t* game, int height ) {
+    return height - ( game->yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? height / 3 : game->yarn->globals.resolution == YARN_RESOLUTION_HIGH ? height / 2 : 0 );
 }
 
 
@@ -552,7 +563,7 @@ gamestate_t location_update( game_t* game ) {
             if( !test_cond( game, &location->opt->items[ i ].cond ) ) {
                 continue;
             }
-            int ypos = 197 + game->font_opt->height * c;
+            int ypos = 197 + font_height( game, game->font_opt->height ) * c;
             pixelfont_bounds_t b = text( game, game->font_opt, location->opt->items[ i ].text, 5, ypos, game->color_opt );
             if( mouse_y >= ypos && mouse_y < ypos + b.height ) {
                 box( game, 4, ypos, 315, b.height, game->color_opt );
@@ -585,7 +596,7 @@ gamestate_t location_update( game_t* game ) {
                 }
             }
         }
-        int ypos = 4 + ( ( 117 - ( game->state.items->count * game->font_use->height ) ) / 2 ) + c * game->font_use->height;
+        int ypos = 4 + ( ( 117 - ( game->state.items->count * font_height( game, game->font_use->height ) ) ) / 2 ) + c * font_height( game, game->font_use->height );
         pixelfont_bounds_t b = center( game, game->font_use, usetxt, 287, ypos, color );
         if( enabled && mouse_y >= ypos && mouse_y < ypos + b.height && mouse_x > 259 ) {
             box( game, 260, ypos, 56, b.height, game->color_use );
@@ -611,7 +622,7 @@ gamestate_t location_update( game_t* game ) {
         if( !test_cond( game, &location->chr->items[ i ].cond ) ) {
             continue;
         }
-        int ypos = 4 + ( ( 117 - ( chr_count * game->font_chr->height ) ) / 2 ) + c * game->font_chr->height;
+        int ypos = 4 + ( ( 117 - ( chr_count * font_height( game, game->font_chr->height ) ) ) / 2 ) + c * font_height( game, game->font_chr->height );
         int color = game->color_chr;
         if( game->queued_dialog >= 0 || game->queued_location >= 0 ) {
             color = game->color_disabled;
@@ -630,7 +641,7 @@ gamestate_t location_update( game_t* game ) {
         ++c;
     }
     if( c == 0 ) {
-        int ypos = 4 + ( ( 117 - ( 2 * game->font_chr->height ) ) / 2 );
+        int ypos = 4 + ( ( 117 - ( 2 * font_height( game, game->font_chr->height ) ) ) / 2 );
         center_wrap( game,  game->font_chr, yarn->globals.alone_text, 32, ypos, game->color_disabled, 56 );
     }
 
@@ -743,7 +754,9 @@ gamestate_t dialog_update( game_t* game ) {
 
     int mouse_x = input_get_mouse_x( game->input );
     int mouse_y = input_get_mouse_y( game->input );
-
+    float mouse_scale = game->yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? 1.5f : game->yarn->globals.resolution == YARN_RESOLUTION_HIGH ? 2.0f : 1.0f;
+    mouse_x = (int)( mouse_x / mouse_scale );
+    mouse_y = (int)( mouse_y / mouse_scale );
 
     // background_dialog:
     if( yarn->globals.background_dialog >= 0 ) {
@@ -795,7 +808,7 @@ gamestate_t dialog_update( game_t* game ) {
             draw( game, game->yarn->assets.bitmaps->items[ character->face_index ], 115, 26 );
         }
     }
-
+    
     // say:
     int say = -1;
     if( game->dialog.enable_options == 2 ) {
@@ -811,7 +824,7 @@ gamestate_t dialog_update( game_t* game ) {
             if( !test_cond( game, &dialog->say->items[ i ].cond ) ) {
                 continue;
             }
-            int ypos = 197 + game->font_opt->height * c;
+            int ypos = 197 + font_height( game, game->font_opt->height ) * c;
             pixelfont_bounds_t b = text( game, game->font_opt, dialog->say->items[ i ].text, 5, ypos, game->color_opt );
             if( game->queued_dialog < 0 && game->queued_location < 0 ) {
                 if( mouse_y >= ypos && mouse_y < ypos + b.height && mouse_x < 277 ) {
@@ -848,7 +861,7 @@ gamestate_t dialog_update( game_t* game ) {
                 }
             }
         }
-        int ypos = 4 + ( ( 117 - ( game->state.items->count * game->font_use->height ) ) / 2 ) + c * game->font_use->height;
+        int ypos = 4 + ( ( 117 - ( game->state.items->count * font_height( game, game->font_use->height ) ) ) / 2 ) + c * font_height( game, game->font_use->height );
         pixelfont_bounds_t b = center( game, game->font_use, txt, 287, ypos, color );
         if( enabled && mouse_y >= ypos && mouse_y < ypos + b.height && mouse_x > 259 ) {
             box( game, 260, ypos, 56, b.height, game->color_use );

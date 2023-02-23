@@ -44,7 +44,18 @@ void input_update(  struct input_t* input, int screen_width, int screen_height, 
                 input->mouse_x -= border_x;
                 input->mouse_y -= border_y;
             } else {
-                app_coordinates_window_to_bitmap( input->app_, screen_width, screen_height, &input->mouse_x, &input->mouse_y );
+                int border_x = 22;
+                int border_y = 33;
+                if( screen_width == 480 ) {
+                    border_x = 33;
+                    border_y = 48;
+                } else if( screen_width == 640 ) {
+                    border_x = 44;
+                    border_y = 66;
+                }
+                app_coordinates_window_to_bitmap( input->app_, screen_width + border_x * 2, screen_height + border_y * 2, &input->mouse_x, &input->mouse_y );
+                input->mouse_x -= border_x;
+                input->mouse_y -= border_y;
             }
         } else if( in.events[ i ].type == APP_INPUT_KEY_DOWN ) {
             input->curr_[ in.events[ i ].data.key ] = true;
