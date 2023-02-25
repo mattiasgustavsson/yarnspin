@@ -139,7 +139,7 @@ int app_proc( app_t* app, void* user_data ) {
     #else
         bool fullscreen = false;
     #endif
-    app_interpolation( app, APP_INTERPOLATION_NONE );
+    app_interpolation( app, yarn->globals.resolution >= YARN_RESOLUTION_FULL ? APP_INTERPOLATION_LINEAR : APP_INTERPOLATION_NONE );
     app_screenmode( app, fullscreen ? APP_SCREENMODE_FULLSCREEN : APP_SCREENMODE_WINDOW );
     app_title( app, yarn->globals.title );
 
@@ -167,14 +167,16 @@ int app_proc( app_t* app, void* user_data ) {
     frametimer_t* frametimer = frametimer_create( NULL );
     frametimer_lock_rate( frametimer, 60 );
 
-    static uint8_t canvas[ 640 * 480 ];
+    static uint8_t canvas[ 1440 * 1080 ];
     memset( canvas, 0, sizeof( canvas) );
 
     crtemu_pc_t* crtemu_pc = NULL;
     crtemu_t* crtemu = NULL;
 
-    int screen_width = yarn->globals.resolution == YARN_RESOLUTION_LOW ? 320 : yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? 480 : 640;
-    int screen_height = yarn->globals.resolution == YARN_RESOLUTION_LOW ? 240 : yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? 360 : 480;
+    int widths[] = { 320, 480, 640, 1440 };
+    int heights[] = { 240, 360, 480, 1080 };
+    int screen_width = widths[ yarn->globals.resolution ];
+    int screen_height = heights[ yarn->globals.resolution ];
 
     // run game
     input_t input;
@@ -208,7 +210,7 @@ int app_proc( app_t* app, void* user_data ) {
                 ( ( ( ( ( (a)        ) & 0xffU ) * ( ( (b)        ) & 0xffU ) ) >> 8U )        ) )
         bg = RGBMUL32( fade, bg );
 
-        static uint32_t screen[ ( 640 + 88 ) * ( 480 + 132 ) ];
+        static uint32_t screen[ ( 1440 + (int)( 22 * 4.5f ) ) * ( 1080 + (int)( 33 * 4.5 ) ) ];
         time += 1000000 / 60;
 
         if( display_filter == YARN_DISPLAY_FILTER_PC && crtemu_pc == NULL ) {
@@ -252,8 +254,9 @@ int app_proc( app_t* app, void* user_data ) {
             crtemu_pc_present( crtemu_pc, time, screen, screen_width, screen_height, fade, bg );
             app_present( app, NULL, 1, 1, 0xffffff, 0x000000 );
         } else if( crtemu ) {
-            int offset_x = yarn->globals.resolution == YARN_RESOLUTION_LOW ? 22 : yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? 33 : 44;
-            int offset_y = yarn->globals.resolution == YARN_RESOLUTION_LOW ? 33 : yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? 48 : 66;
+            int offset_x = 22;
+            int offset_y = 33;
+            scale_for_resolution( &game, &offset_x, &offset_y );
             for( int y = 0; y < screen_height; ++y ) {
                 for( int x = 0; x < screen_width; ++x ) {
                     screen[ ( offset_x + x ) + ( offset_y + y ) * ( screen_width + 2 * offset_x ) ] = yarn->assets.palette[ canvas[ x + y * screen_width ] ];
@@ -262,14 +265,10 @@ int app_proc( app_t* app, void* user_data ) {
             crtemu_present( crtemu, time, screen, screen_width + 2 * offset_x, screen_height + 2 * offset_y, fade, bg );
             app_present( app, NULL, 1, 1, 0xffffff, 0x000000 );
         } else {
-            int offset_x = yarn->globals.resolution == YARN_RESOLUTION_LOW ? 22 : yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? 33 : 44;
-            int offset_y = yarn->globals.resolution == YARN_RESOLUTION_LOW ? 33 : yarn->globals.resolution == YARN_RESOLUTION_MEDIUM ? 48 : 66;
-            for( int y = 0; y < screen_height; ++y ) {
-                for( int x = 0; x < screen_width; ++x ) {
-                    screen[ ( offset_x + x ) + ( offset_y + y ) * ( screen_width + 2 * offset_x ) ] = yarn->assets.palette[ canvas[ x + y * screen_width ] ];
-                }
+            for( int i = 0; i < screen_width * screen_height; ++i ) {
+                screen[ i ] = yarn->assets.palette[ canvas[ i ] ];
             }
-            app_present( app, screen, screen_width + 2 * offset_x, screen_height + 2 * offset_y, fade, bg );
+            app_present( app, screen, screen_width, screen_height, fade, bg );
         }
     }
 

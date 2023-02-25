@@ -893,6 +893,8 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
                     yarn->globals.resolution = YARN_RESOLUTION_MEDIUM;
                 } else if( CMP( id, "high" ) ) {
                     yarn->globals.resolution = YARN_RESOLUTION_HIGH;
+                } else if( CMP( id, "full" ) ) {
+                    yarn->globals.resolution = YARN_RESOLUTION_FULL;
                 } else {
                     printf( "%s(%d): invalid resolution declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
                     no_error = false;

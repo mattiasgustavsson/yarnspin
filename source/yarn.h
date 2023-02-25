@@ -615,6 +615,7 @@ typedef enum yarn_resolution_t {
     YARN_RESOLUTION_LOW,
     YARN_RESOLUTION_MEDIUM,
     YARN_RESOLUTION_HIGH,
+    YARN_RESOLUTION_FULL,
 } yarn_resolution_t;
 
 
@@ -670,7 +671,7 @@ yarn_globals_t* empty_globals( void ) {
     globals.font_characters =  cstr( "fonts/Berkelium64.ttf" );
     globals.font_items = cstr( "fonts/Berkelium64.ttf" );
     globals.font_name = cstr( "fonts/Sierra-SCI-Menu-Font.ttf" );
-    globals.resolution = YARN_RESOLUTION_LOW;
+    globals.resolution = YARN_RESOLUTION_FULL;
     globals.display_filters = managed_array(int);
     globals.logo_indices = managed_array(int);
     globals.background_location = -1;
@@ -1143,9 +1144,9 @@ buffer_t* yarn_compile( char const* path ) {
     printf( "Processing images\n" );
     for( int i = 0; i < yarn.screen_names->count; ++i ) {
         string_id screen_name = yarn.screen_names->items[ i ];
-        int w = yarn.globals.resolution == YARN_RESOLUTION_LOW ? 320 : yarn.globals.resolution == YARN_RESOLUTION_MEDIUM ? 480 : 640;
-        int h = yarn.globals.resolution == YARN_RESOLUTION_LOW ? 240 : yarn.globals.resolution == YARN_RESOLUTION_MEDIUM ? 360 : 480;
-        palrle_data_t* bitmap = manage_palrle( convert_bitmap( screen_name, w, h, yarn.globals.palette, palette ) );
+        int widths[] = { 320, 480, 640, 1440 };
+        int heights[] = { 240, 360, 480, 1080 };
+        palrle_data_t* bitmap = manage_palrle( convert_bitmap( screen_name, widths[ yarn.globals.resolution], heights[ yarn.globals.resolution], yarn.globals.palette, palette ) );
         array_add( yarn.assets.bitmaps, &bitmap );
         if( !bitmap ) {
             printf( "Failed to load image: %s\n", screen_name );
@@ -1155,9 +1156,9 @@ buffer_t* yarn_compile( char const* path ) {
     }
     for( int i = 0; i < yarn.image_names->count; ++i ) {
         string_id image_name = yarn.image_names->items[ i ];
-        int w = yarn.globals.resolution == YARN_RESOLUTION_LOW ? 192 : yarn.globals.resolution == YARN_RESOLUTION_MEDIUM ? 288 : 384;
-        int h = yarn.globals.resolution == YARN_RESOLUTION_LOW ? 128 : yarn.globals.resolution == YARN_RESOLUTION_MEDIUM ? 192 : 256;
-        palrle_data_t* bitmap = manage_palrle( convert_bitmap( image_name, w, h, yarn.globals.palette, palette ) );
+        int widths[] = { 192, 288, 384, 864 };
+        int heights[] = { 128, 192, 256, 576 };
+        palrle_data_t* bitmap = manage_palrle( convert_bitmap( image_name, widths[ yarn.globals.resolution], heights[ yarn.globals.resolution], yarn.globals.palette, palette ) );
         array_add( yarn.assets.bitmaps, &bitmap );
         if( !bitmap ) {
             printf( "Failed to load image: %s\n", image_name );
@@ -1169,9 +1170,9 @@ buffer_t* yarn_compile( char const* path ) {
     printf( "Processing faces\n" );
     for( int i = 0; i < yarn.face_names->count; ++i ) {
         string_id face_name = yarn.face_names->items[ i ];
-        int w = yarn.globals.resolution == YARN_RESOLUTION_LOW ? 90 : yarn.globals.resolution == YARN_RESOLUTION_MEDIUM ? 135 : 180;
-        int h = yarn.globals.resolution == YARN_RESOLUTION_LOW ? 90 : yarn.globals.resolution == YARN_RESOLUTION_MEDIUM ? 135 : 180;
-        palrle_data_t* bitmap = manage_palrle( convert_bitmap( face_name, w, h, yarn.globals.palette, palette ) );
+        int widths[] = { 90, 135, 180, 405 };
+        int heights[] = { 90, 135, 180, 405 };
+        palrle_data_t* bitmap = manage_palrle( convert_bitmap( face_name, widths[ yarn.globals.resolution], heights[ yarn.globals.resolution], yarn.globals.palette, palette ) );
         array_add( yarn.assets.bitmaps, &bitmap );
         if( !bitmap ) {
             printf( "Failed to load image: %s\n", face_name );
