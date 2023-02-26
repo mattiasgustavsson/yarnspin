@@ -34,13 +34,22 @@
 #include "libs/paldither.h"
 #include "libs/palettize.h"
 #include "libs/palrle.h"
-#include "libs/pixelfont.h"
 #include "libs/stb_image.h"
 #include "libs/stb_image_resize.h"
 #include "libs/stb_image_write.h"
 #include "libs/stb_truetype.h"
 #include "libs/sysfont.h"
 #include "libs/thread.h"
+
+#define PIXELFONT_COLOR PIXELFONT_U8
+#define PIXELFONT_FUNC_NAME pixelfont_blit
+#include "libs/pixelfont.h"
+
+#undef PIXELFONT_COLOR
+#undef PIXELFONT_FUNC_NAME
+#define PIXELFONT_COLOR PIXELFONT_U32
+#define PIXELFONT_FUNC_NAME pixelfont_blit_rgb
+#include "libs/pixelfont.h"
 
 
 // Version number stored in the file .cache\VERSION, read at start of program
@@ -167,9 +176,6 @@ int app_proc( app_t* app, void* user_data ) {
     frametimer_t* frametimer = frametimer_create( NULL );
     frametimer_lock_rate( frametimer, 60 );
 
-    static uint8_t canvas[ 1440 * 1080 ];
-    memset( canvas, 0, sizeof( canvas) );
-
     crtemu_pc_t* crtemu_pc = NULL;
     crtemu_t* crtemu = NULL;
 
@@ -177,12 +183,25 @@ int app_proc( app_t* app, void* user_data ) {
     int heights[] = { 240, 360, 480, 1080 };
     int screen_width = widths[ yarn->globals.resolution ];
     int screen_height = heights[ yarn->globals.resolution ];
+    
+    uint8_t* canvas = NULL;
+    uint32_t* canvas_rgb = NULL;
+    uint32_t* screen = (uint32_t*)malloc( ( 1440 + (int)( 22 * 4.5f ) ) * ( 1080 + (int)( 33 * 4.5 ) ) * sizeof( uint32_t ) );
+    memset( screen, 0, ( 1440 + (int)( 22 * 4.5f ) ) * ( 1080 + (int)( 33 * 4.5 ) ) * sizeof( uint32_t ) );
 
     // run game
     input_t input;
     input_init( &input, app );
     game_t game;
-    game_init( &game, yarn, &input, canvas, screen_width, screen_height );
+    if( yarn->globals.colormode == YARN_COLORMODE_PALETTE ) {
+        canvas = (uint8_t*)malloc( screen_width * screen_height * sizeof( uint8_t ) );
+        memset( canvas, 0, screen_width * screen_height * sizeof( uint8_t ) );
+        game_init( &game, yarn, &input, canvas, NULL, screen_width, screen_height );
+    } else {
+        canvas_rgb = (uint32_t*)malloc( screen_width * screen_height * sizeof( uint32_t ) );
+        memset( canvas_rgb, 0, screen_width * screen_height * sizeof( uint32_t ) );
+        game_init( &game, yarn, &input, NULL, canvas_rgb, screen_width, screen_height );
+    }
 
     // main loop
     APP_U64 time = 0;
@@ -210,7 +229,6 @@ int app_proc( app_t* app, void* user_data ) {
                 ( ( ( ( ( (a)        ) & 0xffU ) * ( ( (b)        ) & 0xffU ) ) >> 8U )        ) )
         bg = RGBMUL32( fade, bg );
 
-        static uint32_t screen[ ( 1440 + (int)( 22 * 4.5f ) ) * ( 1080 + (int)( 33 * 4.5 ) ) ];
         time += 1000000 / 60;
 
         if( display_filter == YARN_DISPLAY_FILTER_PC && crtemu_pc == NULL ) {
@@ -248,27 +266,43 @@ int app_proc( app_t* app, void* user_data ) {
         }
 
         if( crtemu_pc ) {
-            for( int i = 0; i < screen_width * screen_height; ++i ) {
-                screen[ i ] = yarn->assets.palette[ canvas[ i ] ];
+            if( canvas ) {
+                for( int i = 0; i < screen_width * screen_height; ++i ) {
+                    screen[ i ] = yarn->assets.palette[ canvas[ i ] ];
+                }
+                crtemu_pc_present( crtemu_pc, time, screen, screen_width, screen_height, fade, bg );
+            } else {
+                crtemu_pc_present( crtemu_pc, time, canvas_rgb, screen_width, screen_height, fade, bg );
             }
-            crtemu_pc_present( crtemu_pc, time, screen, screen_width, screen_height, fade, bg );
             app_present( app, NULL, 1, 1, 0xffffff, 0x000000 );
         } else if( crtemu ) {
             int offset_x = 22;
             int offset_y = 33;
             scale_for_resolution( &game, &offset_x, &offset_y );
-            for( int y = 0; y < screen_height; ++y ) {
-                for( int x = 0; x < screen_width; ++x ) {
-                    screen[ ( offset_x + x ) + ( offset_y + y ) * ( screen_width + 2 * offset_x ) ] = yarn->assets.palette[ canvas[ x + y * screen_width ] ];
+            if( canvas ) {
+                for( int y = 0; y < screen_height; ++y ) {
+                    for( int x = 0; x < screen_width; ++x ) {
+                        screen[ ( offset_x + x ) + ( offset_y + y ) * ( screen_width + 2 * offset_x ) ] = yarn->assets.palette[ canvas[ x + y * screen_width ] ];
+                    }
+                }
+            } else {
+                for( int y = 0; y < screen_height; ++y ) {
+                    for( int x = 0; x < screen_width; ++x ) {
+                        screen[ ( offset_x + x ) + ( offset_y + y ) * ( screen_width + 2 * offset_x ) ] = canvas_rgb[ x + y * screen_width ];
+                    }
                 }
             }
             crtemu_present( crtemu, time, screen, screen_width + 2 * offset_x, screen_height + 2 * offset_y, fade, bg );
             app_present( app, NULL, 1, 1, 0xffffff, 0x000000 );
         } else {
-            for( int i = 0; i < screen_width * screen_height; ++i ) {
-                screen[ i ] = yarn->assets.palette[ canvas[ i ] ];
+            if( canvas ) {
+                for( int i = 0; i < screen_width * screen_height; ++i ) {
+                    screen[ i ] = yarn->assets.palette[ canvas[ i ] ];
+                }
+                app_present( app, screen, screen_width, screen_height, fade, bg );
+            } else {
+                app_present( app, canvas_rgb, screen_width, screen_height, fade, bg );
             }
-            app_present( app, screen, screen_width, screen_height, fade, bg );
         }
     }
 
@@ -279,6 +313,14 @@ int app_proc( app_t* app, void* user_data ) {
     if( crtemu ) {
         crtemu_destroy( crtemu );
     }
+
+    if( canvas ) {
+        free( canvas );
+    }
+    if( canvas_rgb ) {
+        free( canvas_rgb );
+    }
+    free( screen );
 
     if( frame_tv_pixels ) {
         stbi_image_free( frame_tv_pixels );
@@ -535,6 +577,15 @@ int app_proc( app_t* app, void* user_data ) {
 
 #define PIXELFONT_IMPLEMENTATION
 #define PIXELFONT_BUILDER_IMPLEMENTATION
+#undef PIXELFONT_COLOR
+#undef PIXELFONT_FUNC_NAME
+#define PIXELFONT_COLOR PIXELFONT_U8
+#define PIXELFONT_FUNC_NAME pixelfont_blit
+#include "libs/pixelfont.h"
+
+#define PIXELFONT_IMPLEMENTATION
+#define PIXELFONT_COLOR PIXELFONT_U32
+#define PIXELFONT_FUNC_NAME pixelfont_blit_rgb
 #include "libs/pixelfont.h"
 
 #pragma warning( push )

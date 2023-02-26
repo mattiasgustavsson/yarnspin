@@ -19,6 +19,7 @@ typedef struct game_t {
     bool disable_transition;
     int transition_counter;
     uint8_t* screen;
+    uint32_t* screen_rgb;
     int screen_width;
     int screen_height;
     input_t* input;
@@ -58,7 +59,7 @@ typedef struct game_t {
 } game_t;
 
 
-void game_init( game_t* game, yarn_t* yarn, input_t* input, uint8_t* screen, int width, int height ) {
+void game_init( game_t* game, yarn_t* yarn, input_t* input, uint8_t* screen, uint32_t* screen_rgb, int width, int height ) {
     game->state.current_location = -1;
     game->state.current_dialog = -1;
     game->state.current_image = -1;
@@ -115,6 +116,7 @@ void game_init( game_t* game, yarn_t* yarn, input_t* input, uint8_t* screen, int
     game->disable_transition = false;
     game->transition_counter = 10;
     game->screen = screen;
+    game->screen_rgb = screen_rgb;
     game->screen_width = width;
     game->screen_height = height;
     game->input = input;
@@ -234,7 +236,11 @@ void game_update( game_t* game ) {
 
 
 void cls( game_t* game ) {
-    memset( game->screen, game->color_background, (size_t) game->screen_width * game->screen_height );
+    if( game->screen ) {
+        memset( game->screen, game->color_background, (size_t) game->screen_width * game->screen_height );
+    } else {
+        memset( game->screen_rgb, game->color_background, sizeof( uint32_t) *  game->screen_width * game->screen_height );
+    }
 }
 
 
@@ -262,9 +268,13 @@ void scale_for_resolution_inverse( game_t* game, int* x, int* y ) {
 
 void draw( game_t* game, palrle_data_t* bmp, int x, int y ) {
     scale_for_resolution( game, &x, &y );
-    if( bmp->size ) {
+    if( game->screen ) {
         palrle_blit( bmp, x, y, game->screen, game->screen_width, game->screen_height );
     } else {
+        rgbimage_t* image = (rgbimage_t*) bmp;
+        for( int i = 0; i < image->height; ++i ) {
+            memcpy( game->screen_rgb + x + ( y +i ) * game->screen_width, image->pixels + i * image->width, image->width * sizeof( uint32_t ) );
+        }
     }
 }
 
@@ -272,12 +282,24 @@ void draw( game_t* game, palrle_data_t* bmp, int x, int y ) {
 void box( game_t* game, int x, int y, int w, int h, int c ) {
     scale_for_resolution( game, &x, &y );
     scale_for_resolution( game, &w, &h );
-    for( int iy = 0; iy < h; ++iy ) {
-        for( int ix = 0; ix < w; ++ix ) {
-            int xp = x + ix;
-            int yp = y + iy;
-            if( xp >= 0 && xp < game->screen_width && yp >= 0 && yp < game->screen_height ) {
-                game->screen[ xp + yp * game->screen_width ] = (uint8_t) c;
+    if( game->screen ) {
+        for( int iy = 0; iy < h; ++iy ) {
+            for( int ix = 0; ix < w; ++ix ) {
+                int xp = x + ix;
+                int yp = y + iy;
+                if( xp >= 0 && xp < game->screen_width && yp >= 0 && yp < game->screen_height ) {
+                    game->screen[ xp + yp * game->screen_width ] = (uint8_t) c;
+                }
+            }
+        }
+    } else {
+        for( int iy = 0; iy < h; ++iy ) {
+            for( int ix = 0; ix < w; ++ix ) {
+                int xp = x + ix;
+                int yp = y + iy;
+                if( xp >= 0 && xp < game->screen_width && yp >= 0 && yp < game->screen_height ) {
+                    game->screen_rgb[ xp + yp * game->screen_width ] = game->yarn->assets.palette[ c ];
+                }
             }
         }
     }
@@ -287,8 +309,13 @@ void box( game_t* game, int x, int y, int w, int h, int c ) {
 pixelfont_bounds_t center( game_t* game, pixelfont_t* font, string str, int x, int y, int color ) {
     scale_for_resolution( game, &x, &y );
     pixelfont_bounds_t bounds;
-    pixelfont_blit( font, x, y, str, (uint8_t)color, game->screen, game->screen_width, game->screen_height,
-        PIXELFONT_ALIGN_CENTER, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, &bounds );
+    if( game->screen ) {
+        pixelfont_blit( font, x, y, str, (uint8_t)color, game->screen, game->screen_width, game->screen_height,
+            PIXELFONT_ALIGN_CENTER, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, &bounds );
+    } else {
+        pixelfont_blit_rgb( font, x, y, str, game->yarn->assets.palette[ color ], game->screen_rgb, game->screen_width, game->screen_height,
+            PIXELFONT_ALIGN_CENTER, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, &bounds );
+    }
     scale_for_resolution_inverse( game, &bounds.width, &bounds.height );
     return bounds;
 }
@@ -299,9 +326,15 @@ pixelfont_bounds_t center_wrap( game_t* game, pixelfont_t* font, string str, int
     scale_for_resolution( game, &wrap_width, NULL );
     pixelfont_bounds_t bounds;
     x -= wrap_width / 2;
-    pixelfont_blit( font, x, y, str, (uint8_t)color, game->screen, game->screen_width, game->screen_height,
-        PIXELFONT_ALIGN_CENTER, wrap_width, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF,
-        &bounds );
+    if( game->screen ) {
+        pixelfont_blit( font, x, y, str, (uint8_t)color, game->screen, game->screen_width, game->screen_height,
+            PIXELFONT_ALIGN_CENTER, wrap_width, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF,
+            &bounds );
+    } else {
+        pixelfont_blit_rgb( font, x, y, str, game->yarn->assets.palette[ color ], game->screen_rgb, game->screen_width, game->screen_height,
+            PIXELFONT_ALIGN_CENTER, wrap_width, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF,
+            &bounds );
+    }
     scale_for_resolution_inverse( game, &bounds.width, &bounds.height );
     return bounds;
 }
@@ -310,8 +343,13 @@ pixelfont_bounds_t center_wrap( game_t* game, pixelfont_t* font, string str, int
 pixelfont_bounds_t text( game_t* game, pixelfont_t* font, string str, int x, int y, int color ) {
     scale_for_resolution( game, &x, &y );
     pixelfont_bounds_t bounds;
-    pixelfont_blit( font, x, y, str, (uint8_t)color, game->screen, game->screen_width, game->screen_height,
-        PIXELFONT_ALIGN_LEFT, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, &bounds );
+    if( game->screen ) {
+        pixelfont_blit( font, x, y, str, (uint8_t)color, game->screen, game->screen_width, game->screen_height,
+            PIXELFONT_ALIGN_LEFT, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, &bounds );
+    } else {
+        pixelfont_blit_rgb( font, x, y, str, game->yarn->assets.palette[ color ], game->screen_rgb, game->screen_width, game->screen_height,
+            PIXELFONT_ALIGN_LEFT, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, &bounds );
+    }
     scale_for_resolution_inverse( game, &bounds.width, &bounds.height );
     return bounds;
 }
@@ -320,18 +358,30 @@ pixelfont_bounds_t text( game_t* game, pixelfont_t* font, string str, int x, int
 void wrap( game_t* game, pixelfont_t* font, string str, int x, int y, int color, int wrap_width ) {
     scale_for_resolution( game, &x, &y );
     scale_for_resolution( game, &wrap_width, NULL );
-    pixelfont_blit( font, x, y, str, (uint8_t)color, game->screen, game->screen_width, game->screen_height,
-        PIXELFONT_ALIGN_LEFT, wrap_width, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF,
-        NULL );
+    if( game->screen ) {
+        pixelfont_blit( font, x, y, str, (uint8_t)color, game->screen, game->screen_width, game->screen_height,
+            PIXELFONT_ALIGN_LEFT, wrap_width, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF,
+            NULL );
+    } else {
+        pixelfont_blit_rgb( font, x, y, str, game->yarn->assets.palette[ color ], game->screen_rgb, game->screen_width, game->screen_height,
+            PIXELFONT_ALIGN_LEFT, wrap_width, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF,
+            NULL );
+    }
 }
 
 
 void wrap_limit( game_t* game, pixelfont_t* font, string str, int x, int y, int color, int wrap_width, int limit ) {
     scale_for_resolution( game, &x, &y );
     scale_for_resolution( game, &wrap_width, NULL );
-    pixelfont_blit( font, x, y, str, (uint8_t)color, game->screen, game->screen_width, game->screen_height,
-        PIXELFONT_ALIGN_LEFT, wrap_width, 0, 0, limit, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF,
-        PIXELFONT_UNDERLINE_OFF, NULL );
+    if( game->screen ) {
+        pixelfont_blit( font, x, y, str, (uint8_t)color, game->screen, game->screen_width, game->screen_height,
+            PIXELFONT_ALIGN_LEFT, wrap_width, 0, 0, limit, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF,
+            PIXELFONT_UNDERLINE_OFF, NULL );
+    } else {
+        pixelfont_blit_rgb( font, x, y, str, game->yarn->assets.palette[ color ], game->screen_rgb, game->screen_width, game->screen_height,
+            PIXELFONT_ALIGN_LEFT, wrap_width, 0, 0, limit, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF,
+            PIXELFONT_UNDERLINE_OFF, NULL );
+    }
 }
 
 
