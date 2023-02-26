@@ -299,7 +299,7 @@ int app_proc( app_t* app, void* user_data ) {
 
 
 
-int main( int argc, char** argv ) {
+    int main( int argc, char** argv ) {
     (void) argc, (void ) argv;
 
     // Enable windows memory leak detection (will report leaks in the Output window)

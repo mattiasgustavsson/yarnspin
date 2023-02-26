@@ -1,3 +1,10 @@
+typedef struct rgbimage_t {
+    uint32_t marker;
+    uint32_t width;
+    uint32_t height;
+    uint32_t pixels[ 1 ];
+} rgbimage_t;
+
 
 typedef string string_id; // strings of type string_id should be compared with case insensitive comparison
 
@@ -619,6 +626,12 @@ typedef enum yarn_resolution_t {
 } yarn_resolution_t;
 
 
+typedef enum yarn_colormode_t {
+    YARN_COLORMODE_PALETTE,
+    YARN_COLORMODE_RGB,
+} yarn_colormode_t;
+
+
 typedef enum yarn_display_filter_t {
     YARN_DISPLAY_FILTER_NONE,
     YARN_DISPLAY_FILTER_TV,
@@ -638,6 +651,7 @@ typedef struct yarn_globals_t {
     string font_items;
     string font_name;
     yarn_resolution_t resolution;
+    yarn_colormode_t colormode;
     array(yarn_display_filter_t)* display_filters;
     array(int)* logo_indices;
     int background_location;
@@ -671,7 +685,8 @@ yarn_globals_t* empty_globals( void ) {
     globals.font_characters =  cstr( "fonts/Berkelium64.ttf" );
     globals.font_items = cstr( "fonts/Berkelium64.ttf" );
     globals.font_name = cstr( "fonts/Sierra-SCI-Menu-Font.ttf" );
-    globals.resolution = YARN_RESOLUTION_FULL;
+    globals.resolution = YARN_RESOLUTION_MEDIUM;
+    globals.colormode = YARN_COLORMODE_RGB;
     globals.display_filters = managed_array(int);
     globals.logo_indices = managed_array(int);
     globals.background_location = -1;
@@ -705,6 +720,8 @@ void save_globals( buffer_t* out, yarn_globals_t* globals ) {
     buffer_write_string( out, &globals->font_name, 1 );
     int resolution = (int) globals->resolution;
     buffer_write_i32( out, &resolution, 1 );
+    int colormode = (int) globals->colormode;
+    buffer_write_i32( out, &colormode, 1 );
 
     buffer_write_i32( out, &globals->display_filters->count, 1 );
     for( int i = 0; i < globals->display_filters->count; ++i ) {
@@ -748,6 +765,7 @@ void load_globals( buffer_t* in, yarn_globals_t* globals ) {
     globals->font_items = read_string( in );
     globals->font_name = read_string( in );
     globals->resolution = (yarn_resolution_t) read_int( in );
+    globals->colormode = (yarn_colormode_t) read_int( in );
 
     globals->display_filters = managed_array(int);
     int display_filters_count = read_int( in );
@@ -849,8 +867,17 @@ void save_assets( buffer_t* out, yarn_assets_t* assets ) {
 
     buffer_write_i32( out, &assets->bitmaps->count, 1 );
     for( int i = 0; i < assets->bitmaps->count; ++i ) {
-        buffer_write_u32( out, &assets->bitmaps->items[ i ]->size, 1 );
-        buffer_write_u8( out, (uint8_t*) assets->bitmaps->items[ i ], assets->bitmaps->items[ i ]->size );
+        if( assets->bitmaps->items[ i ]->size > 0 ) {
+            buffer_write_u32( out, &assets->bitmaps->items[ i ]->size, 1 );
+            buffer_write_u8( out, (uint8_t*) assets->bitmaps->items[ i ], assets->bitmaps->items[ i ]->size );
+        } else {
+            rgbimage_t* image = (rgbimage_t*) assets->bitmaps->items[ i ];
+            uint32_t marker = 0;
+            buffer_write_u32( out, &marker, 1 );
+            buffer_write_u32( out, &image->width, 1 );
+            buffer_write_u32( out, &image->height, 1 );
+            buffer_write_u32( out, image->pixels, image->width * image->height );
+        }
     }
 
     buffer_write_u32( out, &assets->frame_pc_size, 1 );
@@ -899,9 +926,22 @@ void load_assets( buffer_t* in, yarn_assets_t* assets ) {
     for( int i = 0; i < bitmaps_count; ++i ) {
         uint32_t size;
         buffer_read_u32( in, &size, 1 );
-        palrle_data_t* rle = manage_palrle( malloc( size ) );
-        buffer_read_u8( in, (uint8_t*) rle, size );
-        array_add( assets->bitmaps, &rle );
+        if( size != 0 ) {
+            palrle_data_t* rle = manage_palrle( malloc( size ) );
+            buffer_read_u8( in, (uint8_t*) rle, size );
+            array_add( assets->bitmaps, &rle );
+        } else {
+            uint32_t width = 0;
+            uint32_t height = 0;
+            buffer_read_u32( in, &width, 1 );
+            buffer_read_u32( in, &height, 1 );
+            rgbimage_t* image = (rgbimage_t*)manage_alloc( malloc( ( width * height - 1 ) * sizeof( uint32_t ) + sizeof( rgbimage_t ) ) );
+            image->marker = 0;
+            image->width = width;
+            image->height = height;
+            buffer_read_u32( in, image->pixels, width * height );
+            array_add( assets->bitmaps, (palrle_data_t*)&image );
+        }
     }
 
 
@@ -1146,25 +1186,59 @@ buffer_t* yarn_compile( char const* path ) {
         string_id screen_name = yarn.screen_names->items[ i ];
         int widths[] = { 320, 480, 640, 1440 };
         int heights[] = { 240, 360, 480, 1080 };
-        palrle_data_t* bitmap = manage_palrle( convert_bitmap( screen_name, widths[ yarn.globals.resolution], heights[ yarn.globals.resolution], yarn.globals.palette, palette ) );
-        array_add( yarn.assets.bitmaps, &bitmap );
-        if( !bitmap ) {
-            printf( "Failed to load image: %s\n", screen_name );
-            no_error = false;
+        if( yarn.globals.colormode == YARN_COLORMODE_PALETTE ) {
+            palrle_data_t* bitmap = manage_palrle( convert_bitmap( screen_name, widths[ yarn.globals.resolution], heights[ yarn.globals.resolution], yarn.globals.palette, palette ) );
+            array_add( yarn.assets.bitmaps, &bitmap );
+            if( !bitmap ) {
+                printf( "Failed to load image: %s\n", screen_name );
+                no_error = false;
+            }
+        } else {
+            int w = widths[ yarn.globals.resolution ];
+            int h = heights[ yarn.globals.resolution ];
+            uint32_t* pixels = convert_rgb( screen_name, w, h );
+            if( pixels ) {
+                rgbimage_t* image = (rgbimage_t*)manage_alloc( malloc( ( w * h - 1 ) * sizeof( uint32_t ) + sizeof( rgbimage_t ) ) );
+                image->marker = 0;
+                image->width = w;
+                image->height = h;
+                memcpy( image->pixels, pixels, w * h * sizeof( uint32_t ) );
+                free( pixels );
+                array_add( yarn.assets.bitmaps, (palrle_data_t*)&image );
+            } else {
+                printf( "Failed to load image: %s\n", screen_name );
+                no_error = false;
+            }
         }
-
     }
     for( int i = 0; i < yarn.image_names->count; ++i ) {
         string_id image_name = yarn.image_names->items[ i ];
         int widths[] = { 192, 288, 384, 864 };
         int heights[] = { 128, 192, 256, 576 };
-        palrle_data_t* bitmap = manage_palrle( convert_bitmap( image_name, widths[ yarn.globals.resolution], heights[ yarn.globals.resolution], yarn.globals.palette, palette ) );
-        array_add( yarn.assets.bitmaps, &bitmap );
-        if( !bitmap ) {
-            printf( "Failed to load image: %s\n", image_name );
-            no_error = false;
+        if( yarn.globals.colormode == YARN_COLORMODE_PALETTE ) {
+            palrle_data_t* bitmap = manage_palrle( convert_bitmap( image_name, widths[ yarn.globals.resolution], heights[ yarn.globals.resolution], yarn.globals.palette, palette ) );
+            array_add( yarn.assets.bitmaps, &bitmap );
+            if( !bitmap ) {
+                printf( "Failed to load image: %s\n", image_name );
+                no_error = false;
+            }
+        } else {
+            int w = widths[ yarn.globals.resolution ];
+            int h = heights[ yarn.globals.resolution ];
+            uint32_t* pixels = convert_rgb( image_name, w, h );
+            if( pixels ) {
+                rgbimage_t* image = manage_alloc( malloc( ( w * h - 1 ) * sizeof( uint32_t ) + sizeof( rgbimage_t ) ) );
+                image->marker = 0;
+                image->width = w;
+                image->height = h;
+                memcpy( image->pixels, pixels, w * h * sizeof( uint32_t ) );
+                free( pixels );
+                array_add( yarn.assets.bitmaps, (palrle_data_t*)&image );
+            } else {
+                printf( "Failed to load image: %s\n", image_name );
+                no_error = false;
+            }
         }
-
     }
 
     printf( "Processing faces\n" );
@@ -1172,13 +1246,30 @@ buffer_t* yarn_compile( char const* path ) {
         string_id face_name = yarn.face_names->items[ i ];
         int widths[] = { 90, 135, 180, 405 };
         int heights[] = { 90, 135, 180, 405 };
-        palrle_data_t* bitmap = manage_palrle( convert_bitmap( face_name, widths[ yarn.globals.resolution], heights[ yarn.globals.resolution], yarn.globals.palette, palette ) );
-        array_add( yarn.assets.bitmaps, &bitmap );
-        if( !bitmap ) {
-            printf( "Failed to load image: %s\n", face_name );
-            no_error = false;
+        if( yarn.globals.colormode == YARN_COLORMODE_PALETTE ) {
+            palrle_data_t* bitmap = manage_palrle( convert_bitmap( face_name, widths[ yarn.globals.resolution], heights[ yarn.globals.resolution], yarn.globals.palette, palette ) );
+            array_add( yarn.assets.bitmaps, &bitmap );
+            if( !bitmap ) {
+                printf( "Failed to load image: %s\n", face_name );
+                no_error = false;
+            }
+        } else {
+            int w = widths[ yarn.globals.resolution ];
+            int h = heights[ yarn.globals.resolution ];
+            uint32_t* pixels = convert_rgb( face_name, w, h );
+            if( pixels ) {
+                rgbimage_t* image = manage_alloc( malloc( ( w * h - 1 ) * sizeof( uint32_t ) + sizeof( rgbimage_t ) ) );
+                image->marker = 0;
+                image->width = w;
+                image->height = h;
+                memcpy( image->pixels, pixels, w * h * sizeof( uint32_t ) );
+                free( pixels );
+                array_add( yarn.assets.bitmaps, (palrle_data_t*)&image );
+            } else {
+                printf( "Failed to load image: %s\n", face_name );
+                no_error = false;
+            }
         }
-
     }
 
     printf( "Processing frames\n" );

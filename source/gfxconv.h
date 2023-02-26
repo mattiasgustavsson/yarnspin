@@ -563,7 +563,7 @@ bool load_settings( process_settings_t* settings, char const* filename ) {
 
 
 void process_image( uint32_t* image, int width, int height, uint8_t* output, int outw, int outh, paldither_palette_t* palette, process_settings_t* settings ) {
-    if( width == outw && height == outh ) {
+    if( palette && width == outw && height == outh ) {
         bool all_colors_match = true;
         for( int i = 0; i < width * height; ++i ) {
             uint32_t c = image[ i ] & 0xffffff;
@@ -627,41 +627,43 @@ void process_image( uint32_t* image, int width, int height, uint8_t* output, int
     img_to_argb32( &img, out );
     img_free( &img );
 
-    paldither_type_t dither = PALDITHER_TYPE_DEFAULT;
-    if( settings && settings->bayer_dither ) {
-        dither = PALDITHER_TYPE_BAYER;
-    }
-    paldither_palettize( out, outw, outh, palette, dither, output );
+    if( palette ) {
+        paldither_type_t dither = PALDITHER_TYPE_DEFAULT;
+        if( settings && settings->bayer_dither ) {
+            dither = PALDITHER_TYPE_BAYER;
+        }
+        paldither_palettize( out, outw, outh, palette, dither, output );
 
-    for( int y = 0; y < outh; ++y ) {
-        for( int x = 0; x < outw; ++x )  {
-            uint32_t c = palette->colortable[ output[ x + outw * y ] ];
-            uint32_t b = c & 0xffffff;
-            uint32_t a = ( out[ x + outw * y ] ) >> 24;
-            c = ( c & 0xffffff ) | 0xff000000;
-            if( a < 4 ) {
-                c = b;
-            } else if ( a > 256 - 128 ) {
-                c = c;
-            } else {
-                a = ( a - 4 );
-                a = ( a * 5 ) / ( 256 - 4 - 128 ) + 2;
-                if( a < 2 ) a = 2;
-                if( a > 6 ) a = 6;
-                unsigned char d = transparency_dither[ 4 * 4 * a + ( x & 3 ) + ( y & 3 ) * 4 ];
-                if( d == 0 )
+        for( int y = 0; y < outh; ++y ) {
+            for( int x = 0; x < outw; ++x )  {
+                uint32_t c = palette->colortable[ output[ x + outw * y ] ];
+                uint32_t b = c & 0xffffff;
+                uint32_t a = ( out[ x + outw * y ] ) >> 24;
+                c = ( c & 0xffffff ) | 0xff000000;
+                if( a < 4 ) {
                     c = b;
-                else
+                } else if ( a > 256 - 128 ) {
                     c = c;
+                } else {
+                    a = ( a - 4 );
+                    a = ( a * 5 ) / ( 256 - 4 - 128 ) + 2;
+                    if( a < 2 ) a = 2;
+                    if( a > 6 ) a = 6;
+                    unsigned char d = transparency_dither[ 4 * 4 * a + ( x & 3 ) + ( y & 3 ) * 4 ];
+                    if( d == 0 )
+                        c = b;
+                    else
+                        c = c;
+                }
+                out[ x + outw * y ] = c;
             }
-            out[ x + outw * y ] = c;
         }
     }
 }
 
 
 void process_face( uint32_t* image, int width, int height, uint8_t* output, int outw, int outh, paldither_palette_t* palette, process_settings_t* settings ) {
-    if( width == outw && height == outh ) {
+    if( palette && width == outw && height == outh ) {
         bool all_colors_match = true;
         for( int i = 0; i < width * height; ++i ) {
             uint32_t c = image[ i ] & 0xffffff;
@@ -860,35 +862,37 @@ void process_face( uint32_t* image, int width, int height, uint8_t* output, int 
     img_free( &sobel_img2 );
     img_free( &sobel_img3 );
 
-    paldither_type_t dither = PALDITHER_TYPE_DEFAULT;
-    if( settings && settings->bayer_dither ) {
-        dither = PALDITHER_TYPE_BAYER;
-    }
-    paldither_palettize( out, outw, outh, palette, dither, output );
+    if( palette ) {
+        paldither_type_t dither = PALDITHER_TYPE_DEFAULT;
+        if( settings && settings->bayer_dither ) {
+            dither = PALDITHER_TYPE_BAYER;
+        }
+        paldither_palettize( out, outw, outh, palette, dither, output );
 
 
-    for( int y = 0; y < outh; ++y ) {
-        for( int x = 0; x < outw; ++x )  {
-            uint32_t c = palette->colortable[ output[ x + outw * y ] ];
-            uint32_t b = c & 0xffffff;
-            uint32_t a = ( out[ x + outw * y ] ) >> 24;
-            c = ( c & 0xffffff ) | 0xff000000;
-            if( a < 4 ) {
-                c = b;
-            } else if ( a > 256 - 128 ) {
-                c = c;
-            } else {
-                a = ( a - 4 );
-                a = ( a * 5 ) / ( 256 - 4 - 128 ) + 2;
-                if( a < 2 ) a = 2;
-                if( a > 6 ) a = 6;
-                unsigned char d = transparency_dither[ 4 * 4 * a + ( x & 3 ) + ( y & 3 ) * 4 ];
-                if( d == 0 )
+        for( int y = 0; y < outh; ++y ) {
+            for( int x = 0; x < outw; ++x )  {
+                uint32_t c = palette->colortable[ output[ x + outw * y ] ];
+                uint32_t b = c & 0xffffff;
+                uint32_t a = ( out[ x + outw * y ] ) >> 24;
+                c = ( c & 0xffffff ) | 0xff000000;
+                if( a < 4 ) {
                     c = b;
-                else
+                } else if ( a > 256 - 128 ) {
                     c = c;
+                } else {
+                    a = ( a - 4 );
+                    a = ( a * 5 ) / ( 256 - 4 - 128 ) + 2;
+                    if( a < 2 ) a = 2;
+                    if( a > 6 ) a = 6;
+                    unsigned char d = transparency_dither[ 4 * 4 * a + ( x & 3 ) + ( y & 3 ) * 4 ];
+                    if( d == 0 )
+                        c = b;
+                    else
+                        c = c;
+                }
+                out[ x + outw * y ] = c;
             }
-            out[ x + outw * y ] = c;
         }
     }
 }
@@ -1003,6 +1007,67 @@ palrle_data_t* convert_bitmap( string image_filename, int width, int height, str
     file_destroy( file );
 
     return rle;
+}
+
+
+uint32_t* convert_rgb( string image_filename, int width, int height ) {
+    bool is_face = false;
+    if( cstr_starts( image_filename, "faces/" ) ) {
+        is_face = true;
+        image_filename = cstr_mid( image_filename,  6, 0 );
+    } else if( cstr_starts( image_filename, "images/" ) ) {
+        is_face = false;
+        image_filename = cstr_mid( image_filename,  7, 0 );
+    } else {
+        NULL;
+    }
+
+    string processed_filename_no_ext = cstr_format( ".cache/processed/%s/%dx%d/%s_%s", is_face ? "faces" : "images",
+        width, height, cstr( cbasename( image_filename ) ), cstr_mid( cextname( image_filename ), 1, 0 ) ) ;
+
+    string processed_filename = cstr_cat( processed_filename_no_ext, /* ".qoi"*/ ".png" );
+    string intermediate_processed_filename = cstr_cat( processed_filename_no_ext, ".png" );
+
+    if( !file_exists( processed_filename ) || !file_exists( intermediate_processed_filename ) ||
+        g_cache_version != YARNSPIN_VERSION ||
+        file_more_recent( cstr_cat( is_face ? "faces/" : "images/", image_filename ), processed_filename ) ||
+        file_more_recent( cstr_cat( is_face ? "faces/" : "images/", image_filename ), intermediate_processed_filename ) ||
+        file_more_recent( is_face ? "faces/settings.ini" : "images/settings.ini", processed_filename ) ) {
+
+        int w, h, c;
+        stbi_uc* img = stbi_load( cstr_cat( is_face ? "faces/" : "images/", image_filename ), &w, &h, &c, 4 );
+        if( !img ) {
+            return NULL;
+        }
+
+        if( w * h < width * height ) {
+            img = (stbi_uc*) realloc( img, width * height * 4 );
+        }
+
+        int outw = width;
+        int outh = height;
+
+        process_settings_t settings;
+        bool have_settings = load_settings( &settings, is_face ? "faces/settings.ini" : "images/settings.ini" );
+
+        bool use_portrait_processor = is_face;
+        if( have_settings ) use_portrait_processor = settings.use_portrait_processor;
+        if( use_portrait_processor ) {
+            process_face( (uint32_t*) img, w, h, NULL, outw, outh, NULL, have_settings ? &settings : NULL );
+        } else {
+            process_image( (uint32_t*) img, w, h, NULL, outw, outh, NULL, have_settings ? &settings : NULL );
+        }
+
+        create_path( processed_filename, 0 );
+
+        stbi_write_png( intermediate_processed_filename, outw, outh, 4, (stbi_uc*)img, 4 * outw );
+
+        return (uint32_t*)img;
+    }
+
+    int w, h, c;
+    stbi_uc* img = stbi_load( processed_filename, &w, &h, &c, 4 );
+    return (uint32_t*)img;
 }
 
 

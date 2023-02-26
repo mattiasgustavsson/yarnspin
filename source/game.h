@@ -262,7 +262,10 @@ void scale_for_resolution_inverse( game_t* game, int* x, int* y ) {
 
 void draw( game_t* game, palrle_data_t* bmp, int x, int y ) {
     scale_for_resolution( game, &x, &y );
-    palrle_blit( bmp, x, y, game->screen, game->screen_width, game->screen_height );
+    if( bmp->size ) {
+        palrle_blit( bmp, x, y, game->screen, game->screen_width, game->screen_height );
+    } else {
+    }
 }
 
 
