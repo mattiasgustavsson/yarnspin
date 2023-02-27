@@ -10,6 +10,11 @@ typedef enum gamestate_t {
     GAMESTATE_TERMINATE,
 } gamestate_t;
 
+typedef struct rgbimage_t {
+    uint32_t width;
+    uint32_t height;
+    uint32_t pixels[ 1 ];
+} rgbimage_t;
 
 typedef struct game_t {
     bool exit_flag;
@@ -56,6 +61,7 @@ typedef struct game_t {
         array(bool)* flags;
         array(int)* items;
     } state;
+    rgbimage_t** rgbimages;
 } game_t;
 
 
@@ -145,6 +151,19 @@ void game_init( game_t* game, yarn_t* yarn, input_t* input, uint8_t* screen, uin
     if( game->color_use < 0 ) game->color_use = (uint8_t)brightest_index;
     if( game->color_name < 0 ) game->color_name = (uint8_t)brightest_index;
     if( game->color_facebg < 0 ) game->color_facebg = (uint8_t)facebg_index;
+
+    game->rgbimages = (rgbimage_t**)manage_alloc( malloc( sizeof( rgbimage_t* ) * game->yarn->assets.bitmaps->count ) );
+    for( int i = 0; i < game->yarn->assets.bitmaps->count; ++i ) {
+        qoi_data_t* qoi = (qoi_data_t*)game->yarn->assets.bitmaps->items[ i ];
+        qoi_desc desc;
+        uint32_t* pixels = qoi_decode( qoi->data, qoi->size, &desc, 4 ); 
+        rgbimage_t* image = (rgbimage_t*)manage_alloc( malloc( sizeof( rgbimage_t) + ( desc.width * desc.height - 1 ) * sizeof( uint32_t ) ) );
+        image->width = desc.width;
+        image->height = desc.height;
+        memcpy( image->pixels, pixels, image->width * image->height * sizeof( uint32_t ) );
+        game->rgbimages[ i ] = image;
+        free( pixels );
+    }
 }
 
 
@@ -266,12 +285,12 @@ void scale_for_resolution_inverse( game_t* game, int* x, int* y ) {
 }
 
 
-void draw( game_t* game, palrle_data_t* bmp, int x, int y ) {
+void draw( game_t* game, int bitmap_index, int x, int y ) {
     scale_for_resolution( game, &x, &y );
     if( game->screen ) {
-        palrle_blit( bmp, x, y, game->screen, game->screen_width, game->screen_height );
+        palrle_blit( game->yarn->assets.bitmaps->items[ bitmap_index ], x, y, game->screen, game->screen_width, game->screen_height );
     } else {
-        rgbimage_t* image = (rgbimage_t*) bmp;
+        rgbimage_t* image = game->rgbimages[ bitmap_index ];
         for( int i = 0; i < image->height; ++i ) {
             memcpy( game->screen_rgb + x + ( y +i ) * game->screen_width, image->pixels + i * image->width, image->width * sizeof( uint32_t ) );
         }
@@ -525,8 +544,7 @@ gamestate_t title_init( game_t* game ) {
 gamestate_t title_update( game_t* game ) {
     if( game->state.logo_index < game->yarn->globals.logo_indices->count ) {
         cls( game );
-        palrle_data_t* img = game->yarn->assets.bitmaps->items[ game->yarn->globals.logo_indices->items[ game->state.logo_index ] ];
-        draw( game, img, 0, 0 );
+        draw( game, game->yarn->globals.logo_indices->items[ game->state.logo_index ], 0, 0 );
     }
 
     if( was_key_pressed( game, APP_KEY_LBUTTON ) || was_key_pressed( game, APP_KEY_SPACE ) || was_key_pressed( game, APP_KEY_ESCAPE ) ) {
@@ -590,7 +608,7 @@ gamestate_t location_update( game_t* game ) {
 
     // background_location:
     if( yarn->globals.background_location >= 0 ) {
-        draw( game, yarn->assets.bitmaps->items[ yarn->globals.background_location ], 0, 0 );
+        draw( game, yarn->globals.background_location, 0, 0 );
     }
 
     // img:
@@ -600,7 +618,7 @@ gamestate_t location_update( game_t* game ) {
         }
     }
     if( game->state.current_image >= 0 ) {
-        draw( game, yarn->assets.bitmaps->items[ game->state.current_image ], 64, 10 );
+        draw( game, game->state.current_image, 64, 10 );
     }
 
     // txt:
@@ -821,7 +839,7 @@ gamestate_t dialog_update( game_t* game ) {
 
     // background_dialog:
     if( yarn->globals.background_dialog >= 0 ) {
-        draw( game, game->yarn->assets.bitmaps->items[ yarn->globals.background_dialog ], 0, 0 );
+        draw( game, yarn->globals.background_dialog, 0, 0 );
     }
 
     // phrase:
@@ -866,7 +884,7 @@ gamestate_t dialog_update( game_t* game ) {
         center( game, game->font_name, character->name, 160, 10, game->color_name );
         if( character->face_index >= 0 ) {
             box( game, 115, 26, 90, 90, game->color_facebg );
-            draw( game, game->yarn->assets.bitmaps->items[ character->face_index ], 115, 26 );
+            draw( game, character->face_index, 115, 26 );
         }
     }
     

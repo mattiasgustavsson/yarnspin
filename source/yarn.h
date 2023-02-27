@@ -1,10 +1,3 @@
-typedef struct rgbimage_t {
-    uint32_t marker;
-    uint32_t width;
-    uint32_t height;
-    uint32_t pixels[ 1 ];
-} rgbimage_t;
-
 
 typedef string string_id; // strings of type string_id should be compared with case insensitive comparison
 
@@ -846,7 +839,7 @@ yarn_assets_t* empty_assets( void ) {
 }
 
 
-void save_assets( buffer_t* out, yarn_assets_t* assets ) {
+void save_assets( buffer_t* out, yarn_assets_t* assets, yarn_colormode_t colormode ) {
     buffer_write_i32( out, &assets->palette_count, 1 );
     buffer_write_u32( out, assets->palette, assets->palette_count );
 
@@ -867,16 +860,13 @@ void save_assets( buffer_t* out, yarn_assets_t* assets ) {
 
     buffer_write_i32( out, &assets->bitmaps->count, 1 );
     for( int i = 0; i < assets->bitmaps->count; ++i ) {
-        if( assets->bitmaps->items[ i ]->size > 0 ) {
+        if( colormode == YARN_COLORMODE_PALETTE ) {
             buffer_write_u32( out, &assets->bitmaps->items[ i ]->size, 1 );
             buffer_write_u8( out, (uint8_t*) assets->bitmaps->items[ i ], assets->bitmaps->items[ i ]->size );
         } else {
-            rgbimage_t* image = (rgbimage_t*) assets->bitmaps->items[ i ];
-            uint32_t marker = 0;
-            buffer_write_u32( out, &marker, 1 );
-            buffer_write_u32( out, &image->width, 1 );
-            buffer_write_u32( out, &image->height, 1 );
-            buffer_write_u32( out, image->pixels, image->width * image->height );
+            qoi_data_t* qoi = (qoi_data_t*) assets->bitmaps->items[ i ];
+            buffer_write_u32( out, &qoi->size, 1 );
+            buffer_write_u8( out, qoi->data, qoi->size );
         }
     }
 
@@ -892,7 +882,7 @@ void save_assets( buffer_t* out, yarn_assets_t* assets ) {
 }
 
 
-void load_assets( buffer_t* in, yarn_assets_t* assets ) {
+void load_assets( buffer_t* in, yarn_assets_t* assets, yarn_colormode_t colormode ) {
     assets->palette_count = read_int( in );
     buffer_read_u32( in, assets->palette, assets->palette_count );
 
@@ -924,23 +914,20 @@ void load_assets( buffer_t* in, yarn_assets_t* assets ) {
     assets->bitmaps = managed_array(palrle_data_t*);
     int bitmaps_count = read_int( in );
     for( int i = 0; i < bitmaps_count; ++i ) {
-        uint32_t size;
-        buffer_read_u32( in, &size, 1 );
-        if( size != 0 ) {
-            palrle_data_t* rle = manage_palrle( malloc( size ) );
-            buffer_read_u8( in, (uint8_t*) rle, size );
+        if( colormode == YARN_COLORMODE_PALETTE ) {
+            uint32_t size;
+            buffer_read_u32( in, &size, 1 );
+            palrle_data_t* rle = (palrle_data_t*)manage_alloc( malloc( size ) );
+            rle->size = size;
+            buffer_read_u8( in, (uint8_t*) rle, size - sizeof( uint32_t ) );
             array_add( assets->bitmaps, &rle );
         } else {
-            uint32_t width = 0;
-            uint32_t height = 0;
-            buffer_read_u32( in, &width, 1 );
-            buffer_read_u32( in, &height, 1 );
-            rgbimage_t* image = (rgbimage_t*)manage_alloc( malloc( ( width * height - 1 ) * sizeof( uint32_t ) + sizeof( rgbimage_t ) ) );
-            image->marker = 0;
-            image->width = width;
-            image->height = height;
-            buffer_read_u32( in, image->pixels, width * height );
-            array_add( assets->bitmaps, (palrle_data_t*)&image );
+            uint32_t size;
+            buffer_read_u32( in, &size, 1 );
+            qoi_data_t* qoi = (qoi_data_t*)manage_alloc( malloc( sizeof( qoi_data_t ) + ( size - 1 ) ) );
+            qoi->size = size;
+            buffer_read_u8( in, qoi->data, size );
+            array_add( assets->bitmaps, (qoi_data_t*)&qoi );
         }
     }
 
@@ -1035,7 +1022,7 @@ void yarn_save( buffer_t* out, yarn_t* yarn ) {
         save_character( out, &yarn->characters->items[ i ] );
     }
 
-    save_assets( out, &yarn->assets );
+    save_assets( out, &yarn->assets, yarn->globals.colormode );
 }
 
 
@@ -1080,7 +1067,7 @@ void yarn_load( buffer_t* in, yarn_t* yarn ) {
         array_add( yarn->characters, &character );
     }
 
-    load_assets( in, &yarn->assets );
+    load_assets( in, &yarn->assets, yarn->globals.colormode );
 }
 
 
@@ -1194,18 +1181,9 @@ buffer_t* yarn_compile( char const* path ) {
                 no_error = false;
             }
         } else {
-            int w = widths[ yarn.globals.resolution ];
-            int h = heights[ yarn.globals.resolution ];
-            uint32_t* pixels = convert_rgb( screen_name, w, h );
-            if( pixels ) {
-                rgbimage_t* image = (rgbimage_t*)manage_alloc( malloc( ( w * h - 1 ) * sizeof( uint32_t ) + sizeof( rgbimage_t ) ) );
-                image->marker = 0;
-                image->width = w;
-                image->height = h;
-                memcpy( image->pixels, pixels, w * h * sizeof( uint32_t ) );
-                free( pixels );
-                array_add( yarn.assets.bitmaps, (palrle_data_t*)&image );
-            } else {
+            qoi_data_t* qoi = (qoi_data_t*)manage_alloc( convert_rgb( screen_name, widths[ yarn.globals.resolution], heights[ yarn.globals.resolution ] ) );
+            array_add( yarn.assets.bitmaps, (palrle_data_t*)&qoi );
+            if( !qoi ) {
                 printf( "Failed to load image: %s\n", screen_name );
                 no_error = false;
             }
@@ -1223,18 +1201,9 @@ buffer_t* yarn_compile( char const* path ) {
                 no_error = false;
             }
         } else {
-            int w = widths[ yarn.globals.resolution ];
-            int h = heights[ yarn.globals.resolution ];
-            uint32_t* pixels = convert_rgb( image_name, w, h );
-            if( pixels ) {
-                rgbimage_t* image = manage_alloc( malloc( ( w * h - 1 ) * sizeof( uint32_t ) + sizeof( rgbimage_t ) ) );
-                image->marker = 0;
-                image->width = w;
-                image->height = h;
-                memcpy( image->pixels, pixels, w * h * sizeof( uint32_t ) );
-                free( pixels );
-                array_add( yarn.assets.bitmaps, (palrle_data_t*)&image );
-            } else {
+            qoi_data_t* qoi = (qoi_data_t*)manage_alloc( convert_rgb( image_name, widths[ yarn.globals.resolution], heights[ yarn.globals.resolution ] ) );
+            array_add( yarn.assets.bitmaps, (palrle_data_t*)&qoi );
+            if( !qoi ) {
                 printf( "Failed to load image: %s\n", image_name );
                 no_error = false;
             }
@@ -1254,18 +1223,9 @@ buffer_t* yarn_compile( char const* path ) {
                 no_error = false;
             }
         } else {
-            int w = widths[ yarn.globals.resolution ];
-            int h = heights[ yarn.globals.resolution ];
-            uint32_t* pixels = convert_rgb( face_name, w, h );
-            if( pixels ) {
-                rgbimage_t* image = manage_alloc( malloc( ( w * h - 1 ) * sizeof( uint32_t ) + sizeof( rgbimage_t ) ) );
-                image->marker = 0;
-                image->width = w;
-                image->height = h;
-                memcpy( image->pixels, pixels, w * h * sizeof( uint32_t ) );
-                free( pixels );
-                array_add( yarn.assets.bitmaps, (palrle_data_t*)&image );
-            } else {
+            qoi_data_t* qoi = (qoi_data_t*)manage_alloc( convert_rgb( face_name, widths[ yarn.globals.resolution], heights[ yarn.globals.resolution ] ) );
+            array_add( yarn.assets.bitmaps, (palrle_data_t*)&qoi );
+            if( !qoi ) {
                 printf( "Failed to load image: %s\n", face_name );
                 no_error = false;
             }

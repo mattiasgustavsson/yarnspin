@@ -34,6 +34,7 @@
 #include "libs/paldither.h"
 #include "libs/palettize.h"
 #include "libs/palrle.h"
+#include "libs/qoi.h"
 #include "libs/stb_image.h"
 #include "libs/stb_image_resize.h"
 #include "libs/stb_image_write.h"
@@ -148,7 +149,7 @@ int app_proc( app_t* app, void* user_data ) {
     #else
         bool fullscreen = false;
     #endif
-    app_interpolation( app, yarn->globals.resolution >= YARN_RESOLUTION_FULL ? APP_INTERPOLATION_LINEAR : APP_INTERPOLATION_NONE );
+    app_interpolation( app, yarn->globals.resolution >= YARN_RESOLUTION_FULL || ( yarn->globals.resolution == YARN_RESOLUTION_HIGH && yarn->globals.colormode == YARN_COLORMODE_RGB ) ? APP_INTERPOLATION_LINEAR : APP_INTERPOLATION_NONE );
     app_screenmode( app, fullscreen ? APP_SCREENMODE_FULLSCREEN : APP_SCREENMODE_WINDOW );
     app_title( app, yarn->globals.title );
 
@@ -247,7 +248,7 @@ int app_proc( app_t* app, void* user_data ) {
                 crtemu_pc_destroy( crtemu_pc );
                 crtemu_pc = NULL;
             }
-            memset( screen, 0, sizeof( screen ) );
+            memset( screen, 0, ( 1440 + (int)( 22 * 4.5f ) ) * ( 1080 + (int)( 33 * 4.5 ) ) * sizeof( uint32_t ) );
             crtemu = crtemu_create( NULL );
             if( crtemu && frame_tv_pixels ) {
                 crtemu_frame( crtemu, frame_tv_pixels, frame_tv_width, frame_tv_height );
@@ -262,7 +263,7 @@ int app_proc( app_t* app, void* user_data ) {
         if( display_filter == YARN_DISPLAY_FILTER_NONE && crtemu != NULL ) {
                 crtemu_destroy( crtemu );
                 crtemu = NULL;
-                memset( screen, 0, sizeof( screen ) );
+                memset( screen, 0, ( 1440 + (int)( 22 * 4.5f ) ) * ( 1080 + (int)( 33 * 4.5 ) ) * sizeof( uint32_t ) );
         }
 
         if( crtemu_pc ) {
@@ -587,6 +588,9 @@ int app_proc( app_t* app, void* user_data ) {
 #define PIXELFONT_COLOR PIXELFONT_U32
 #define PIXELFONT_FUNC_NAME pixelfont_blit_rgb
 #include "libs/pixelfont.h"
+
+#define QOI_IMPLEMENTATION
+#include "libs/qoi.h"
 
 #pragma warning( push )
 #pragma warning( disable: 4255 )

@@ -1010,7 +1010,13 @@ palrle_data_t* convert_bitmap( string image_filename, int width, int height, str
 }
 
 
-uint32_t* convert_rgb( string image_filename, int width, int height ) {
+typedef struct qoi_data_t {
+    uint32_t size;
+    uint8_t data[ 1 ];
+} qoi_data_t;
+
+
+qoi_data_t* convert_rgb( string image_filename, int width, int height ) {
     bool is_face = false;
     if( cstr_starts( image_filename, "faces/" ) ) {
         is_face = true;
@@ -1025,7 +1031,7 @@ uint32_t* convert_rgb( string image_filename, int width, int height ) {
     string processed_filename_no_ext = cstr_format( ".cache/processed/%s/%dx%d/%s_%s", is_face ? "faces" : "images",
         width, height, cstr( cbasename( image_filename ) ), cstr_mid( cextname( image_filename ), 1, 0 ) ) ;
 
-    string processed_filename = cstr_cat( processed_filename_no_ext, /* ".qoi"*/ ".png" );
+    string processed_filename = cstr_cat( processed_filename_no_ext, ".qoi" );
     string intermediate_processed_filename = cstr_cat( processed_filename_no_ext, ".png" );
 
     if( !file_exists( processed_filename ) || !file_exists( intermediate_processed_filename ) ||
@@ -1059,15 +1065,24 @@ uint32_t* convert_rgb( string image_filename, int width, int height ) {
         }
 
         create_path( processed_filename, 0 );
-
+        
         stbi_write_png( intermediate_processed_filename, outw, outh, 4, (stbi_uc*)img, 4 * outw );
 
-        return (uint32_t*)img;
+        qoi_desc desc;
+        desc.width = outw;
+        desc.height = outh;
+        desc.channels = 4;
+        desc.colorspace = 0;
+        qoi_write( processed_filename, img, &desc );
     }
 
-    int w, h, c;
-    stbi_uc* img = stbi_load( processed_filename, &w, &h, &c, 4 );
-    return (uint32_t*)img;
+    file_t* file = file_load( processed_filename, FILE_MODE_BINARY, 0 );
+    qoi_data_t* qoi = (qoi_data_t*) malloc( sizeof( qoi_data_t ) + ( file->size - 1 ) );
+    qoi->size = (uint32_t) file->size;
+    memcpy( qoi->data, file->data, file->size );
+    file_destroy( file );
+
+    return qoi;
 }
 
 
