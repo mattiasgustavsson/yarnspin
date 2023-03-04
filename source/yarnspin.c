@@ -8,7 +8,7 @@
 #endif
 
 // Yarnspin version for file formats. Increment by one for each release
-#define YARNSPIN_VERSION 1
+#define YARNSPIN_VERSION 2
 
 // C standard lib includes
 #include <ctype.h>
@@ -357,15 +357,9 @@ int app_proc( app_t* app, void* user_data ) {
     #ifndef __wasm__
         if( argc == 2 && ( strcmp( argv[ 1 ], "-i" ) == 0 || strcmp( argv[ 1 ], "--images" ) == 0 ) ) {
             threads_init();
-            int resolution = 0;
-            int prev_resolution = resolution;
-            int result = EXIT_SUCCESS;
-            for( ; ; ) {
-                result = app_run( imgedit_proc, &resolution, NULL, NULL, NULL );
-                if( prev_resolution == resolution ) {
-                    break;
-                }
-                prev_resolution = resolution;
+            int result = -1;
+            while( result < 0 ) {
+                result = app_run( imgedit_proc, NULL, NULL, NULL, NULL );
             } 
             return result;
         }

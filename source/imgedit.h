@@ -347,8 +347,8 @@ int imgedit_process_thread( void* user_data ) {
     int faces_capacity = faces_count;
     imgedit_image_t* faces = (imgedit_image_t*) malloc( sizeof( imgedit_image_t ) * faces_count );
     int selected_palette = imgedit->selected_palette;
-    paldither_palette_t* palette = (paldither_palette_t*) malloc( imgedit->palette_size );
-    memcpy( palette, imgedit->palette, imgedit->palette_size );
+    paldither_palette_t* palette = selected_palette == 0 ? NULL : (paldither_palette_t*) malloc( imgedit->palette_size );
+    if( selected_palette ) memcpy( palette, imgedit->palette, imgedit->palette_size );
     while( thread_atomic_int_load( &imgedit->exit_process_thread ) == 0 ) {
         bool show_processed = imgedit->panels[ imgedit->mode ].show_processed;
         bool mode_faces = imgedit->mode == IMGEDIT_MODE_FACES;
@@ -375,16 +375,22 @@ int imgedit_process_thread( void* user_data ) {
             thread_yield();
             
             size_t palette_size = 0;
-            paldither_palette_t* new_palette = convert_palette( palette_filename, &palette_size );
+            paldither_palette_t* new_palette = selected_palette == 0 ? NULL : convert_palette( palette_filename, &palette_size );
             
 
             thread_mutex_lock( &imgedit->mutex );            
             imgedit->converting_palette = false;
-            paldither_palette_destroy( imgedit->palette, NULL );
+            if( imgedit->palette ) {
+                paldither_palette_destroy( imgedit->palette, NULL );
+            }
             imgedit->palette = new_palette;
             imgedit->palette_size = palette_size;
-            palette = (paldither_palette_t*) malloc( imgedit->palette_size );
-            memcpy( palette, imgedit->palette, imgedit->palette_size );
+            if( new_palette ) {
+                palette = (paldither_palette_t*) malloc( imgedit->palette_size );
+                memcpy( palette, imgedit->palette, imgedit->palette_size );
+            } else {
+                palette = NULL;
+            }
             continue;
         }
 
@@ -484,11 +490,19 @@ int imgedit_process_thread( void* user_data ) {
                 }
 
                 image.processed = (uint32_t*) malloc( sizeof( uint32_t ) * outw * outh ); 
-                for( int y = 0; y < outh; ++y ) {
-                    for( int x = 0; x < outw; ++x ) {
-                        uint32_t c = img[ x + outw * y ] & 0xff000000;
-                        c = c | ( palette->colortable[ pixels[ x + outw * y ] ] & 0x00ffffff );
-                        image.processed[ x + outw * y ] = c;
+                if( palette ) {
+                    for( int y = 0; y < outh; ++y ) {
+                        for( int x = 0; x < outw; ++x ) {
+                            uint32_t c = img[ x + outw * y ] & 0xff000000;
+                            c = c | ( palette->colortable[ pixels[ x + outw * y ] ] & 0x00ffffff );
+                            image.processed[ x + outw * y ] = c;
+                        }
+                    }
+                } else {
+                    for( int y = 0; y < outh; ++y ) {
+                        for( int x = 0; x < outw; ++x ) {
+                            image.processed[ x + outw * y ] = img[ x + outw * y ];
+                        }
                     }
                 }
                 free( img );
@@ -1135,6 +1149,29 @@ void imgedit_panel( imgedit_t* imgedit, imgedit_input_t* input ) {
 
 
 int imgedit_proc( app_t* app, void* user_data ) {       
+
+    // Load imgedit state
+    int ini_resolution = 1;
+    cstr_t ini_palette = NULL;
+    file_t* state_file = file_load( ".cache/imgedit.ini", FILE_MODE_TEXT, NULL );
+    if( state_file ) {
+        ini_t* state_ini = ini_load( state_file->data, NULL );
+        if( state_ini ) {
+            int prop_resolution = ini_find_property( state_ini, INI_GLOBAL_SECTION, "resolution", -1 );
+            int prop_palette = ini_find_property( state_ini, INI_GLOBAL_SECTION, "palette", -1 );
+
+            if( prop_resolution != INI_NOT_FOUND ) {
+                ini_resolution = atoi( ini_property_value( state_ini, INI_GLOBAL_SECTION, prop_resolution ) );
+            }
+
+            if( prop_palette != INI_NOT_FOUND ) {
+                ini_palette = cstr( ini_property_value( state_ini, INI_GLOBAL_SECTION, prop_palette ) );
+            }
+            ini_destroy( state_ini );
+        }
+        file_destroy( state_file );
+    }
+
     file_t* version_file = file_load( ".cache/VERSION", FILE_MODE_TEXT, NULL );
     if( version_file ) {
         g_cache_version = atoi( (char const*) version_file->data );
@@ -1146,14 +1183,16 @@ int imgedit_proc( app_t* app, void* user_data ) {
     app_title( app, "Yarnspin Image Editor" );
 
     imgedit_t imgedit = { 0 };
-    imgedit.resolution = *(int*)user_data;
+    imgedit.resolution = ini_resolution;
 
     imgedit.palettes = array_create( cstr_t );
+    cstr_t palette_none = cstr( "None (RGB mode)" );
+    array_add( imgedit.palettes, &palette_none );
     imgedit_list_palettes( imgedit.palettes );
-    if( array_count( imgedit.palettes ) == 0 ) {
-        printf( "No image files found in folder 'palettes'\n" );
-        return EXIT_FAILURE;
-    }
+    //if( array_count( imgedit.palettes ) == 0 ) {
+    //    printf( "No image files found in folder 'palettes'\n" );
+    //    return EXIT_FAILURE;
+    //}
 
     float resolution_scale = imgedit.resolution == 1 ? 1.5f : imgedit.resolution == 2 ? 2.0f : 1.0f;
 
@@ -1170,11 +1209,11 @@ int imgedit_proc( app_t* app, void* user_data ) {
 
     // Use first palette in list.. 
     imgedit.selected_palette = 0; 
-    // ...unless "yarnspin_default.png" is in the list
+    // ...unless the palette in the ini file is in the list
     for( int i = 0; i < array_count( imgedit.palettes ); ++i ) { 
         cstr_t filename = "";
         array_get( imgedit.palettes, i, &filename );
-        if( cstr_is_equal( filename, "yarnspin_default.png" ) ) {
+        if( cstr_is_equal( filename, ini_palette ) ) {
             imgedit.selected_palette = i;
             break;
         } 
@@ -1182,7 +1221,7 @@ int imgedit_proc( app_t* app, void* user_data ) {
     cstr_t palette_filename;
     array_get( imgedit.palettes, imgedit.selected_palette, &palette_filename );
 
-    imgedit.palette = convert_palette( cstr_cat( "palettes/", palette_filename ), &imgedit.palette_size );
+    imgedit.palette = imgedit.selected_palette == 0 ? NULL : convert_palette( cstr_cat( "palettes/", palette_filename ), &imgedit.palette_size );
 
     imgedit.screen_width = app_window_width( app );
     imgedit.screen_height = app_window_height( app );
@@ -1305,6 +1344,22 @@ int imgedit_proc( app_t* app, void* user_data ) {
     thread_destroy( process_thread );
     thread_mutex_term( &imgedit.mutex );
 
+    // save imgedit state
+    //cstr( "None (RGB mode)" )
+    ini_t* save_ini = ini_create( NULL );
+    ini_property_add( save_ini, INI_GLOBAL_SECTION, "resolution", 0, cstr_int( imgedit.resolution ), 0 );
+    cstr_t selected_palette = "";
+    array_get( imgedit.palettes, imgedit.selected_palette, &selected_palette );
+    ini_property_add( save_ini, INI_GLOBAL_SECTION, "palette", 0, selected_palette, 0 );
+    int ini_size = ini_save( save_ini, NULL, 0 );
+    file_t* ini_save_file = file_create( ini_size, NULL );
+    ini_save( save_ini, ini_save_file->data, ini_save_file->size );
+    file_save( ini_save_file, ".cache/imgedit.ini", FILE_MODE_TEXT );
+    ini_destroy( save_ini );
+    file_destroy( ini_save_file );
+
+    int run_again = ini_resolution != imgedit.resolution;
+
     for( int i = 0; i < array_count( imgedit.images ); ++i ) {
         imgedit_image_t img;
         array_get( imgedit.images, i, &img );
@@ -1344,6 +1399,5 @@ int imgedit_proc( app_t* app, void* user_data ) {
     paldither_palette_destroy( imgedit.palette, NULL );
     free( imgedit.screen );
     memmgr_clear( &g_memmgr );
-    *(int*)user_data = imgedit.resolution;
-    return EXIT_SUCCESS;
+    return run_again ? -1 : EXIT_SUCCESS;
 }
