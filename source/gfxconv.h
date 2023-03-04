@@ -78,30 +78,31 @@ img_rgba_t img_rgba_saturate( img_rgba_t a ) {
 }
 
 
-pixelfont_t* generate_pixel_font( uint8_t* ttf_data ) {
+pixelfont_t* generate_pixel_font( uint8_t* ttf_data, int font_size ) {
     stbtt_fontinfo font;
     stbtt_InitFont( &font, ttf_data, stbtt_GetFontOffsetForIndex( ttf_data, 0) );
 
-    int size = 0;
-    for( int i = 1; i < 32; ++i ) {
-        float scale = stbtt_ScaleForPixelHeight( &font, (float) i );
-        int w, h;
-        PIXELFONT_U8* bitmap = stbtt_GetGlyphBitmap( &font, scale, scale, 'A', &w, &h, 0, 0 );
-        int empty = 1;
-        int antialiased = 0;
-        for( int j = 0; j < w * h; ++j ) {
-            if( bitmap[ j ] > 0 ) {
-                empty = 0;
-                if( bitmap[ j ] < 255 ) { antialiased = 1; break; }
+    int size = font_size;
+    if( size == 0 ) {
+        for( int i = 1; i < 32; ++i ) {
+            float scale = stbtt_ScaleForPixelHeight( &font, (float) i );
+            int w, h;
+            PIXELFONT_U8* bitmap = stbtt_GetGlyphBitmap( &font, scale, scale, 'A', &w, &h, 0, 0 );
+            int empty = 1;
+            int antialiased = 0;
+            for( int j = 0; j < w * h; ++j ) {
+                if( bitmap[ j ] > 0 ) {
+                    empty = 0;
+                    if( bitmap[ j ] < 255 ) { antialiased = 1; break; }
+                }
             }
+            stbtt_FreeBitmap( bitmap, 0 );
+            if( !empty && !antialiased ) { size = i; break; }
         }
-        stbtt_FreeBitmap( bitmap, 0 );
-        if( !empty && !antialiased ) { size = i; break; }
     }
 
-    if( !size ) {
-        printf( "Not a pixel font (size detection failed)\n" );
-        return NULL;
+    if( size == 0 ) {
+        size = 12;
     }
 
     float scale = stbtt_ScaleForPixelHeight( &font, (float) size );
@@ -162,7 +163,7 @@ pixelfont_t* generate_pixel_font( uint8_t* ttf_data ) {
                 PIXELFONT_U8* out = temp_bmp + top * w;
                 for( int y = 0; y < h; ++y )
                     for( int x = 0; x < w; ++x )
-                        *out++ = bitmap[ x + y * w ] ? 1U : 0U; // font pixel
+                        *out++ = bitmap[ x + y * w ]; // font pixel
                 pixelfont_builder_glyph( builder, c, w, temp_bmp, left, advance );
                 if( bitmap ) stbtt_FreeBitmap( bitmap, NULL );
                 if( temp_bmp ) free( temp_bmp );
@@ -598,18 +599,23 @@ void process_image( uint32_t* image, int width, int height, uint8_t* output, int
     if( settings ) {
         auto_contrast( &img, settings->auto_contrast );
         img_adjust_saturation( &img, lerp( -0.5f, 0.5f, settings->saturation )  );
-        img_adjust_contrast( &img, lerp( 0.1f, 1.9f, settings->contrast ) );
+        img_adjust_contrast( &img, lerp( 0.1f, 2.1f, settings->contrast ) );
         img_adjust_brightness( &img, lerp( -0.5f, 0.5f, settings->brightness ) );
         vignette( &img, settings->vignette_size * 1.5f, settings->vignette_opacity );
-        img_sharpen( &img, settings->sharpen_radius, settings->sharpen_strength );
+        float sharpen_strength = settings->sharpen_strength * 2.0f;
+        if( sharpen_strength > 1.0f ) {
+            img_sharpen( &img, settings->sharpen_radius, 1.0f );
+            sharpen_strength -= 1.0f;
+        }
+        img_sharpen( &img, settings->sharpen_radius, sharpen_strength );
     } else {
         auto_contrast( &img, 1.0f );
         img_sharpen( &img, 0.15f, 1.0f );
     } 
 
 
-    img_adjust_contrast( &img, 1.2f );
-    img_adjust_saturation( &img, 0.15f );
+    //img_adjust_contrast( &img, 1.2f );
+    //img_adjust_saturation( &img, 0.15f );
 
     for( int y = 0; y < img.height; ++y ) {
         for( int x = 0; x < img.width; ++x )     {
@@ -1086,10 +1092,13 @@ qoi_data_t* convert_rgb( string image_filename, int width, int height ) {
 }
 
 
-pixelfont_t* convert_font( string font_filename ) {
+pixelfont_t* convert_font( string font_filename, int font_size ) {
     // TODO: Save converted font to cache and don't regenerate if it already exists
     file_t* ttf = file_load( font_filename, FILE_MODE_BINARY, 0 );
-    pixelfont_t* font = generate_pixel_font( (uint8_t*) ttf->data );
+    if( !ttf ) {
+        return NULL;
+    }
+    pixelfont_t* font = generate_pixel_font( (uint8_t*) ttf->data, font_size );
     file_destroy( ttf );
     return font;
 }

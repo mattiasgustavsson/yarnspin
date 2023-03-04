@@ -639,10 +639,15 @@ typedef struct yarn_globals_t {
     string palette;
     string alone_text;
     string font_description;
+    int font_description_size;
     string font_options;
+    int font_options_size;
     string font_characters;
+    int font_characters_size;
     string font_items;
+    int font_items_size;
     string font_name;
+    int font_name_size;
     yarn_resolution_t resolution;
     yarn_colormode_t colormode;
     array(yarn_display_filter_t)* display_filters;
@@ -674,10 +679,15 @@ yarn_globals_t* empty_globals( void ) {
     globals.palette = NULL;
     globals.alone_text = cstr( "You are alone." );
     globals.font_description = cstr( "fonts/Berkelium64.ttf" );
+    globals.font_description_size = 0;
     globals.font_options = cstr( "fonts/Sierra-SCI-Menu-Font.ttf" );
+    globals.font_options_size = 0;
     globals.font_characters =  cstr( "fonts/Berkelium64.ttf" );
+    globals.font_characters_size = 0;
     globals.font_items = cstr( "fonts/Berkelium64.ttf" );
+    globals.font_items_size = 0;
     globals.font_name = cstr( "fonts/Sierra-SCI-Menu-Font.ttf" );
+    globals.font_name_size = 0;
     globals.resolution = YARN_RESOLUTION_MEDIUM;
     globals.colormode = YARN_COLORMODE_RGB;
     globals.display_filters = managed_array(int);
@@ -707,10 +717,15 @@ void save_globals( buffer_t* out, yarn_globals_t* globals ) {
     buffer_write_string( out, &globals->palette, 1 );
     buffer_write_string( out, &globals->alone_text, 1 );
     buffer_write_string( out, &globals->font_description, 1 );
+    buffer_write_i32( out, &globals->font_description_size, 1 );
     buffer_write_string( out, &globals->font_options, 1 );
+    buffer_write_i32( out, &globals->font_options_size, 1 );
     buffer_write_string( out, &globals->font_characters, 1 );
+    buffer_write_i32( out, &globals->font_characters_size, 1 );
     buffer_write_string( out, &globals->font_items, 1 );
+    buffer_write_i32( out, &globals->font_items_size, 1 );
     buffer_write_string( out, &globals->font_name, 1 );
+    buffer_write_i32( out, &globals->font_name_size, 1 );
     int resolution = (int) globals->resolution;
     buffer_write_i32( out, &resolution, 1 );
     int colormode = (int) globals->colormode;
@@ -753,10 +768,15 @@ void load_globals( buffer_t* in, yarn_globals_t* globals ) {
     globals->palette = read_string( in );
     globals->alone_text = read_string( in );
     globals->font_description = read_string( in );
+    globals->font_description_size = read_int( in );
     globals->font_options = read_string( in );
+    globals->font_options_size = read_int( in );
     globals->font_characters = read_string( in );
+    globals->font_characters_size = read_int( in );
     globals->font_items = read_string( in );
+    globals->font_items_size = read_int( in );
     globals->font_name = read_string( in );
+    globals->font_name_size = read_int( in );
     globals->resolution = (yarn_resolution_t) read_int( in );
     globals->colormode = (yarn_colormode_t) read_int( in );
 
@@ -1162,11 +1182,31 @@ buffer_t* yarn_compile( char const* path ) {
     memcpy( yarn.assets.palette, palette->colortable, palette->color_count * sizeof( *palette->colortable ) );
 
     printf( "Processing fonts\n" );
-    yarn.assets.font_description = manage_pixelfont( convert_font( yarn.globals.font_description ) );
-    yarn.assets.font_options = manage_pixelfont( convert_font( yarn.globals.font_options ) );
-    yarn.assets.font_characters = manage_pixelfont( convert_font( yarn.globals.font_characters ) );
-    yarn.assets.font_items = manage_pixelfont( convert_font( yarn.globals.font_items ) );
-    yarn.assets.font_name = manage_pixelfont( convert_font( yarn.globals.font_name ) );
+    yarn.assets.font_description = manage_pixelfont( convert_font( yarn.globals.font_description, yarn.globals.font_description_size ) );
+    if( !yarn.assets.font_description ) {
+        printf( "Failed to load font: %s\n", yarn.globals.font_description );
+        no_error = false;
+    }
+    yarn.assets.font_options = manage_pixelfont( convert_font( yarn.globals.font_options, yarn.globals.font_options_size ) );
+    if( !yarn.assets.font_options ) {
+        printf( "Failed to load font: %s\n", yarn.globals.font_options );
+        no_error = false;
+    }
+    yarn.assets.font_characters = manage_pixelfont( convert_font( yarn.globals.font_characters, yarn.globals.font_characters_size ) );
+    if( !yarn.assets.font_characters ) {
+        printf( "Failed to load font: %s\n", yarn.globals.font_characters );
+        no_error = false;
+    }
+    yarn.assets.font_items = manage_pixelfont( convert_font( yarn.globals.font_items, yarn.globals.font_items_size ) );
+    if( !yarn.assets.font_items ) {
+        printf( "Failed to load font: %s\n", yarn.globals.font_items );
+        no_error = false;
+    }
+    yarn.assets.font_name = manage_pixelfont( convert_font( yarn.globals.font_name, yarn.globals.font_name_size ) );
+    if( !yarn.assets.font_name ) {
+        printf( "Failed to load font: %s\n", yarn.globals.font_name );
+        no_error = false;
+    }
 
     printf( "Processing images\n" );
     for( int i = 0; i < yarn.screen_names->count; ++i ) {
@@ -1213,8 +1253,8 @@ buffer_t* yarn_compile( char const* path ) {
     printf( "Processing faces\n" );
     for( int i = 0; i < yarn.face_names->count; ++i ) {
         string_id face_name = yarn.face_names->items[ i ];
-        int widths[] = { 90, 135, 180, 405 };
-        int heights[] = { 90, 135, 180, 405 };
+        int widths[] = { 110, 165, 220, 495 };
+        int heights[] = { 110, 165, 220, 495 };
         if( yarn.globals.colormode == YARN_COLORMODE_PALETTE ) {
             palrle_data_t* bitmap = manage_palrle( convert_bitmap( face_name, widths[ yarn.globals.resolution], heights[ yarn.globals.resolution], yarn.globals.palette, palette ) );
             array_add( yarn.assets.bitmaps, &bitmap );
@@ -1258,9 +1298,12 @@ buffer_t* yarn_compile( char const* path ) {
         }
     }
 
-    printf( "Saving compiled yarn\n" );
-    buffer_t* buffer = buffer_create();
-    yarn_save( buffer, &yarn );
+    buffer_t* buffer = NULL;
+    if( no_error ) {
+        printf( "Saving compiled yarn\n" );
+        buffer = buffer_create();
+        yarn_save( buffer, &yarn );
+    }
     memmgr_rollback( &g_memmgr, mem_restore );
     cstr_rollback( str_restore );
     return buffer;

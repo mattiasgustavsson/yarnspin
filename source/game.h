@@ -1,3 +1,13 @@
+uint32_t blend_rgb( uint32_t color1, uint32_t color2, uint8_t alpha ) {
+    uint64_t c1 = (uint64_t) color1;
+    uint64_t c2 = (uint64_t) color2;
+    uint64_t a = (uint64_t)( alpha );
+    // bit magic to alpha blend R G B with single mul
+    c1 = ( c1 | ( c1 << 24 ) ) & 0x00ff00ff00ffull;
+    c2 = ( c2 | ( c2 << 24 ) ) & 0x00ff00ff00ffull;
+    uint64_t o = ( ( ( ( c2 - c1 ) * a ) >> 8 ) + c1 ) & 0x00ff00ff00ffull; 
+    return (uint32_t) ( o | ( o >> 24 ) );
+}
 
 
 typedef enum gamestate_t {
@@ -156,11 +166,16 @@ void game_init( game_t* game, yarn_t* yarn, input_t* input, uint8_t* screen, uin
     for( int i = 0; i < game->yarn->assets.bitmaps->count; ++i ) {
         qoi_data_t* qoi = (qoi_data_t*)game->yarn->assets.bitmaps->items[ i ];
         qoi_desc desc;
-        uint32_t* pixels = qoi_decode( qoi->data, qoi->size, &desc, 4 ); 
+        uint32_t* pixels = (uint32_t*)qoi_decode( qoi->data, qoi->size, &desc, 4 ); 
         rgbimage_t* image = (rgbimage_t*)manage_alloc( malloc( sizeof( rgbimage_t) + ( desc.width * desc.height - 1 ) * sizeof( uint32_t ) ) );
         image->width = desc.width;
         image->height = desc.height;
-        memcpy( image->pixels, pixels, image->width * image->height * sizeof( uint32_t ) );
+        uint32_t bgcolor = game->yarn->assets.palette[ game->color_background ];
+        for( int i = 0; i < image->width * image->height; ++i ) {
+            uint32_t c = pixels[ i ];
+            uint8_t a = (uint8_t)( c >> 24 );
+            image->pixels[ i ] = blend_rgb( bgcolor, c, a );
+        }
         game->rgbimages[ i ] = image;
         free( pixels );
     }
@@ -855,7 +870,7 @@ gamestate_t dialog_update( game_t* game ) {
             }
             game->dialog.phrase_len = (int) cstr_len( txt );
             if( dialog->phrase->items[ i ].character_index >= 0 ) {
-                wrap_limit( game, game->font_txt, txt, 5, 126, game->color_txt, 310, (int)game->dialog.limit );
+                wrap_limit( game, game->font_txt, txt, 5, 136, game->color_txt, 310, (int)game->dialog.limit );
             } else {
                 wrap_limit( game, game->font_opt, txt, 5, 197, game->color_txt, 310, (int)game->dialog.limit );
             }
@@ -881,10 +896,10 @@ gamestate_t dialog_update( game_t* game ) {
 
     if( game->dialog.chr_index >= 0 ) {
         yarn_character_t* character = &game->yarn->characters->items[ game->dialog.chr_index ];
-        center( game, game->font_name, character->name, 160, 10, game->color_name );
+        center( game, game->font_name, character->name, 160, 6, game->color_name );
         if( character->face_index >= 0 ) {
-            box( game, 115, 26, 90, 90, game->color_facebg );
-            draw( game, character->face_index, 115, 26 );
+            box( game, 105, 18, 110, 110, game->color_facebg );
+            draw( game, character->face_index, 105, 18 );
         }
     }
     

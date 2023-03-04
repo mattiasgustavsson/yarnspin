@@ -34,7 +34,10 @@ typedef struct parser_section_t {
 
 
 bool is_multi_item_keyword( string keyword ) {
-    char const* multi_item_keywords[] = { "display_filters", "logo", "flags", "items" };
+    char const* multi_item_keywords[] = { 
+        "display_filters", "logo", "flags", "items",
+        "font_description", "font_options", "font_characters", "font_items", "font_name",
+    };
     for( int i = 0; i < ARRAY_COUNT( multi_item_keywords ); ++i ) {
         if( cstr_compare_nocase( keyword, multi_item_keywords[ i ] ) == 0 ) {
             return true;

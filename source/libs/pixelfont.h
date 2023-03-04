@@ -40,7 +40,7 @@ typedef struct pixelfont_t
     PIXELFONT_U8 height;
     PIXELFONT_U8 line_spacing;
     PIXELFONT_U8 baseline;
-    PIXELFONT_U16 offsets[ 256 ];
+    PIXELFONT_U32 offsets[ 256 ];
     PIXELFONT_U8 glyphs[ 1 ]; // "open" array - ok to access out of bounds (use size_in_bytes to determine the end)
     } pixelfont_t;
 
@@ -123,7 +123,7 @@ void PIXELFONT_FUNC_NAME( pixelfont_t const* font, int x, int y, char const* tex
 #undef PIXELFONT_IMPLEMENTATION
 
 #ifndef PIXELFONT_PIXEL_FUNC
-    #define PIXELFONT_PIXEL_FUNC( dst, src ) *(dst) = (src);
+    #define PIXELFONT_PIXEL_FUNC( dst, fnt, col ) *(dst) = (col);
 #endif
 
 void PIXELFONT_FUNC_NAME( pixelfont_t const* font, int x, int y, char const* text, PIXELFONT_COLOR color,
@@ -200,9 +200,9 @@ void PIXELFONT_FUNC_NAME( pixelfont_t const* font, int x, int y, char const* tex
                             if( ix >= 0 && iy >= 0 && ix < width && iy < height )
                                 {
                                 last_x_on_line = ix >= last_x_on_line ? ix + ( bold ? 1 : 0 ) : last_x_on_line;
-                                PIXELFONT_PIXEL_FUNC( ( &target[ ix + iy * width ] ), color );
+                                PIXELFONT_PIXEL_FUNC( ( &target[ ix + iy * width ] ), (PIXELFONT_U8)p, color );
                                 if( bold && ix + 1 < width )
-                                    PIXELFONT_PIXEL_FUNC( ( &target[ ix + 1 + iy * width ] ), color );
+                                    PIXELFONT_PIXEL_FUNC( ( &target[ ix + 1 + iy * width ] ), (PIXELFONT_U8)p, color );
                                 }
                     }
                 }
@@ -221,7 +221,7 @@ void PIXELFONT_FUNC_NAME( pixelfont_t const* font, int x, int y, char const* tex
             if( underline && target && y + font->baseline + 1 >= 0 && y + font->baseline + 1 < height && last_x_on_line > xp )
                 for( int ix = xp; ix <= last_x_on_line; ++ix )
                     if( ix >= 0 && ix < width )
-                        PIXELFONT_PIXEL_FUNC( ( &target[ ix + ( y + font->baseline + 1 ) * width ] ), color );
+                        PIXELFONT_PIXEL_FUNC( ( &target[ ix + ( y + font->baseline + 1 ) * width ] ), (PIXELFONT_U8)255, color );
             last_x_on_line = xp;
             max_x = x > max_x ? x : max_x;
             x = xp;
@@ -406,7 +406,7 @@ pixelfont_t* pixelfont_builder_font( pixelfont_builder_t* builder )
     for( int i = 0; i < builder->kernings_count; ++i )
         ++kerning_counts[ builder->kernings[ i ].glyph ];
 
-    PIXELFONT_U16 offsets[ 256 ];
+    PIXELFONT_U32 offsets[ 256 ];
     memset( offsets, 0, sizeof( offsets ) );
     int current_offset = 0;
     int total_width = 0;
@@ -417,8 +417,7 @@ pixelfont_t* pixelfont_builder_font( pixelfont_builder_t* builder )
             {
             ++glyph_count;
             total_width += builder->glyphs[ i ].width;
-            if( current_offset > 0xffff ) return 0; // font too large for pixelfont format
-            offsets[ i ] = (PIXELFONT_U16) current_offset;
+            offsets[ i ] = current_offset;
             current_offset += 1 + kerning_counts[ i ] + 3 + builder->glyphs[ i ].width * builder->height;
             }
         }

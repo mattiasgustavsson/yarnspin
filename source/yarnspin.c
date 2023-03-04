@@ -187,8 +187,8 @@ int app_proc( app_t* app, void* user_data ) {
     
     uint8_t* canvas = NULL;
     uint32_t* canvas_rgb = NULL;
-    uint32_t* screen = (uint32_t*)malloc( ( 1440 + (int)( 22 * 4.5f ) ) * ( 1080 + (int)( 33 * 4.5 ) ) * sizeof( uint32_t ) );
-    memset( screen, 0, ( 1440 + (int)( 22 * 4.5f ) ) * ( 1080 + (int)( 33 * 4.5 ) ) * sizeof( uint32_t ) );
+    uint32_t* screen = (uint32_t*)malloc( ( 1440 + (int)( 44 * 4.5f ) ) * ( 1080 + (int)(66 * 4.5 ) ) * sizeof( uint32_t ) );
+    memset( screen, 0, ( 1440 + (int)( 44 * 4.5f ) ) * ( 1080 + (int)( 66 * 4.5 ) ) * sizeof( uint32_t ) );
 
     // run game
     input_t input;
@@ -587,6 +587,18 @@ int app_proc( app_t* app, void* user_data ) {
 #define PIXELFONT_IMPLEMENTATION
 #define PIXELFONT_COLOR PIXELFONT_U32
 #define PIXELFONT_FUNC_NAME pixelfont_blit_rgb
+uint32_t pixelfont_blend( uint32_t color1, uint32_t color2, uint8_t alpha )	{
+    uint64_t c1 = (uint64_t) color1;
+    uint64_t c2 = (uint64_t) color2;
+    uint64_t a = (uint64_t)( alpha );
+    // bit magic to alpha blend R G B with single mul
+    c1 = ( c1 | ( c1 << 24 ) ) & 0x00ff00ff00ffull;
+    c2 = ( c2 | ( c2 << 24 ) ) & 0x00ff00ff00ffull;
+    uint64_t o = ( ( ( ( c2 - c1 ) * a ) >> 8 ) + c1 ) & 0x00ff00ff00ffull; 
+    return (uint32_t) ( o | ( o >> 24 ) );
+}
+#undef PIXELFONT_PIXEL_FUNC
+#define PIXELFONT_PIXEL_FUNC( dst, fnt, col ) *dst = pixelfont_blend( *dst, col, fnt );
 #include "libs/pixelfont.h"
 
 #define QOI_IMPLEMENTATION
@@ -613,6 +625,7 @@ int app_proc( app_t* app, void* user_data ) {
 #pragma warning( pop )
 
 #define STB_TRUETYPE_IMPLEMENTATION
+#define STBTT_RASTERIZER_VERSION 1
 #include "libs/stb_truetype.h"
 
 #pragma warning( push )
