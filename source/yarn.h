@@ -117,6 +117,7 @@ typedef enum yarn_action_type_t {
     ACTION_TYPE_GOTO_LOCATION,
     ACTION_TYPE_GOTO_DIALOG,
     ACTION_TYPE_EXIT,
+    ACTION_TYPE_RETURN,
     ACTION_TYPE_FLAG_SET,
     ACTION_TYPE_FLAG_CLEAR,
     ACTION_TYPE_FLAG_TOGGLE,
@@ -612,6 +613,7 @@ void load_character( buffer_t* in, yarn_character_t* character ) {
 
 
 typedef enum yarn_resolution_t {
+    YARN_RESOLUTION_RETRO,
     YARN_RESOLUTION_LOW,
     YARN_RESOLUTION_MEDIUM,
     YARN_RESOLUTION_HIGH,
@@ -622,6 +624,7 @@ typedef enum yarn_resolution_t {
 typedef enum yarn_colormode_t {
     YARN_COLORMODE_PALETTE,
     YARN_COLORMODE_RGB,
+    YARN_COLORMODE_RGB9,
 } yarn_colormode_t;
 
 
@@ -636,6 +639,7 @@ typedef struct yarn_globals_t {
     string title;
     string author;
     string start;
+    string debug_start;
     string palette;
     string alone_text;
     string font_description;
@@ -668,6 +672,9 @@ typedef struct yarn_globals_t {
 
     bool explicit_items;
     array(string_id)* items;
+
+    array(string_id)* debug_set_flags;
+    array(string_id)* debug_get_items;
 } yarn_globals_t;
 
 
@@ -676,6 +683,7 @@ yarn_globals_t* empty_globals( void ) {
     globals.title = NULL;
     globals.author = NULL;
     globals.start = NULL;
+    globals.debug_start = NULL;
     globals.palette = NULL;
     globals.alone_text = cstr( "You are alone." );
     globals.font_description = cstr( "fonts/Berkelium64.ttf" );
@@ -688,7 +696,7 @@ yarn_globals_t* empty_globals( void ) {
     globals.font_items_size = 0;
     globals.font_name = cstr( "fonts/Sierra-SCI-Menu-Font.ttf" );
     globals.font_name_size = 0;
-    globals.resolution = YARN_RESOLUTION_MEDIUM;
+    globals.resolution = YARN_RESOLUTION_LOW;
     globals.colormode = YARN_COLORMODE_RGB;
     globals.display_filters = managed_array(int);
     globals.logo_indices = managed_array(int);
@@ -706,6 +714,8 @@ yarn_globals_t* empty_globals( void ) {
     globals.flags = managed_array(string_id);
     globals.explicit_items = false;
     globals.items = managed_array(string_id);
+    globals.debug_set_flags = managed_array(string_id);
+    globals.debug_get_items = managed_array(string_id);
     return &globals;
 }
 
@@ -714,6 +724,7 @@ void save_globals( buffer_t* out, yarn_globals_t* globals ) {
     buffer_write_string( out, &globals->title, 1 );
     buffer_write_string( out, &globals->author, 1 );
     buffer_write_string( out, &globals->start, 1 );
+    buffer_write_string( out, &globals->debug_start, 1 );
     buffer_write_string( out, &globals->palette, 1 );
     buffer_write_string( out, &globals->alone_text, 1 );
     buffer_write_string( out, &globals->font_description, 1 );
@@ -758,6 +769,12 @@ void save_globals( buffer_t* out, yarn_globals_t* globals ) {
     buffer_write_bool( out, &globals->explicit_items, 1 );
     buffer_write_i32( out, &globals->items->count, 1 );
     buffer_write_string( out, globals->items->items, globals->items->count );
+
+    buffer_write_i32( out, &globals->debug_set_flags->count, 1 );
+    buffer_write_string( out, globals->debug_set_flags->items, globals->debug_set_flags->count );
+
+    buffer_write_i32( out, &globals->debug_get_items->count, 1 );
+    buffer_write_string( out, globals->debug_get_items->items, globals->debug_get_items->count );
 }
 
 
@@ -765,6 +782,7 @@ void load_globals( buffer_t* in, yarn_globals_t* globals ) {
     globals->title = read_string( in );
     globals->author = read_string( in );
     globals->start = read_string( in );
+    globals->debug_start = read_string( in );
     globals->palette = read_string( in );
     globals->alone_text = read_string( in );
     globals->font_description = read_string( in );
@@ -813,6 +831,11 @@ void load_globals( buffer_t* in, yarn_globals_t* globals ) {
     globals->items = managed_array(string_id);
     read_string_array( in, globals->items );
 
+    globals->debug_set_flags = managed_array(string_id);
+    read_string_array( in, globals->debug_set_flags );
+
+    globals->debug_get_items = managed_array(string_id);
+    read_string_array( in, globals->debug_get_items );
 }
 
 typedef struct yarn_assets_t {
@@ -967,9 +990,12 @@ void load_assets( buffer_t* in, yarn_assets_t* assets, yarn_colormode_t colormod
 
 
 typedef struct yarn_t {
+    bool is_debug;
     yarn_globals_t globals;
     int start_location;
     int start_dialog;
+    int debug_start_location;
+    int debug_start_dialog;
 
     array(string_id)* flag_ids;
     array(string_id)* item_ids;
@@ -987,9 +1013,12 @@ typedef struct yarn_t {
 
 yarn_t* empty_yarn( void ) {
     static yarn_t yarn;
+    yarn.is_debug = false;
     yarn.globals = *empty_globals();
     yarn.start_location = -1;
     yarn.start_dialog = -1;
+    yarn.debug_start_location = -1;
+    yarn.debug_start_dialog = -1;
 
     yarn.flag_ids = managed_array(string_id);
     yarn.item_ids = managed_array(string_id);
@@ -1011,6 +1040,9 @@ void yarn_save( buffer_t* out, yarn_t* yarn ) {
 
     buffer_write_i32( out, &yarn->start_location, 1 );
     buffer_write_i32( out, &yarn->start_dialog, 1 );
+
+    buffer_write_i32( out, &yarn->debug_start_location, 1 );
+    buffer_write_i32( out, &yarn->debug_start_dialog, 1 );
 
     buffer_write_i32( out, &yarn->flag_ids->count, 1 );
     buffer_write_string( out, yarn->flag_ids->items, yarn->flag_ids->count );
@@ -1046,11 +1078,14 @@ void yarn_save( buffer_t* out, yarn_t* yarn ) {
 }
 
 
-void yarn_load( buffer_t* in, yarn_t* yarn ) {
+void yarn_load( buffer_t* in, yarn_t* yarn, bool is_debug ) {
+    yarn->is_debug = is_debug;
     load_globals( in, &yarn->globals );
 
     yarn->start_location = read_int( in );
     yarn->start_dialog = read_int( in );
+    yarn->debug_start_location = read_int( in );
+    yarn->debug_start_dialog = read_int( in );
 
     yarn->flag_ids = managed_array(string_id);
     read_string_array( in, yarn->flag_ids );
@@ -1208,20 +1243,24 @@ buffer_t* yarn_compile( char const* path ) {
         no_error = false;
     }
 
+    float scale_factors[] = { 1.0f, 1.25f, 1.5f, 2.0f, 4.5f };
+    float resolution_scale = scale_factors[ yarn.globals.resolution ];
+
     printf( "Processing images\n" );
     for( int i = 0; i < yarn.screen_names->count; ++i ) {
         string_id screen_name = yarn.screen_names->items[ i ];
-        int widths[] = { 320, 480, 640, 1440 };
-        int heights[] = { 240, 360, 480, 1080 };
+        int width = (int)( 320 * resolution_scale );
+        int height = (int)( 240 * resolution_scale );
         if( yarn.globals.colormode == YARN_COLORMODE_PALETTE ) {
-            palrle_data_t* bitmap = manage_palrle( convert_bitmap( screen_name, widths[ yarn.globals.resolution], heights[ yarn.globals.resolution], yarn.globals.palette, palette ) );
+            palrle_data_t* bitmap = manage_palrle( convert_bitmap( screen_name, width, height, yarn.globals.palette, palette, resolution_scale ) );
             array_add( yarn.assets.bitmaps, &bitmap );
             if( !bitmap ) {
                 printf( "Failed to load image: %s\n", screen_name );
                 no_error = false;
             }
         } else {
-            qoi_data_t* qoi = (qoi_data_t*)manage_alloc( convert_rgb( screen_name, widths[ yarn.globals.resolution], heights[ yarn.globals.resolution ] ) );
+            int bpp = yarn.globals.colormode == YARN_COLORMODE_RGB9 ? 9 : 24;
+            qoi_data_t* qoi = (qoi_data_t*)manage_alloc( convert_rgb( screen_name, width, height, bpp, resolution_scale ) );
             array_add( yarn.assets.bitmaps, (palrle_data_t*)&qoi );
             if( !qoi ) {
                 printf( "Failed to load image: %s\n", screen_name );
@@ -1230,18 +1269,19 @@ buffer_t* yarn_compile( char const* path ) {
         }
     }
     for( int i = 0; i < yarn.image_names->count; ++i ) {
+        int width = (int)( 192 * resolution_scale );
+        int height = (int)( 128 * resolution_scale );
         string_id image_name = yarn.image_names->items[ i ];
-        int widths[] = { 192, 288, 384, 864 };
-        int heights[] = { 128, 192, 256, 576 };
         if( yarn.globals.colormode == YARN_COLORMODE_PALETTE ) {
-            palrle_data_t* bitmap = manage_palrle( convert_bitmap( image_name, widths[ yarn.globals.resolution], heights[ yarn.globals.resolution], yarn.globals.palette, palette ) );
+            palrle_data_t* bitmap = manage_palrle( convert_bitmap( image_name, width, height, yarn.globals.palette, palette, resolution_scale ) );
             array_add( yarn.assets.bitmaps, &bitmap );
             if( !bitmap ) {
                 printf( "Failed to load image: %s\n", image_name );
                 no_error = false;
             }
         } else {
-            qoi_data_t* qoi = (qoi_data_t*)manage_alloc( convert_rgb( image_name, widths[ yarn.globals.resolution], heights[ yarn.globals.resolution ] ) );
+            int bpp = yarn.globals.colormode == YARN_COLORMODE_RGB9 ? 9 : 24;
+            qoi_data_t* qoi = (qoi_data_t*)manage_alloc( convert_rgb( image_name, width, height, bpp, resolution_scale ) );
             array_add( yarn.assets.bitmaps, (palrle_data_t*)&qoi );
             if( !qoi ) {
                 printf( "Failed to load image: %s\n", image_name );
@@ -1253,17 +1293,18 @@ buffer_t* yarn_compile( char const* path ) {
     printf( "Processing faces\n" );
     for( int i = 0; i < yarn.face_names->count; ++i ) {
         string_id face_name = yarn.face_names->items[ i ];
-        int widths[] = { 110, 165, 220, 495 };
-        int heights[] = { 110, 165, 220, 495 };
+        int width = (int)( 112 * resolution_scale );
+        int height = (int)( 112 * resolution_scale );
         if( yarn.globals.colormode == YARN_COLORMODE_PALETTE ) {
-            palrle_data_t* bitmap = manage_palrle( convert_bitmap( face_name, widths[ yarn.globals.resolution], heights[ yarn.globals.resolution], yarn.globals.palette, palette ) );
+            palrle_data_t* bitmap = manage_palrle( convert_bitmap( face_name, width, height, yarn.globals.palette, palette, resolution_scale ) );
             array_add( yarn.assets.bitmaps, &bitmap );
             if( !bitmap ) {
                 printf( "Failed to load image: %s\n", face_name );
                 no_error = false;
             }
         } else {
-            qoi_data_t* qoi = (qoi_data_t*)manage_alloc( convert_rgb( face_name, widths[ yarn.globals.resolution], heights[ yarn.globals.resolution ] ) );
+            int bpp = yarn.globals.colormode == YARN_COLORMODE_RGB9 ? 9 : 24;
+            qoi_data_t* qoi = (qoi_data_t*)manage_alloc( convert_rgb( face_name, width, height, bpp, resolution_scale ) );
             array_add( yarn.assets.bitmaps, (palrle_data_t*)&qoi );
             if( !qoi ) {
                 printf( "Failed to load image: %s\n", face_name );

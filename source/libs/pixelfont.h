@@ -225,7 +225,11 @@ void PIXELFONT_FUNC_NAME( pixelfont_t const* font, int x, int y, char const* tex
             last_x_on_line = xp;
             max_x = x > max_x ? x : max_x;
             x = xp;
-            y += font->line_spacing + vspacing;
+            if( *str ) {
+                y += font->line_spacing + vspacing;
+            } else {
+                y += font->height;
+            }
             if( *str == '\n' ) ++str;
             if( *str && skip_space && *str <= ' ' ) ++str;
         }

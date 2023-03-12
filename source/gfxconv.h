@@ -80,7 +80,9 @@ img_rgba_t img_rgba_saturate( img_rgba_t a ) {
 
 pixelfont_t* generate_pixel_font( uint8_t* ttf_data, int font_size ) {
     stbtt_fontinfo font;
-    stbtt_InitFont( &font, ttf_data, stbtt_GetFontOffsetForIndex( ttf_data, 0) );
+    if( !stbtt_InitFont( &font, ttf_data, stbtt_GetFontOffsetForIndex( ttf_data, 0) ) ) {
+        return NULL;
+    }
 
     int size = font_size;
     if( size == 0 ) {
@@ -139,6 +141,21 @@ pixelfont_t* generate_pixel_font( uint8_t* ttf_data, int font_size ) {
 
     pixelfont_builder_t* builder = pixelfont_builder_create( y1 - y0 + 1, ascent, line_spacing, 0 );
 
+    static uint8_t powlut[ 256 ] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0x01, 0x01, 0x02, 0x02, 0x02, 0x03, 
+        0x03, 0x04, 0x04, 0x04, 0x05, 0x05, 0x06, 0x06, 0x06, 0x07, 0x07, 0x08, 0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0b, 0x0b, 
+        0x0c, 0x0c, 0x0d, 0x0e, 0x0e, 0x0f, 0x0f, 0x10, 0x11, 0x11, 0x12, 0x12, 0x13, 0x14, 0x14, 0x15, 0x16, 0x16, 0x17, 
+        0x18, 0x18, 0x19, 0x1a, 0x1a, 0x1b, 0x1c, 0x1d, 0x1d, 0x1e, 0x1f, 0x20, 0x20, 0x21, 0x22, 0x23, 0x23, 0x24, 0x25, 
+        0x26, 0x27, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f, 0x30, 0x31, 0x31, 0x32, 0x33, 0x34, 0x35, 
+        0x36, 0x37, 0x38, 0x39, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f, 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 
+        0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f, 0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5a, 
+        0x5b, 0x5c, 0x5d, 0x5e, 0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6b, 0x6c, 0x6d, 0x6e, 0x6f,
+        0x70, 0x71, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x7a, 0x7b, 0x7c, 0x7d, 0x7e, 0x7f, 0x81, 0x82, 0x83, 0x84, 0x85, 
+        0x87, 0x88, 0x89, 0x8a, 0x8c, 0x8d, 0x8e, 0x8f, 0x90, 0x92, 0x93, 0x94, 0x95, 0x97, 0x98, 0x99, 0x9b, 0x9c, 0x9d, 
+        0x9e, 0xa0, 0xa1, 0xa2, 0xa4, 0xa5, 0xa6, 0xa7, 0xa9, 0xaa, 0xab, 0xad, 0xae, 0xaf, 0xb1, 0xb2, 0xb3, 0xb5, 0xb6, 
+        0xb7, 0xb9, 0xba, 0xbb, 0xbd, 0xbe, 0xbf, 0xc1, 0xc2, 0xc4, 0xc5, 0xc6, 0xc8, 0xc9, 0xca, 0xcc, 0xcd, 0xcf, 0xd0, 
+        0xd1, 0xd3, 0xd4, 0xd6, 0xd7, 0xd9, 0xda, 0xdb, 0xdd, 0xde, 0xe0, 0xe1, 0xe3, 0xe4, 0xe5, 0xe7, 0xe8, 0xea, 0xeb, 
+        0xed, 0xee, 0xf0, 0xf1, 0xf3, 0xf4, 0xf6, 0xf7, 0xf9, 0xfa, 0xfc, 0xfd, 0xff };
+
     PIXELFONT_U8 dummy;
     pixelfont_builder_glyph( builder, 0, 0, &dummy, 0, 0 );
     for( int c = 1; c < 256; ++c ) {
@@ -161,9 +178,11 @@ pixelfont_t* generate_pixel_font( uint8_t* ttf_data, int font_size ) {
                 int top = ascent + yo;
                 top = top < 0 ? 0 : top;
                 PIXELFONT_U8* out = temp_bmp + top * w;
-                for( int y = 0; y < h; ++y )
-                    for( int x = 0; x < w; ++x )
-                        *out++ = bitmap[ x + y * w ]; // font pixel
+                for( int y = 0; y < h; ++y ) {
+                    for( int x = 0; x < w; ++x ) {
+                        *out++ = /*powlut[ */bitmap[ x + y * w ] /*]*/; // font pixel
+                    }
+                }
                 pixelfont_builder_glyph( builder, c, w, temp_bmp, left, advance );
                 if( bitmap ) stbtt_FreeBitmap( bitmap, NULL );
                 if( temp_bmp ) free( temp_bmp );
@@ -255,7 +274,7 @@ img_t duplicate( img_t const* image ) {
 
 
 
-void sobel( img_t* img, float r ) {
+void sobel( img_t* img, float r, float scale ) {
     int width = img->width;
     int height = img->height;
     img_t out = img_create( width, height );
@@ -294,7 +313,7 @@ void sobel( img_t* img, float r ) {
             float final_val[3];
             for( int k = 0; k < 3; ++k ) {
                 float result = ( sum_h[k] * sum_h[k] + sum_v[k] * sum_v[k] ) / 2.0f;
-                result = 1.0f - clamp( result, 0.0f, 1.0f );
+                result = 1.0f - clamp( result * scale, 0.0f, 1.0f );
                 final_val[ k] = result;
             }
             set_pixel( &out, x, y, img_rgba( final_val[ 0 ], final_val[ 1 ], final_val[ 2 ], 1.0f ) );
@@ -563,7 +582,7 @@ bool load_settings( process_settings_t* settings, char const* filename ) {
 }
 
 
-void process_image( uint32_t* image, int width, int height, uint8_t* output, int outw, int outh, paldither_palette_t* palette, process_settings_t* settings ) {
+void process_image( uint32_t* image, int width, int height, uint8_t* output, int outw, int outh, paldither_palette_t* palette, process_settings_t* settings, float resolution_scale ) {
     if( palette && width == outw && height == outh ) {
         bool all_colors_match = true;
         for( int i = 0; i < width * height; ++i ) {
@@ -604,18 +623,14 @@ void process_image( uint32_t* image, int width, int height, uint8_t* output, int
         vignette( &img, settings->vignette_size * 1.5f, settings->vignette_opacity );
         float sharpen_strength = settings->sharpen_strength * 2.0f;
         if( sharpen_strength > 1.0f ) {
-            img_sharpen( &img, settings->sharpen_radius, 1.0f );
+            img_sharpen( &img, settings->sharpen_radius * resolution_scale, 1.0f );
             sharpen_strength -= 1.0f;
         }
-        img_sharpen( &img, settings->sharpen_radius, sharpen_strength );
+        img_sharpen( &img, settings->sharpen_radius * resolution_scale , sharpen_strength );
     } else {
         auto_contrast( &img, 1.0f );
-        img_sharpen( &img, 0.15f, 1.0f );
+        img_sharpen( &img, 0.15f * resolution_scale, 1.0f );
     } 
-
-
-    //img_adjust_contrast( &img, 1.2f );
-    //img_adjust_saturation( &img, 0.15f );
 
     for( int y = 0; y < img.height; ++y ) {
         for( int x = 0; x < img.width; ++x )     {
@@ -734,13 +749,13 @@ void process_face( uint32_t* image, int width, int height, uint8_t* output, int 
 
 
     img_t sobel_img = duplicate( &img );
-    sobel( &sobel_img, 0.6f );
+    sobel( &sobel_img, 0.6f, 1.0f );
 
     img_t sobel_img2 = duplicate( &img );
-    sobel( &sobel_img2, 1.1f );
+    sobel( &sobel_img2, 1.1f, 1.0f );
 
     img_t sobel_img3 = duplicate( &img );
-    sobel( &sobel_img3, 1.5f );
+    sobel( &sobel_img3, 1.5f, 1.0f );
 
     for( int y = 0; y < img.height; ++y ) {
         for( int x = 0; x < img.width; ++x ) {
@@ -937,7 +952,7 @@ paldither_palette_t* convert_palette( string palette_filename, size_t* palette_s
 }
 
 
-palrle_data_t* convert_bitmap( string image_filename, int width, int height, string palette_filename, paldither_palette_t* palette ) {
+palrle_data_t* convert_bitmap( string image_filename, int width, int height, string palette_filename, paldither_palette_t* palette, float resolution_scale ) {
     bool is_face = false;
     if( cstr_starts( image_filename, "faces/" ) ) {
         is_face = true;
@@ -985,7 +1000,7 @@ palrle_data_t* convert_bitmap( string image_filename, int width, int height, str
         if( use_portrait_processor ) {
             process_face( (uint32_t*) img, w, h, pixels, outw, outh, palette, have_settings ? &settings : NULL );
         } else {
-            process_image( (uint32_t*) img, w, h, pixels, outw, outh, palette, have_settings ? &settings : NULL );
+            process_image( (uint32_t*) img, w, h, pixels, outw, outh, palette, have_settings ? &settings : NULL, resolution_scale );
         }
 
         uint8_t* mask = pixels + outw * outh;
@@ -1016,13 +1031,250 @@ palrle_data_t* convert_bitmap( string image_filename, int width, int height, str
 }
 
 
+unsigned char bayer_dither_pattern[ 4 * 4 * 17 ] = {
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+
+	1, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+
+	1, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 1, 0,
+	0, 0, 0, 0,
+
+	1, 0, 1, 0,
+	0, 0, 0, 0,
+	0, 0, 1, 0,
+	0, 0, 0, 0,
+
+	1, 0, 1, 0,
+	0, 0, 0, 0,
+	1, 0, 1, 0,
+	0, 0, 0, 0,
+
+	1, 0, 1, 0,
+	0, 1, 0, 0,
+	1, 0, 1, 0,
+	0, 0, 0, 0,
+
+	1, 0, 1, 0,
+	0, 1, 0, 0,
+	1, 0, 1, 0,
+	0, 0, 0, 1,
+
+	1, 0, 1, 0,
+	0, 1, 0, 1,
+	1, 0, 1, 0,
+	0, 0, 0, 1,
+
+	1, 0, 1, 0,
+	0, 1, 0, 1,
+	1, 0, 1, 0,
+	0, 1, 0, 1,
+
+	1, 1, 1, 0,
+	0, 1, 0, 1,
+	1, 0, 1, 0,
+	0, 1, 0, 1,
+
+	1, 1, 1, 0,
+	0, 1, 0, 1,
+	1, 0, 1, 1,
+	0, 1, 0, 1,
+
+	1, 1, 1, 1,
+	0, 1, 0, 1,
+	1, 0, 1, 1,
+	0, 1, 0, 1,
+
+	1, 1, 1, 1,
+	0, 1, 0, 1,
+	1, 1, 1, 1,
+	0, 1, 0, 1,
+
+	1, 1, 1, 1,
+	1, 1, 0, 1,
+	1, 1, 1, 1,
+	0, 1, 0, 1,
+
+	1, 1, 1, 1,
+	1, 1, 0, 1,
+	1, 1, 1, 1,
+	0, 1, 1, 1,
+
+	1, 1, 1, 1,
+	1, 1, 1, 1,
+	1, 1, 1, 1,
+	0, 1, 1, 1,
+
+	1, 1, 1, 1,
+	1, 1, 1, 1,
+	1, 1, 1, 1,
+	1, 1, 1, 1,
+};
+
+
+unsigned char custom_dither_pattern[ 4 * 4 * 7 ] =  {
+
+	0,0,0,0,
+	0,0,0,0,
+	0,0,0,0,
+	0,0,0,0,
+
+    0,0,0,0,
+	0,0,0,0,
+	0,0,0,0,
+	0,0,0,0,
+
+	1,0,1,0,
+	0,0,0,0,
+	1,0,1,0,
+	0,0,0,0,
+
+	1,0,1,0,
+	0,1,0,0,
+	1,0,1,0,
+	0,0,0,1,
+
+	1,0,1,0,
+	0,1,0,1,
+	1,0,1,0,
+	0,1,0,1,
+
+	1,1,1,1,
+	1,1,1,1,
+	1,1,1,1,
+	1,1,1,1,
+
+    1,1,1,1,
+	1,1,1,1,
+	1,1,1,1,
+	1,1,1,1,
+};
+
+void dither_rgb9( uint32_t* pixels, int width, int height, bool use_bayer_dither, float resolution_scale ) {
+    img_t sobel_img = img_from_abgr32( pixels, width, height );
+    float radius = resolution_scale / 3.0f;
+    sobel( &sobel_img, radius, 0.5f );
+    
+    for( int y = 0; y < height; ++y ) {
+        for( int x = 0; x < width; ++x ) {
+            uint32_t src = pixels[ x + y * width ];
+            uint32_t sr = src & 0xff;
+            uint32_t sg = ( src >> 8 ) & 0xff;
+            uint32_t sb = ( src >> 16 ) & 0xff;
+            uint32_t a = ( src >> 24 ) & 0xff;
+            uint32_t dr = ( ( ( ( sr * 8 )  ) / 256 ) * 256 ) / 8 ;
+            uint32_t dg = ( ( ( ( sg * 8 )  ) / 256 ) * 256 ) / 8 ;
+            uint32_t db = ( ( ( ( sb * 8 )  ) / 256 ) * 256 ) / 8 ;
+            uint32_t br = dr + 32;
+            uint32_t bg = dg + 32;
+            uint32_t bb = db + 32;
+            dr = dr > 255 ? 255 : dr;
+            dg = dg > 255 ? 255 : dg;
+            db = db > 255 ? 255 : db;
+            br = br > 255 ? 255 : br;
+            bg = bg > 255 ? 255 : bg;
+            bb = bb > 255 ? 255 : bb;
+
+            int diff_r = sr - dr;
+            int diff_g = sg - dg;
+            int diff_b = sb - db;
+
+            if( sobel_img.pixels[ x + y * width ].r < 0.75f || sobel_img.pixels[ x + y * width ].g < 0.75f || sobel_img.pixels[ x + y * width ].b < 0.75f) {
+                diff_r = diff_r < 16 ? 0 : 31;
+                diff_g = diff_g < 16 ? 0 : 31;
+                diff_b = diff_b < 16 ? 0 : 31;
+            }
+
+            if( use_bayer_dither ) {
+                dr = bayer_dither_pattern[ ( ( diff_r * 17 ) / 32 ) * 4 * 4 + ( x % 4 ) + ( y % 4 ) * 4 ] ? br : dr;
+                dg = bayer_dither_pattern[ ( ( diff_g * 17 ) / 32 ) * 4 * 4 + ( x % 4 ) + ( y % 4 ) * 4 ] ? bg : dg;
+                db = bayer_dither_pattern[ ( ( diff_b * 17 ) / 32 ) * 4 * 4 + ( x % 4 ) + ( y % 4 ) * 4 ] ? bb : db;
+            } else {
+                dr = custom_dither_pattern[ ( ( diff_r * 7 ) / 32 ) * 4 * 4 + ( x % 4 ) + ( y % 4 ) * 4 ] ? br : dr;
+                dg = custom_dither_pattern[ ( ( diff_g * 7 ) / 32 ) * 4 * 4 + ( x % 4 ) + ( y % 4 ) * 4 ] ? bg : dg;
+                db = custom_dither_pattern[ ( ( diff_b * 7 ) / 32 ) * 4 * 4 + ( x % 4 ) + ( y % 4 ) * 4 ] ? bb : db;
+            }
+            //dr = (uint32_t)( 255.0f * sobel_img.pixels[ x + y * width ].r );
+            //dg = (uint32_t)( 255.0f * sobel_img.pixels[ x + y * width ].g );
+            //db = (uint32_t)( 255.0f * sobel_img.pixels[ x + y * width ].b );
+
+            uint32_t dst = ( a << 24 ) | ( db << 16 ) | ( dg << 8 ) | dr;
+            pixels[ x + y * width ] = dst;
+        }
+    }
+    img_free( &sobel_img );
+}
+
+
+void dither_rgb8( uint32_t* pixels, int width, int height, bool use_bayer_dither, float resolution_scale ) {
+    img_t sobel_img = img_from_abgr32( pixels, width, height );
+    float radius = resolution_scale / 3.0f;
+    sobel( &sobel_img, radius, 0.5f );
+    
+    for( int y = 0; y < height; ++y ) {
+        for( int x = 0; x < width; ++x ) {
+            uint32_t src = pixels[ x + y * width ];
+            uint32_t sr = src & 0xff;
+            uint32_t sg = ( src >> 8 ) & 0xff;
+            uint32_t sb = ( src >> 16 ) & 0xff;
+            uint32_t a = ( src >> 24 ) & 0xff;
+            uint32_t dr = ( ( ( ( sr * 6 )  ) / 256 ) * 256 ) / 6 ;
+            uint32_t dg = ( ( ( ( sg * 6 )  ) / 256 ) * 256 ) / 6 ;
+            uint32_t db = ( ( ( ( sb * 6 )  ) / 256 ) * 256 ) / 6 ;
+            uint32_t br = dr + 42;
+            uint32_t bg = dg + 42;
+            uint32_t bb = db + 42;
+            dr = dr > 255 ? 255 : dr;
+            dg = dg > 255 ? 255 : dg;
+            db = db > 255 ? 255 : db;
+            br = br > 255 ? 255 : br;
+            bg = bg > 255 ? 255 : bg;
+            bb = bb > 255 ? 255 : bb;
+
+            int diff_r = sr - dr;
+            int diff_g = sg - dg;
+            int diff_b = sb - db;
+
+            if( sobel_img.pixels[ x + y * width ].r < 0.75f || sobel_img.pixels[ x + y * width ].g < 0.75f || sobel_img.pixels[ x + y * width ].b < 0.75f) {
+                diff_r = diff_r < 21 ? 0 : 41;
+                diff_g = diff_g < 21 ? 0 : 41;
+                diff_b = diff_b < 21 ? 0 : 41;
+            }
+
+            if( use_bayer_dither ) {
+                dr = bayer_dither_pattern[ ( ( diff_r * 17 ) / 43 ) * 4 * 4 + ( x % 4 ) + ( y % 4 ) * 4 ] ? br : dr;
+                dg = bayer_dither_pattern[ ( ( diff_g * 17 ) / 43 ) * 4 * 4 + ( x % 4 ) + ( y % 4 ) * 4 ] ? bg : dg;
+                db = bayer_dither_pattern[ ( ( diff_b * 17 ) / 43 ) * 4 * 4 + ( x % 4 ) + ( y % 4 ) * 4 ] ? bb : db;
+            } else {
+                dr = custom_dither_pattern[ ( ( diff_r * 7 ) / 43 ) * 4 * 4 + ( x % 4 ) + ( y % 4 ) * 4 ] ? br : dr;
+                dg = custom_dither_pattern[ ( ( diff_g * 7 ) / 43 ) * 4 * 4 + ( x % 4 ) + ( y % 4 ) * 4 ] ? bg : dg;
+                db = custom_dither_pattern[ ( ( diff_b * 7 ) / 43 ) * 4 * 4 + ( x % 4 ) + ( y % 4 ) * 4 ] ? bb : db;
+            }
+            //dr = (uint32_t)( 255.0f * sobel_img.pixels[ x + y * width ].r );
+            //dg = (uint32_t)( 255.0f * sobel_img.pixels[ x + y * width ].g );
+            //db = (uint32_t)( 255.0f * sobel_img.pixels[ x + y * width ].b );
+
+            uint32_t dst = ( a << 24 ) | ( db << 16 ) | ( dg << 8 ) | dr;
+            pixels[ x + y * width ] = dst;
+        }
+    }
+    img_free( &sobel_img );
+}
+
 typedef struct qoi_data_t {
     uint32_t size;
     uint8_t data[ 1 ];
 } qoi_data_t;
 
 
-qoi_data_t* convert_rgb( string image_filename, int width, int height ) {
+qoi_data_t* convert_rgb( string image_filename, int width, int height, int bpp, float resolution_scale ) {
     bool is_face = false;
     if( cstr_starts( image_filename, "faces/" ) ) {
         is_face = true;
@@ -1067,7 +1319,11 @@ qoi_data_t* convert_rgb( string image_filename, int width, int height ) {
         if( use_portrait_processor ) {
             process_face( (uint32_t*) img, w, h, NULL, outw, outh, NULL, have_settings ? &settings : NULL );
         } else {
-            process_image( (uint32_t*) img, w, h, NULL, outw, outh, NULL, have_settings ? &settings : NULL );
+            process_image( (uint32_t*) img, w, h, NULL, outw, outh, NULL, have_settings ? &settings : NULL, resolution_scale );
+        }
+
+        if( bpp == 9 ) {
+            dither_rgb9( (uint32_t*) img, outw, outh, false, resolution_scale );
         }
 
         create_path( processed_filename, 0 );
@@ -1097,6 +1353,13 @@ pixelfont_t* convert_font( string font_filename, int font_size ) {
     file_t* ttf = file_load( font_filename, FILE_MODE_BINARY, 0 );
     if( !ttf ) {
         return NULL;
+    }
+    char const* ext = strrchr( font_filename, '.' );
+    if( ext && cstr_compare_nocase( ext, ".fnt" ) == 0 ) {
+        pixelfont_t* font = (pixelfont_t*) malloc( ttf->size );
+        memcpy( font, ttf->data, ttf->size );
+        file_destroy( ttf );
+        return font;
     }
     pixelfont_t* font = generate_pixel_font( (uint8_t*) ttf->data, font_size );
     file_destroy( ttf );

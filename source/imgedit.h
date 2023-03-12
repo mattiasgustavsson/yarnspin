@@ -87,8 +87,8 @@ void imgedit_list_images( array_param(imgedit_image_t)* images, cstr_t folder, f
             img.orig_width = 0;
             img.orig_height = 0;
             img.orig_pixels = NULL;
-            img.sized_width = (int)( ( mode_faces ? 90 : 192 ) * resolution_scale ) ;
-            img.sized_height = (int)( ( mode_faces ? 90 : 128 ) * resolution_scale );
+            img.sized_width = (int)( ( mode_faces ? 112 : 192 ) * resolution_scale ) ;
+            img.sized_height = (int)( ( mode_faces ? 112 : 128 ) * resolution_scale );
             img.sized_pixels = NULL;
             img.processed = NULL;
             img.prev_processed = NULL;
@@ -347,8 +347,10 @@ int imgedit_process_thread( void* user_data ) {
     int faces_capacity = faces_count;
     imgedit_image_t* faces = (imgedit_image_t*) malloc( sizeof( imgedit_image_t ) * faces_count );
     int selected_palette = imgedit->selected_palette;
-    paldither_palette_t* palette = selected_palette == 0 ? NULL : (paldither_palette_t*) malloc( imgedit->palette_size );
-    if( selected_palette ) memcpy( palette, imgedit->palette, imgedit->palette_size );
+    paldither_palette_t* palette = selected_palette == 0 || selected_palette == 1 ? NULL : (paldither_palette_t*) malloc( imgedit->palette_size );
+    if( selected_palette > 1 ) memcpy( palette, imgedit->palette, imgedit->palette_size );
+    float scale_factors[] = { 1.0f, 1.25f, 1.5f, 2.0f, 4.5f };
+    float resolution_scale = scale_factors[ imgedit->resolution ];
     while( thread_atomic_int_load( &imgedit->exit_process_thread ) == 0 ) {
         bool show_processed = imgedit->panels[ imgedit->mode ].show_processed;
         bool mode_faces = imgedit->mode == IMGEDIT_MODE_FACES;
@@ -375,7 +377,7 @@ int imgedit_process_thread( void* user_data ) {
             thread_yield();
             
             size_t palette_size = 0;
-            paldither_palette_t* new_palette = selected_palette == 0 ? NULL : convert_palette( palette_filename, &palette_size );
+            paldither_palette_t* new_palette = selected_palette == 0 || selected_palette == 1 ? NULL : convert_palette( palette_filename, &palette_size );
             
 
             thread_mutex_lock( &imgedit->mutex );            
@@ -479,14 +481,18 @@ int imgedit_process_thread( void* user_data ) {
                     if( settings[ IMGEDIT_MODE_IMAGES ].use_portrait_processor ) {
                         process_face( img, image.orig_width, image.orig_height, pixels, outw, outh, palette, &settings[ IMGEDIT_MODE_IMAGES ] );
                     } else {
-                        process_image( img, image.orig_width, image.orig_height, pixels, outw, outh, palette, &settings[ IMGEDIT_MODE_IMAGES ] );
+                        process_image( img, image.orig_width, image.orig_height, pixels, outw, outh, palette, &settings[ IMGEDIT_MODE_IMAGES ], resolution_scale );
                     }
                 } else {
                     if( settings[ IMGEDIT_MODE_FACES ].use_portrait_processor ) {
                         process_face( img, image.orig_width, image.orig_height, pixels, outw, outh, palette, &settings[ IMGEDIT_MODE_FACES ] );
                     } else {
-                        process_image( img, image.orig_width, image.orig_height, pixels, outw, outh, palette, &settings[ IMGEDIT_MODE_FACES ] );
+                        process_image( img, image.orig_width, image.orig_height, pixels, outw, outh, palette, &settings[ IMGEDIT_MODE_FACES ], resolution_scale );
                     }
+                }
+
+                if( selected_palette == 1 ) {
+                    dither_rgb9( img, outw, outh, false, resolution_scale );
                 }
 
                 image.processed = (uint32_t*) malloc( sizeof( uint32_t ) * outw * outh ); 
@@ -581,9 +587,10 @@ void imgedit_images( imgedit_t* imgedit, app_input_t input ) {
         imglist = ARRAY_CAST( imgedit->faces );
     }
 
-    float resolution_scale = imgedit->resolution == 1 ? 1.5f : imgedit->resolution == 2 ? 2.0f : 1.0f;
-    int w = (int)( ( imgedit->mode == IMGEDIT_MODE_FACES ? 90 : 192 ) * resolution_scale );
-    int h = (int)( ( imgedit->mode == IMGEDIT_MODE_FACES ? 90 : 128 ) * resolution_scale );
+    float scale_factors[] = { 1.0f, 1.25f, 1.5f, 2.0f, 4.5f };
+    float resolution_scale = scale_factors[ imgedit->resolution ];
+    int w = (int)( ( imgedit->mode == IMGEDIT_MODE_FACES ? 112 : 192 ) * resolution_scale );
+    int h = (int)( ( imgedit->mode == IMGEDIT_MODE_FACES ? 112 : 128 ) * resolution_scale );
 
     imgedit->panels[ imgedit->mode ].scroll += (int)( scroll_delta * 100.0f );
     int hcount = imgedit->screen_width / ( ( w + 1 ) * imgedit->panels[ imgedit->mode ].scale );
@@ -1087,7 +1094,7 @@ void imgedit_panel( imgedit_t* imgedit, imgedit_input_t* input ) {
     panel->pending_settings.vignette_size = imgedit_slider( imgedit, 900, 80, 250, "Vignette Scale", &panel->sliders[ 6 ], panel->pending_settings.vignette_size, input );
     panel->pending_settings.vignette_opacity = imgedit_slider( imgedit, 900, 100, 250, "Vignette Strength", &panel->sliders[ 7 ], panel->pending_settings.vignette_opacity, input );
 
-    char const* resolutions[] = { "Low", "Medium", "High", };
+    char const* resolutions[] = { "Retro", "Low", "Medium", "High", };
     imgedit->resolution = imgedit_radiobuttons( imgedit, 1180, 40, resolutions, sizeof( resolutions ) / sizeof( *resolutions ), imgedit->resolution, input );
    
     imgedit_text( imgedit, 230, 5, "Palette", 0xffffffff );
@@ -1188,13 +1195,12 @@ int imgedit_proc( app_t* app, void* user_data ) {
     imgedit.palettes = array_create( cstr_t );
     cstr_t palette_none = cstr( "None (RGB mode)" );
     array_add( imgedit.palettes, &palette_none );
+    cstr_t palette_none9 = cstr( "None (9-bit RGB)" );
+    array_add( imgedit.palettes, &palette_none9 );
     imgedit_list_palettes( imgedit.palettes );
-    //if( array_count( imgedit.palettes ) == 0 ) {
-    //    printf( "No image files found in folder 'palettes'\n" );
-    //    return EXIT_FAILURE;
-    //}
 
-    float resolution_scale = imgedit.resolution == 1 ? 1.5f : imgedit.resolution == 2 ? 2.0f : 1.0f;
+    float scale_factors[] = { 1.0f, 1.25f, 1.5f, 2.0f, 4.5f };
+    float resolution_scale = scale_factors[ imgedit.resolution ];
 
     imgedit.images = array_create( imgedit_image_t );
     imgedit_list_images( imgedit.images, "images", resolution_scale );
@@ -1221,7 +1227,7 @@ int imgedit_proc( app_t* app, void* user_data ) {
     cstr_t palette_filename;
     array_get( imgedit.palettes, imgedit.selected_palette, &palette_filename );
 
-    imgedit.palette = imgedit.selected_palette == 0 ? NULL : convert_palette( cstr_cat( "palettes/", palette_filename ), &imgedit.palette_size );
+    imgedit.palette = imgedit.selected_palette == 0 || imgedit.selected_palette == 1 ? NULL : convert_palette( cstr_cat( "palettes/", palette_filename ), &imgedit.palette_size );
 
     imgedit.screen_width = app_window_width( app );
     imgedit.screen_height = app_window_height( app );

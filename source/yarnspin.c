@@ -180,8 +180,8 @@ int app_proc( app_t* app, void* user_data ) {
     crtemu_pc_t* crtemu_pc = NULL;
     crtemu_t* crtemu = NULL;
 
-    int widths[] = { 320, 480, 640, 1440 };
-    int heights[] = { 240, 360, 480, 1080 };
+    int widths[] = { 320, 400, 480, 640, 1440 };
+    int heights[] = { 240, 300, 360, 480, 1080 };
     int screen_width = widths[ yarn->globals.resolution ];
     int screen_height = heights[ yarn->globals.resolution ];
     
@@ -210,6 +210,21 @@ int app_proc( app_t* app, void* user_data ) {
         frametimer_update( frametimer );
         input_update( &input, screen_width, screen_height, crtemu_pc, crtemu );
         game_update( &game );
+
+        if( game.yarn->is_debug ) {
+            char const* dbgstr = "debug";
+            pixelfont_bounds_t bounds;
+            pixelfont_blit( game.yarn->assets.font_description, 0, 0, dbgstr, 0, NULL, game.screen_width, game.screen_height,
+                    PIXELFONT_ALIGN_LEFT, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, &bounds );            
+            if( game.screen ) {
+                pixelfont_blit( game.yarn->assets.font_description, game.screen_width - bounds.width - 1, game.screen_height - bounds.height, dbgstr, (uint8_t)game.color_disabled, game.screen, game.screen_width, game.screen_height,
+                    PIXELFONT_ALIGN_LEFT, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, NULL );
+            } else {
+                pixelfont_blit_rgb( game.yarn->assets.font_description, game.screen_width - bounds.width - 1, game.screen_height - bounds.height, dbgstr, 0x404040, game.screen_rgb, game.screen_width, game.screen_height,
+                    PIXELFONT_ALIGN_LEFT, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, NULL );
+            }
+
+        }
 
         if( input_was_key_pressed( &input, APP_KEY_F11 ) ) {
             fullscreen = !fullscreen;
@@ -340,9 +355,12 @@ int app_proc( app_t* app, void* user_data ) {
     void threads_init( void );
 #endif
 
+#ifdef _WIN32
+    void opengl_preinit( void );
+#endif
 
 
-    int main( int argc, char** argv ) {
+int main( int argc, char** argv ) {
     (void) argc, (void ) argv;
 
     // Enable windows memory leak detection (will report leaks in the Output window)
@@ -351,6 +369,10 @@ int app_proc( app_t* app, void* user_data ) {
         flag |= _CRTDBG_LEAK_CHECK_DF; // Turn on leak-checking bit
         _CrtSetDbgFlag( flag ); // Set flag to the new value
         //_CrtSetBreakAlloc( 0 ); // Can be manually commented back in to break at a certain allocation
+    #endif
+
+    #ifdef _WIN32
+        opengl_preinit();
     #endif
 
     // if -i or --images parameter were specified, run image editor
@@ -365,9 +387,19 @@ int app_proc( app_t* app, void* user_data ) {
         }
     #endif
 
+    bool is_debug = false;
     #ifndef __wasm__
+        bool no_compile = false;
+        if( argc == 2 && ( strcmp( argv[ 1 ], "-r" ) == 0 || strcmp( argv[ 1 ], "--run" ) == 0 ) ) {
+            no_compile = true;
+        }
+ 
+        if( argc == 2 && ( strcmp( argv[ 1 ], "-d" ) == 0 || strcmp( argv[ 1 ], "--debug" ) == 0 ) ) {
+            is_debug = true;
+        }
+
         // compile yarn
-        if( folder_exists( "scripts" ) ) {
+        if( folder_exists( "scripts" ) && !no_compile ) {
             file_t* version_file = file_load( ".cache/VERSION", FILE_MODE_TEXT, NULL );
             if( version_file ) {
                 g_cache_version = atoi( (char const*) version_file->data );
@@ -379,27 +411,36 @@ int app_proc( app_t* app, void* user_data ) {
                 return EXIT_FAILURE;
             }
 
-            printf( "Compressing yarn file\n" );
-            size_t size;
-            void* data = compress_lzma( buffer_data( compiled_yarn ), buffer_size( compiled_yarn ), &size );
+            size_t size = 0;
+            void* data = NULL;
+            if( !is_debug ) {
+                printf( "Compressing yarn file\n" );
+                data = compress_lzma( buffer_data( compiled_yarn ), buffer_size( compiled_yarn ), &size );
+            }
             uint32_t original_size = (uint32_t) buffer_size( compiled_yarn );
-            buffer_destroy( compiled_yarn );
 
             FILE* fp = fopen( "yarnspin.dat", "wb" );
             char header[] = "YARNSPIN";
+            char headerdbg[] = "YARN_DBG";
             uint32_t version = YARNSPIN_VERSION;
-            uint32_t size_in_bytes = (uint32_t)( size + 2 * strlen( header ) + sizeof( uint32_t ) * 5 );
-            fwrite( header, 1, strlen( header ), fp );
+            uint32_t size_in_bytes = (uint32_t)( size + 2 * strlen( is_debug ? headerdbg : header ) + sizeof( uint32_t ) * 5 );
+            fwrite( is_debug ? headerdbg : header, 1, strlen( is_debug ? headerdbg : header ), fp );
             fwrite( &version, 1, sizeof( version ), fp );
             fwrite( &size_in_bytes, 1, sizeof( size_in_bytes ), fp );
             fwrite( &original_size, 1, sizeof( original_size ), fp );
-            fwrite( data, 1, size, fp );
+            if( !is_debug ) {
+                fwrite( data, 1, size, fp );
+                free( data );
+            } else {
+                fwrite( buffer_data( compiled_yarn ), 1, buffer_size( compiled_yarn ), fp );
+            }
             fwrite( &size_in_bytes, 1, sizeof( size_in_bytes ), fp );
             fwrite( &version, 1, sizeof( version ), fp );
-            fwrite( header, 1, strlen( header ), fp );
+            fwrite( is_debug ? headerdbg : header, 1, strlen( is_debug ? headerdbg : header ), fp );
             fclose( fp );
-            free( data );
             printf( "yarnspin.dat written\n" );
+
+            buffer_destroy( compiled_yarn );
 
             char version_string[ 16 ];
             sprintf( version_string, "%d", (int) YARNSPIN_VERSION );
@@ -423,9 +464,14 @@ int app_proc( app_t* app, void* user_data ) {
         }
         char header[ 8 ];
         buffer_read_i8( loaded_yarn, header, 8 );
-        if( strncmp( header, "YARNSPIN", 8 ) != 0 ) {
+        bool is_yarnspin = strncmp( header, "YARNSPIN", 8 ) == 0;
+        bool is_yarn_dbg = strncmp( header, "YARN_DBG", 8 ) == 0;
+        if( !is_yarnspin && !is_yarn_dbg ) {
             printf( "The file yarnspin.dat is not a valid Yarnspin game data file\n" );
             return EXIT_FAILURE;
+        }
+        if( is_yarn_dbg ) {
+            is_debug = true;
         }
         uint32_t version = 0;
         buffer_read_u32( loaded_yarn, &version, 1 );
@@ -440,12 +486,24 @@ int app_proc( app_t* app, void* user_data ) {
         buffer_resize( decompressed_yarn, uncompressed_size );
         void* data = (void*) ( ( (uintptr_t)buffer_data( loaded_yarn ) ) + buffer_position( loaded_yarn ) );
         size_t size = buffer_size( loaded_yarn ) - buffer_position( loaded_yarn );
-        size_t decompressed_size = decompress_lzma( data, size, buffer_data( decompressed_yarn ), uncompressed_size );
-        buffer_destroy( loaded_yarn );
-        if( decompressed_size != uncompressed_size ) {
-            buffer_destroy( decompressed_yarn );
-            printf( "Failed to decompress game file\n" );
-            return EXIT_FAILURE;
+
+        if( !is_yarn_dbg ) {
+            size_t decompressed_size = decompress_lzma( data, size, buffer_data( decompressed_yarn ), uncompressed_size );
+            buffer_destroy( loaded_yarn );
+            if( decompressed_size != uncompressed_size ) {
+                buffer_destroy( decompressed_yarn );
+                printf( "Failed to decompress game file\n" );
+                return EXIT_FAILURE;
+            }
+        } else {
+            if( size < uncompressed_size ) {
+                buffer_destroy( decompressed_yarn );
+                buffer_destroy( loaded_yarn );
+                printf( "Game file has invalid size\n" );
+                return EXIT_FAILURE;
+            }
+            memcpy( buffer_data( decompressed_yarn ), data, uncompressed_size ); 
+            buffer_destroy( loaded_yarn );
         }
     #ifndef __wasm__
     } else {
@@ -463,9 +521,14 @@ int app_proc( app_t* app, void* user_data ) {
         fseek( fp, -8, SEEK_END );
         char header[ 8 ];
         fread( header, 1, 8, fp );
-        if( strncmp( header, "YARNSPIN", 8 ) != 0 ) {
+        bool is_yarnspin = strncmp( header, "YARNSPIN", 8 ) == 0;
+        bool is_yarn_dbg = strncmp( header, "YARN_DBG", 8 ) == 0;
+        if( !is_yarnspin && !is_yarn_dbg ) {
             printf( "No yarnspin.dat game data can be loaded\n" );
             return EXIT_FAILURE;
+        }
+        if( is_yarn_dbg ) {
+            is_debug = true;
         }
         fseek( fp, -( 8 + (int) sizeof( uint32_t ) ), SEEK_END );
         uint32_t version = 0;
@@ -483,17 +546,32 @@ int app_proc( app_t* app, void* user_data ) {
         uint32_t uncompressed_size;
         fread( &uncompressed_size, 1, sizeof( uncompressed_size ), fp );
         buffer_resize( decompressed_yarn, uncompressed_size );
+
+
         size_t size = size_in_bytes - ( 8 + sizeof( uint32_t ) * 3 );
         void* data = malloc( size );
         fread( data, 1, size, fp );
         fclose( fp );
-        size_t decompressed_size = decompress_lzma( data, size, buffer_data( decompressed_yarn ), uncompressed_size );
-        free( data );
-        if( decompressed_size != uncompressed_size ) {
-            buffer_destroy( decompressed_yarn );
-            printf( "Failed to decompress game file\n" );
-            return EXIT_FAILURE;
+
+        if( !is_yarn_dbg ) {
+            size_t decompressed_size = decompress_lzma( data, size, buffer_data( decompressed_yarn ), uncompressed_size );
+            free( data );
+            if( decompressed_size != uncompressed_size ) {
+                buffer_destroy( decompressed_yarn );
+                printf( "Failed to decompress game file\n" );
+                return EXIT_FAILURE;
+            }
+        } else {
+            if( size < uncompressed_size ) {
+                buffer_destroy( decompressed_yarn );
+                free( data );
+                printf( "Game file has invalid size\n" );
+                return EXIT_FAILURE;
+            }
+            memcpy( buffer_data( decompressed_yarn ), data, uncompressed_size ); 
+                free( data );
         }
+        
     #endif
     }
 
@@ -504,7 +582,7 @@ int app_proc( app_t* app, void* user_data ) {
 
     // load yarn
     yarn_t yarn;
-    yarn_load( decompressed_yarn, &yarn );
+    yarn_load( decompressed_yarn, &yarn, is_debug );
     buffer_destroy( decompressed_yarn );
 
     return app_run( app_proc, &yarn, NULL, NULL, NULL );
@@ -895,3 +973,21 @@ void ensure_console_open( void ) {
     #endif
 #endif
 
+
+
+#ifdef _WIN32
+
+    int opengl_preinit_thread_proc( void* user_data ) {
+        (void) user_data;
+        HDC dc = GetDC( NULL );
+	    DescribePixelFormat( dc, 0, 0, NULL );
+	    ReleaseDC( NULL, dc );
+        return 0;
+    }
+
+
+    void opengl_preinit( void ) {
+        thread_create( opengl_preinit_thread_proc, NULL, THREAD_STACK_SIZE_DEFAULT );
+    }
+
+#endif

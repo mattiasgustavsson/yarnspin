@@ -364,6 +364,8 @@ bool compile_action( array_param(string)* data_param, yarn_act_t* compiled_actio
     string_id command = data->items[ 0 ];
     if( CMP( command, "exit" ) ) {
         compiled_action->type = ACTION_TYPE_EXIT;
+    } else if( CMP( command, "return" ) ) {
+        compiled_action->type = ACTION_TYPE_RETURN;
     } else if( skip_word_if_match( &command, "set" ) ) {
         compiled_action->type = ACTION_TYPE_FLAG_SET;
         int flag_index = find_flag_index( command, yarn );
@@ -778,6 +780,13 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
                 printf( "%s(%d): invalid start declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
                 no_error = false;
             }
+        } else if( CMP( global->keyword, "debug_start" ) ) {
+            if( global->data->count == 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) {
+                yarn->globals.debug_start = cstr_trim( global->data->items[ 0 ] );
+            } else {
+                printf( "%s(%d): invalid debug_start declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
+                no_error = false;
+            }
         } else if( CMP( global->keyword, "palette" ) ) {
             if( global->data->count == 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) {
                 yarn->globals.palette = cstr_cat( "palettes/", cstr_trim( global->data->items[ 0 ] ) );
@@ -892,6 +901,26 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
                     no_error = false;
                 }
             }
+        } else if( CMP( global->keyword, "debug_set_flags" ) ) {
+            for( int j = 0; j < global->data->count; ++j ) {
+                if( cstr_len( cstr_trim( global->data->items[ j ] ) ) > 0 ) {
+                    string_id flag = cstr_trim( global->data->items[ j ] );
+                    array_add( yarn->globals.debug_set_flags, &flag );
+                } else {
+                    printf( "%s(%d): invalid debug_set_flags declaration '%s: %s'. Flag index %d is empty\n", global->filename, global->line_number, global->keyword, concat_data( global->data ), j + 1 );
+                    no_error = false;
+                }
+            }
+        } else if( CMP( global->keyword, "debug_get_items" ) ) {
+            for( int j = 0; j < global->data->count; ++j ) {
+                if( cstr_len( cstr_trim( global->data->items[ j ] ) ) > 0 ) {
+                    string_id item = cstr_trim( global->data->items[ j ] );
+                    array_add( yarn->globals.debug_get_items, &item );
+                } else {
+                    printf( "%s(%d): invalid debug_get_items declaration '%s: %s'. Item index %d is empty\n", global->filename, global->line_number, global->keyword, concat_data( global->data ), j + 1 );
+                    no_error = false;
+                }
+            }
         } else if( CMP( global->keyword, "logo" ) ) {
             found_logo = true;
             for( int j = 0; j < global->data->count; ++j ) {
@@ -912,7 +941,9 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
         } else if( CMP( global->keyword, "resolution" ) ) {
             if( global->data->count == 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) {
                 string_id id = cstr_trim( global->data->items[ 0 ] );
-                if( CMP( id, "low" ) ) {
+                if( CMP( id, "retro" ) ) {
+                    yarn->globals.resolution = YARN_RESOLUTION_RETRO;
+                } else if( CMP( id, "low" ) ) {
                     yarn->globals.resolution = YARN_RESOLUTION_LOW;
                 } else if( CMP( id, "medium" ) ) {
                     yarn->globals.resolution = YARN_RESOLUTION_MEDIUM;
@@ -935,6 +966,8 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
                     yarn->globals.colormode = YARN_COLORMODE_PALETTE;
                 } else if( CMP( id, "rgb" ) ) {
                     yarn->globals.colormode = YARN_COLORMODE_RGB;
+                } else if( CMP( id, "rgb9" ) ) {
+                    yarn->globals.colormode = YARN_COLORMODE_RGB9;
                 } else {
                     printf( "%s(%d): invalid colormode declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
                     no_error = false;
@@ -1235,5 +1268,7 @@ bool yarn_compiler( array_param(parser_global_t)* parser_globals_param, array_pa
         no_error = false;
     }
 
+    yarn->debug_start_location = find_location_index( yarn->globals.debug_start, &context );
+    yarn->debug_start_dialog = find_dialog_index( yarn->globals.debug_start, &context );
     return no_error;
 }

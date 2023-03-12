@@ -26,6 +26,12 @@ typedef struct rgbimage_t {
     uint32_t pixels[ 1 ];
 } rgbimage_t;
 
+
+typedef struct stack_entry_t {
+    bool is_location;
+    int index;
+} stack_entry_t;
+
 typedef struct game_t {
     bool exit_flag;
     bool exit_requested;
@@ -70,6 +76,7 @@ typedef struct game_t {
         int logo_index;
         array(bool)* flags;
         array(int)* items;
+        array(stack_entry_t)* section_stack;
     } state;
     rgbimage_t** rgbimages;
 } game_t;
@@ -82,12 +89,41 @@ void game_init( game_t* game, yarn_t* yarn, input_t* input, uint8_t* screen, uin
     game->state.logo_index = 0;
     game->state.flags = managed_array( bool );
     game->state.items = managed_array( int );
+    game->state.section_stack = managed_array( stack_entry_t );
     game->state.current_location = yarn->start_location;
     game->state.current_dialog = yarn->start_dialog;
+    if( yarn->is_debug && yarn->debug_start_location >= 0 ) {
+        game->state.current_location = yarn->debug_start_location;
+        game->state.current_dialog = -1;
+    }
+    if( yarn->is_debug && yarn->debug_start_dialog  >= 0 ) {
+        game->state.current_dialog = yarn->debug_start_dialog;
+        game->state.current_location = -1;
+    }
     for( int i = 0; i < yarn->flag_ids->count; ++i ) {
         bool value = false;
+        if( yarn->is_debug ) {
+            for( int j = 0; j < yarn->globals.debug_set_flags->count; ++j ) {
+                if( CMP( yarn->flag_ids->items[ i ], yarn->globals.debug_set_flags->items[ j ] ) ) {
+                    value = true;
+                    break;
+                }
+            }
+        }
         array_add( game->state.flags, &value );
     }
+
+    for( int i = 0; i < yarn->item_ids->count; ++i ) {
+        if( yarn->is_debug ) {
+            for( int j = 0; j < yarn->globals.debug_get_items->count; ++j ) {
+                if( CMP( yarn->item_ids->items[ i ], yarn->globals.debug_get_items->items[ j ] ) ) {
+                    array_add( game->state.items, &i );
+                    break;
+                }
+            }
+        }
+    }
+
     int darkest_index = 0;
     int darkest_luma = 65536;
     int brightest_index = 0;
@@ -279,7 +315,7 @@ void cls( game_t* game ) {
 
 
 void scale_for_resolution( game_t* game, int* x, int* y ) {
-    float scale_factors[] = { 1.0f, 1.5f, 2.0f, 4.5f };
+    float scale_factors[] = { 1.0f, 1.25f, 1.5f, 2.0f, 4.5f };
     if( x ) {
         *x = (int)( *x * scale_factors[ (int) game->yarn->globals.resolution ] );
     }
@@ -290,7 +326,7 @@ void scale_for_resolution( game_t* game, int* x, int* y ) {
 
 
 void scale_for_resolution_inverse( game_t* game, int* x, int* y ) {
-    float scale_factors[] = { 1.0f, 1.5f, 2.0f, 4.5f };
+    float scale_factors[] = { 1.0f, 1.25f, 1.5f, 2.0f, 4.5f };
     if( x ) {
         *x = (int)( *x / scale_factors[ (int) game->yarn->globals.resolution ] );
     }
@@ -491,6 +527,19 @@ void do_actions( game_t* game, array_param(yarn_act_t)* act_param ) {
             case ACTION_TYPE_EXIT: {
                 game->exit_requested = true;
             } break;
+            case ACTION_TYPE_RETURN: {
+                if( game->state.section_stack->count > 1 ) {
+                    --game->state.section_stack->count;
+                    stack_entry_t entry = game->state.section_stack->items[ --game->state.section_stack->count ];
+                    if( entry.is_location ) {
+                        game->queued_dialog = -1;
+                        game->queued_location = entry.index;
+                    } else {
+                        game->queued_location = -1;
+                        game->queued_dialog = entry.index;
+                    }
+                }
+            } break;
             case ACTION_TYPE_FLAG_SET: {
                 game->state.flags->items[ action->param_flag_index ] = true;
             } break;
@@ -532,7 +581,7 @@ void do_actions( game_t* game, array_param(yarn_act_t)* act_param ) {
 gamestate_t boot_init( game_t* game ) {
     cls( game );
     game->state.logo_index = -1;
-    if( game->yarn->screen_names->count > 0 ) {
+    if( game->yarn->screen_names->count > 0 && !game->yarn->is_debug) {
         return GAMESTATE_TITLE;
     } else if( game->state.current_location >= 0 ) {
         return GAMESTATE_LOCATION;
@@ -566,7 +615,11 @@ gamestate_t title_update( game_t* game ) {
         if( game->state.logo_index < game->yarn->globals.logo_indices->count - 1 ) {
             return GAMESTATE_TITLE;
         } else {
-            return GAMESTATE_LOCATION;
+            if( game->state.current_location >= 0 ) {
+                return GAMESTATE_LOCATION;
+            } else if( game->state.current_dialog >= 0 ) {
+                return GAMESTATE_DIALOG;
+            }
         }
     }
     return GAMESTATE_NO_CHANGE;
@@ -575,6 +628,11 @@ gamestate_t title_update( game_t* game ) {
 
 // location
 gamestate_t location_init( game_t* game ) {
+    stack_entry_t entry;
+    entry.is_location = true;
+    entry.index = game->state.current_location;
+    array_add( game->state.section_stack, &entry );
+
     game->queued_location = -1;
     game->queued_dialog = -1;
 
@@ -662,7 +720,7 @@ gamestate_t location_update( game_t* game ) {
             int ypos = 197 + font_height( game, game->font_opt->height ) * c;
             pixelfont_bounds_t b = text( game, game->font_opt, location->opt->items[ i ].text, 5, ypos, game->color_opt );
             if( mouse_y >= ypos && mouse_y < ypos + b.height ) {
-                box( game, 4, ypos, 315, b.height, game->color_opt );
+                box( game, 4, ypos - 1, 315, b.height + 1, game->color_opt );
                 text( game, game->font_opt, location->opt->items[ i ].text, 5, ypos, game->color_background );
                 if( was_key_pressed( game, APP_KEY_LBUTTON ) ) {
                     opt = c;
@@ -695,7 +753,7 @@ gamestate_t location_update( game_t* game ) {
         int ypos = 4 + ( ( 117 - ( game->state.items->count * font_height( game, game->font_use->height ) ) ) / 2 ) + c * font_height( game, game->font_use->height );
         pixelfont_bounds_t b = center( game, game->font_use, usetxt, 287, ypos, color );
         if( enabled && mouse_y >= ypos && mouse_y < ypos + b.height && mouse_x > 259 ) {
-            box( game, 260, ypos, 56, b.height, game->color_use );
+            box( game, 260, ypos - 1, 56, b.height + 1, game->color_use );
             center( game, game->font_use, usetxt, 287, ypos, game->color_background );
             if( was_key_pressed( game, APP_KEY_LBUTTON ) ) {
                 use = c;
@@ -727,7 +785,7 @@ gamestate_t location_update( game_t* game ) {
         pixelfont_bounds_t b = center( game,  game->font_chr, game->yarn->characters->items[ location->chr->items[ i ].chr_indices->items[ 0 ] ].short_name, 32, ypos, color );
         if( game->queued_dialog < 0 && game->queued_location < 0 ) {
             if( mouse_y >= ypos && mouse_y < ypos + b.height && mouse_x < 60 ) {
-                box( game, 4, ypos, 56, b.height, game->color_chr );
+                box( game, 4, ypos - 1, 56, b.height + 1, game->color_chr );
                 center( game,  game->font_chr, game->yarn->characters->items[ location->chr->items[ i ].chr_indices->items[ 0 ] ].short_name, 32, ypos, game->color_background );
                 if( was_key_pressed( game, APP_KEY_LBUTTON ) ) {
                     chr = c;
@@ -807,6 +865,11 @@ gamestate_t location_update( game_t* game ) {
 
 // dialog
 gamestate_t dialog_init( game_t* game ) {
+    stack_entry_t entry;
+    entry.is_location = false;
+    entry.index = game->state.current_dialog;
+    array_add( game->state.section_stack, &entry );
+
     game->queued_location = -1;
     game->queued_dialog = -1;
 
@@ -898,8 +961,8 @@ gamestate_t dialog_update( game_t* game ) {
         yarn_character_t* character = &game->yarn->characters->items[ game->dialog.chr_index ];
         center( game, game->font_name, character->name, 160, 6, game->color_name );
         if( character->face_index >= 0 ) {
-            box( game, 105, 18, 110, 110, game->color_facebg );
-            draw( game, character->face_index, 105, 18 );
+            box( game, 104, 18, 112, 112, game->color_facebg );
+            draw( game, character->face_index, 104, 18 );
         }
     }
     
@@ -922,7 +985,7 @@ gamestate_t dialog_update( game_t* game ) {
             pixelfont_bounds_t b = text( game, game->font_opt, dialog->say->items[ i ].text, 5, ypos, game->color_opt );
             if( game->queued_dialog < 0 && game->queued_location < 0 ) {
                 if( mouse_y >= ypos && mouse_y < ypos + b.height && mouse_x < 277 ) {
-                    box( game, 4, ypos, 315, b.height, game->color_opt );
+                    box( game, 4, ypos - 1, 315, b.height + 1, game->color_opt );
                     text( game, game->font_opt, dialog->say->items[ i ].text, 5, ypos, game->color_background );
                     if( was_key_pressed( game, APP_KEY_LBUTTON ) ) {
                         say = c;
@@ -958,7 +1021,7 @@ gamestate_t dialog_update( game_t* game ) {
         int ypos = 4 + ( ( 117 - ( game->state.items->count * font_height( game, game->font_use->height ) ) ) / 2 ) + c * font_height( game, game->font_use->height );
         pixelfont_bounds_t b = center( game, game->font_use, txt, 287, ypos, color );
         if( enabled && mouse_y >= ypos && mouse_y < ypos + b.height && mouse_x > 259 ) {
-            box( game, 260, ypos, 56, b.height, game->color_use );
+            box( game, 260, ypos - 1, 56, b.height + 1, game->color_use );
             center( game, game->font_use, txt, 287, ypos, game->color_background );
             if( was_key_pressed( game, APP_KEY_LBUTTON ) ) {
                 use = c;
