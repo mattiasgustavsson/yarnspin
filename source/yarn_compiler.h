@@ -988,6 +988,9 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
                 } else if( CMP( id, "pc" ) ) {
                     yarn_display_filter_t value = YARN_DISPLAY_FILTER_PC;
                     array_add( yarn->globals.display_filters, &value );
+                } else if( CMP( id, "lite" ) ) {
+                    yarn_display_filter_t value = YARN_DISPLAY_FILTER_LITE;
+                    array_add( yarn->globals.display_filters, &value );
                 } else {
                     printf( "%s(%d): invalid display_filter declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
                     no_error = false;
@@ -1257,7 +1260,7 @@ bool yarn_compiler( array_param(parser_global_t)* parser_globals_param, array_pa
     }
 
     if( yarn->globals.display_filters->count == 0 ) {
-        yarn_display_filter_t value = YARN_DISPLAY_FILTER_TV;
+        yarn_display_filter_t value = YARN_DISPLAY_FILTER_NONE;
         array_add( yarn->globals.display_filters, &value );
     }
 

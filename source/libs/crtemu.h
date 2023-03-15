@@ -1171,9 +1171,9 @@ void crtemu_present( crtemu_t* crtemu, CRTEMU_U64 time_us, CRTEMU_U32 const* pix
     crtemu->BufferData( CRTEMU_GL_ARRAY_BUFFER, 4 * 4 * sizeof( CRTEMU_GLfloat ), screen_vertices, CRTEMU_GL_STATIC_DRAW );
     crtemu->BindBuffer( CRTEMU_GL_ARRAY_BUFFER, crtemu->vertexbuffer );
 
-    float r = ( ( border_xbgr >> 16 ) & 0xff ) / 255.0f;
+    float b = ( ( border_xbgr >> 16 ) & 0xff ) / 255.0f;
     float g = ( ( border_xbgr >> 8  ) & 0xff ) / 255.0f;
-    float b = ( ( border_xbgr       ) & 0xff ) / 255.0f;
+    float r = ( ( border_xbgr       ) & 0xff ) / 255.0f;
     crtemu->ClearColor( r, g, b, 1.0f );
     crtemu->Clear( CRTEMU_GL_COLOR_BUFFER_BIT );
 

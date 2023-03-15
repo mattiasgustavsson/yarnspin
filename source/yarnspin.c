@@ -1,3 +1,4 @@
+#define CRTEMU_LITE_REPORT_SHADER_ERRORS
 #define _CRT_NONSTDC_NO_DEPRECATE
 #define _CRT_SECURE_NO_WARNINGS
 
@@ -24,6 +25,7 @@
 #include "libs/array.h"
 #include "libs/buffer.h"
 #include "libs/crtemu.h"
+#include "libs/crtemu_lite.h"
 #include "libs/crtemu_pc.h"
 #include "libs/cstr.h"
 #include "libs/dir.h"
@@ -177,6 +179,7 @@ int app_proc( app_t* app, void* user_data ) {
     frametimer_t* frametimer = frametimer_create( NULL );
     frametimer_lock_rate( frametimer, 60 );
 
+    crtemu_lite_t* crtemu_lite = NULL;
     crtemu_pc_t* crtemu_pc = NULL;
     crtemu_t* crtemu = NULL;
 
@@ -208,7 +211,7 @@ int app_proc( app_t* app, void* user_data ) {
     APP_U64 time = 0;
     while( app_yield( app ) != APP_STATE_EXIT_REQUESTED && !game.exit_flag ) {
         frametimer_update( frametimer );
-        input_update( &input, screen_width, screen_height, crtemu_pc, crtemu );
+        input_update( &input, screen_width, screen_height, crtemu_lite, crtemu_pc, crtemu );
         game_update( &game );
 
         if( game.yarn->is_debug ) {
@@ -247,7 +250,23 @@ int app_proc( app_t* app, void* user_data ) {
 
         time += 1000000 / 60;
 
+        if( display_filter == YARN_DISPLAY_FILTER_LITE && crtemu_lite == NULL ) {
+            if( crtemu ) {
+                crtemu_destroy( crtemu );
+                crtemu = NULL;
+            }
+            if( crtemu_pc ) {
+                crtemu_pc_destroy( crtemu_pc );
+                crtemu_pc = NULL;
+            }
+            crtemu_lite = crtemu_lite_create( NULL );
+        }
+        
         if( display_filter == YARN_DISPLAY_FILTER_PC && crtemu_pc == NULL ) {
+            if( crtemu_lite ) {
+                crtemu_lite_destroy( crtemu_lite );
+                crtemu_lite = NULL;
+            }
             if( crtemu ) {
                 crtemu_destroy( crtemu );
                 crtemu = NULL;
@@ -259,6 +278,10 @@ int app_proc( app_t* app, void* user_data ) {
         }
 
         if( display_filter == YARN_DISPLAY_FILTER_TV && crtemu == NULL ) {
+            if( crtemu_lite ) {
+                crtemu_lite_destroy( crtemu_lite );
+                crtemu_lite = NULL;
+            }
             if( crtemu_pc ) {
                 crtemu_pc_destroy( crtemu_pc );
                 crtemu_pc = NULL;
@@ -268,6 +291,11 @@ int app_proc( app_t* app, void* user_data ) {
             if( crtemu && frame_tv_pixels ) {
                 crtemu_frame( crtemu, frame_tv_pixels, frame_tv_width, frame_tv_height );
             }
+        }
+
+        if( display_filter == YARN_DISPLAY_FILTER_NONE && crtemu_lite != NULL ) {
+            crtemu_lite_destroy( crtemu_lite );
+            crtemu_lite = NULL;
         }
 
         if( display_filter == YARN_DISPLAY_FILTER_NONE && crtemu_pc != NULL ) {
@@ -281,14 +309,24 @@ int app_proc( app_t* app, void* user_data ) {
                 memset( screen, 0, ( 1440 + (int)( 22 * 4.5f ) ) * ( 1080 + (int)( 33 * 4.5 ) ) * sizeof( uint32_t ) );
         }
 
-        if( crtemu_pc ) {
+        if( crtemu_lite ) {
             if( canvas ) {
                 for( int i = 0; i < screen_width * screen_height; ++i ) {
                     screen[ i ] = yarn->assets.palette[ canvas[ i ] ];
                 }
-                crtemu_pc_present( crtemu_pc, time, screen, screen_width, screen_height, fade, bg );
+                crtemu_lite_present( crtemu_lite, time, screen, screen_width, screen_height, fade, 0x000000 );
             } else {
-                crtemu_pc_present( crtemu_pc, time, canvas_rgb, screen_width, screen_height, fade, bg );
+                crtemu_lite_present( crtemu_lite, time, canvas_rgb, screen_width, screen_height, fade, 0x000000 );
+            }
+            app_present( app, NULL, 1, 1, 0xffffff, 0x000000 );
+        } else if( crtemu_pc ) {
+            if( canvas ) {
+                for( int i = 0; i < screen_width * screen_height; ++i ) {
+                    screen[ i ] = yarn->assets.palette[ canvas[ i ] ];
+                }
+                crtemu_pc_present( crtemu_pc, time, screen, screen_width, screen_height, fade, 0x000000 );
+            } else {
+                crtemu_pc_present( crtemu_pc, time, canvas_rgb, screen_width, screen_height, fade, 0x000000 );
             }
             app_present( app, NULL, 1, 1, 0xffffff, 0x000000 );
         } else if( crtemu ) {
@@ -308,7 +346,7 @@ int app_proc( app_t* app, void* user_data ) {
                     }
                 }
             }
-            crtemu_present( crtemu, time, screen, screen_width + 2 * offset_x, screen_height + 2 * offset_y, fade, bg );
+            crtemu_present( crtemu, time, screen, screen_width + 2 * offset_x, screen_height + 2 * offset_y, fade, 0x000000 );
             app_present( app, NULL, 1, 1, 0xffffff, 0x000000 );
         } else {
             if( canvas ) {
@@ -323,6 +361,9 @@ int app_proc( app_t* app, void* user_data ) {
     }
 
     frametimer_destroy( frametimer );
+    if( crtemu_lite ) {
+        crtemu_lite_destroy( crtemu_lite );
+    }
     if( crtemu_pc ) {
         crtemu_pc_destroy( crtemu_pc );
     }
@@ -612,6 +653,9 @@ int main( int argc, char** argv ) {
 
 #define CRTEMU_PC_IMPLEMENTATION
 #include "libs/crtemu_pc.h"
+
+#define CRTEMU_LITE_IMPLEMENTATION
+#include "libs/crtemu_lite.h"
 
 #define CSTR_IMPLEMENTATION
 #include "libs/cstr.h"

@@ -632,6 +632,7 @@ typedef enum yarn_display_filter_t {
     YARN_DISPLAY_FILTER_NONE,
     YARN_DISPLAY_FILTER_TV,
     YARN_DISPLAY_FILTER_PC,
+    YARN_DISPLAY_FILTER_LITE,
 } yarn_display_filter_t;
 
 

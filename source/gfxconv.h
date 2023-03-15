@@ -583,24 +583,28 @@ bool load_settings( process_settings_t* settings, char const* filename ) {
 
 
 void process_image( uint32_t* image, int width, int height, uint8_t* output, int outw, int outh, paldither_palette_t* palette, process_settings_t* settings, float resolution_scale ) {
-    if( palette && width == outw && height == outh ) {
-        bool all_colors_match = true;
-        for( int i = 0; i < width * height; ++i ) {
-            uint32_t c = image[ i ] & 0xffffff;
-            bool color_found = false;
-            for( int j = 0; j < palette->color_count; ++j ) {
-                if( c == ( palette->colortable[ j ] & 0xffffff ) ) {
-                    color_found = true;
-                    output[ i ] = (uint8_t) j;
+    if( width == outw && height == outh ) {
+        if( palette ) {
+            bool all_colors_match = true;
+            for( int i = 0; i < width * height; ++i ) {
+                uint32_t c = image[ i ] & 0xffffff;
+                bool color_found = false;
+                for( int j = 0; j < palette->color_count; ++j ) {
+                    if( c == ( palette->colortable[ j ] & 0xffffff ) ) {
+                        color_found = true;
+                        output[ i ] = (uint8_t) j;
+                        break;
+                    }
+                }
+                if( !color_found ) {
+                    all_colors_match = false;
                     break;
                 }
             }
-            if( !color_found ) {
-                all_colors_match = false;
-                break;
+            if( all_colors_match ) {
+                return;
             }
-        }
-        if( all_colors_match ) {
+        } else {
             return;
         }
     }
@@ -1226,10 +1230,10 @@ void dither_rgb8( uint32_t* pixels, int width, int height, bool use_bayer_dither
             uint32_t sb = ( src >> 16 ) & 0xff;
             uint32_t a = ( src >> 24 ) & 0xff;
             uint32_t dr = ( ( ( ( sr * 6 )  ) / 256 ) * 256 ) / 6 ;
-            uint32_t dg = ( ( ( ( sg * 6 )  ) / 256 ) * 256 ) / 6 ;
+            uint32_t dg = ( ( ( ( sg * 7 )  ) / 256 ) * 256 ) / 7 ;
             uint32_t db = ( ( ( ( sb * 6 )  ) / 256 ) * 256 ) / 6 ;
             uint32_t br = dr + 42;
-            uint32_t bg = dg + 42;
+            uint32_t bg = dg + 36;
             uint32_t bb = db + 42;
             dr = dr > 255 ? 255 : dr;
             dg = dg > 255 ? 255 : dg;
@@ -1244,17 +1248,17 @@ void dither_rgb8( uint32_t* pixels, int width, int height, bool use_bayer_dither
 
             if( sobel_img.pixels[ x + y * width ].r < 0.75f || sobel_img.pixels[ x + y * width ].g < 0.75f || sobel_img.pixels[ x + y * width ].b < 0.75f) {
                 diff_r = diff_r < 21 ? 0 : 41;
-                diff_g = diff_g < 21 ? 0 : 41;
+                diff_g = diff_g < 28 ? 0 : 35;
                 diff_b = diff_b < 21 ? 0 : 41;
             }
 
             if( use_bayer_dither ) {
                 dr = bayer_dither_pattern[ ( ( diff_r * 17 ) / 43 ) * 4 * 4 + ( x % 4 ) + ( y % 4 ) * 4 ] ? br : dr;
-                dg = bayer_dither_pattern[ ( ( diff_g * 17 ) / 43 ) * 4 * 4 + ( x % 4 ) + ( y % 4 ) * 4 ] ? bg : dg;
+                dg = bayer_dither_pattern[ ( ( diff_g * 17 ) / 37 ) * 4 * 4 + ( x % 4 ) + ( y % 4 ) * 4 ] ? bg : dg;
                 db = bayer_dither_pattern[ ( ( diff_b * 17 ) / 43 ) * 4 * 4 + ( x % 4 ) + ( y % 4 ) * 4 ] ? bb : db;
             } else {
                 dr = custom_dither_pattern[ ( ( diff_r * 7 ) / 43 ) * 4 * 4 + ( x % 4 ) + ( y % 4 ) * 4 ] ? br : dr;
-                dg = custom_dither_pattern[ ( ( diff_g * 7 ) / 43 ) * 4 * 4 + ( x % 4 ) + ( y % 4 ) * 4 ] ? bg : dg;
+                dg = custom_dither_pattern[ ( ( diff_g * 7 ) / 37 ) * 4 * 4 + ( x % 4 ) + ( y % 4 ) * 4 ] ? bg : dg;
                 db = custom_dither_pattern[ ( ( diff_b * 7 ) / 43 ) * 4 * 4 + ( x % 4 ) + ( y % 4 ) * 4 ] ? bb : db;
             }
             //dr = (uint32_t)( 255.0f * sobel_img.pixels[ x + y * width ].r );
@@ -1267,6 +1271,7 @@ void dither_rgb8( uint32_t* pixels, int width, int height, bool use_bayer_dither
     }
     img_free( &sobel_img );
 }
+
 
 typedef struct qoi_data_t {
     uint32_t size;
@@ -1322,6 +1327,9 @@ qoi_data_t* convert_rgb( string image_filename, int width, int height, int bpp, 
             process_image( (uint32_t*) img, w, h, NULL, outw, outh, NULL, have_settings ? &settings : NULL, resolution_scale );
         }
 
+        if( bpp == 8 ) {
+            dither_rgb8( (uint32_t*) img, outw, outh, false, resolution_scale );
+        }
         if( bpp == 9 ) {
             dither_rgb9( (uint32_t*) img, outw, outh, false, resolution_scale );
         }

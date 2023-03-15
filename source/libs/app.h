@@ -1107,9 +1107,9 @@ static int app_internal_opengl_present( struct app_internal_opengl_t* gl, APP_U3
         gl->TexParameteri( APP_GL_TEXTURE_2D, APP_GL_TEXTURE_MAG_FILTER, APP_GL_NEAREST );
         }
 
-    float r = ( ( border_xbgr >> 16 ) & 0xff ) / 255.0f;
+    float b = ( ( border_xbgr >> 16 ) & 0xff ) / 255.0f;
     float g = ( ( border_xbgr >> 8  ) & 0xff ) / 255.0f;
-    float b = ( ( border_xbgr       ) & 0xff ) / 255.0f;
+    float r = ( ( border_xbgr       ) & 0xff ) / 255.0f;
     gl->ClearColor( r, g, b, 1.0f );
     gl->Clear( APP_GL_COLOR_BUFFER_BIT );
     gl->DrawArrays( APP_GL_TRIANGLE_FAN, 0, 4 );

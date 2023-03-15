@@ -309,7 +309,10 @@ void cls( game_t* game ) {
     if( game->screen ) {
         memset( game->screen, game->color_background, (size_t) game->screen_width * game->screen_height );
     } else {
-        memset( game->screen_rgb, game->color_background, sizeof( uint32_t) *  game->screen_width * game->screen_height );
+        uint32_t c = game->yarn->assets.palette[ game->color_background ];
+        for( int i = 0; i < game->screen_width * game->screen_height ; ++i ) {
+            game->screen_rgb[ i ] = c;
+        }
     }
 }
 
@@ -581,7 +584,7 @@ void do_actions( game_t* game, array_param(yarn_act_t)* act_param ) {
 gamestate_t boot_init( game_t* game ) {
     cls( game );
     game->state.logo_index = -1;
-    if( game->yarn->screen_names->count > 0 && !game->yarn->is_debug) {
+    if( game->yarn->screen_names->count > 0 && !( game->yarn->is_debug && ( game->yarn->debug_start_dialog >= 0 || game->yarn->debug_start_location >= 0  ) ) ) {
         return GAMESTATE_TITLE;
     } else if( game->state.current_location >= 0 ) {
         return GAMESTATE_LOCATION;
