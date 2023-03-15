@@ -1035,3 +1035,298 @@ void ensure_console_open( void ) {
     }
 
 #endif
+
+
+
+void atarist_palettize( PALDITHER_U32* abgr, int width, int height, paldither_palette_t const* palette,
+    paldither_type_t dither_type, PALDITHER_U8* output )
+    {
+    unsigned char default_dither_pattern[ 4 * 4 * 11 ] =
+        {
+        0,0,0,0,
+        0,0,0,0,
+        0,0,0,0,
+        0,0,0,0,
+
+        0,0,0,0,
+        0,0,0,0,
+        0,0,0,0,
+        0,0,0,0,
+
+        0,0,0,0,
+        0,0,0,0,
+        0,0,0,0,
+        0,0,0,0,
+
+        0,0,0,0,
+        0,0,0,0,
+        0,0,0,0,
+        0,0,0,1,
+
+        1,0,1,0,
+        0,1,0,0,
+        1,0,1,0,
+        0,0,0,1,
+
+        1,0,1,0,
+        0,1,0,1,
+        1,0,1,0,
+        0,1,0,1,
+
+        1,0,1,0,
+        1,1,0,1,
+        1,0,1,0,
+        0,1,1,1,
+
+        1,1,1,1,
+        1,1,1,1,
+        1,1,1,1,
+        1,1,1,1,
+
+        1,1,1,1,
+        1,1,1,1,
+        1,1,1,1,
+        1,1,1,1,
+
+        1,1,1,1,
+        1,1,1,1,
+        1,1,1,1,
+        1,1,1,1,
+
+        1,1,1,1,
+        1,1,1,1,
+        1,1,1,1,
+        1,1,1,1,
+
+       };
+
+    unsigned char bayer_dither_pattern[ 4 * 4 * 17 ] =
+        {
+        0, 0, 0, 0,
+        0, 0, 0, 0,
+        0, 0, 0, 0,
+        0, 0, 0, 0,
+
+        1, 0, 0, 0,
+        0, 0, 0, 0,
+        0, 0, 0, 0,
+        0, 0, 0, 0,
+
+        1, 0, 0, 0,
+        0, 0, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 0,
+
+        1, 0, 1, 0,
+        0, 0, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 0,
+
+        1, 0, 1, 0,
+        0, 0, 0, 0,
+        1, 0, 1, 0,
+        0, 0, 0, 0,
+
+        1, 0, 1, 0,
+        0, 1, 0, 0,
+        1, 0, 1, 0,
+        0, 0, 0, 0,
+
+        1, 0, 1, 0,
+        0, 1, 0, 0,
+        1, 0, 1, 0,
+        0, 0, 0, 1,
+
+        1, 0, 1, 0,
+        0, 1, 0, 1,
+        1, 0, 1, 0,
+        0, 0, 0, 1,
+
+        1, 0, 1, 0,
+        0, 1, 0, 1,
+        1, 0, 1, 0,
+        0, 1, 0, 1,
+
+        1, 1, 1, 0,
+        0, 1, 0, 1,
+        1, 0, 1, 0,
+        0, 1, 0, 1,
+
+        1, 1, 1, 0,
+        0, 1, 0, 1,
+        1, 0, 1, 1,
+        0, 1, 0, 1,
+
+        1, 1, 1, 1,
+        0, 1, 0, 1,
+        1, 0, 1, 1,
+        0, 1, 0, 1,
+
+        1, 1, 1, 1,
+        0, 1, 0, 1,
+        1, 1, 1, 1,
+        0, 1, 0, 1,
+
+        1, 1, 1, 1,
+        1, 1, 0, 1,
+        1, 1, 1, 1,
+        0, 1, 0, 1,
+
+        1, 1, 1, 1,
+        1, 1, 0, 1,
+        1, 1, 1, 1,
+        0, 1, 1, 1,
+
+        1, 1, 1, 1,
+        1, 1, 1, 1,
+        1, 1, 1, 1,
+        0, 1, 1, 1,
+
+        1, 1, 1, 1,
+        1, 1, 1, 1,
+        1, 1, 1, 1,
+        1, 1, 1, 1,
+        };
+
+    unsigned char none_dither_pattern[ 4 * 4 * 2 ] =
+        {
+        0, 0, 0, 0,
+        0, 0, 0, 0,
+        0, 0, 0, 0,
+        0, 0, 0, 0,
+        };
+
+
+    uintptr_t ptr = (uintptr_t)( palette + 1 );
+
+    int default_pal_mix_count = *(int*)ptr; ptr += sizeof( int );
+    paldither_mix_t const* default_pal_mix = (paldither_mix_t*) ptr; ptr += default_pal_mix_count * sizeof( paldither_mix_t );
+    int const* default_pal_map = (int*) ptr; ptr += 16 * 16 * 16 * sizeof( int );
+    int default_pal_list_count = *(int*)ptr; ptr += sizeof( int );
+    int const* default_pal_list = (int*) ptr; ptr += default_pal_list_count * sizeof( int );
+
+    int bayer_pal_mix_count = *(int*)ptr; ptr += sizeof( int );
+    paldither_mix_t const* bayer_pal_mix = (paldither_mix_t*) ptr; ptr += bayer_pal_mix_count * sizeof( paldither_mix_t );
+    int const* bayer_pal_map = (int*) ptr; ptr += 16 * 16 * 16 * sizeof( int );
+    int bayer_pal_list_count = *(int*)ptr; ptr += sizeof( int );
+    int const* bayer_pal_list = (int*) ptr; ptr += bayer_pal_list_count * sizeof( int );
+
+    int nodither_pal_mix_count = *(int*)ptr; ptr += sizeof( int );
+    paldither_mix_t const* nodither_pal_mix = (paldither_mix_t*) ptr; ptr += nodither_pal_mix_count * sizeof( paldither_mix_t );
+    int const* nodither_pal_map = (int*) ptr; ptr += 16 * 16 * 16 * sizeof( int );
+    int nodither_pal_list_count = *(int*)ptr; ptr += sizeof( int );
+    int const* nodither_pal_list = (int*) ptr; ptr += nodither_pal_list_count * sizeof( int );
+
+    unsigned char* dither_pattern = default_dither_pattern;
+    int pal_mix_count = default_pal_mix_count;
+    paldither_mix_t const* pal_mix = default_pal_mix;
+    int const* pal_map = default_pal_map;
+    int const* pal_list = default_pal_list;
+
+    if( dither_type == PALDITHER_TYPE_BAYER )
+        {
+        dither_pattern = bayer_dither_pattern;
+        pal_mix_count = bayer_pal_mix_count;
+        pal_mix = bayer_pal_mix;
+        pal_map = bayer_pal_map;
+        pal_list = bayer_pal_list;
+        }
+    else if( dither_type == PALDITHER_TYPE_NONE )
+        {
+        dither_pattern = none_dither_pattern;
+        pal_mix_count = nodither_pal_mix_count;
+        pal_mix = nodither_pal_mix;
+        pal_map = nodither_pal_map;
+        pal_list = nodither_pal_list;
+        }
+
+    for( int y = 0; y < height; ++y )
+        {
+        for( int x = 0; x < width; ++x )
+            {
+            PALDITHER_U32 color = abgr[ x + y * width ];
+            int r = (int)( ( color & 0x000000ff ) );
+            int g = (int)( ( color & 0x0000ff00 ) >> 8 );
+            int b = (int)( ( color & 0x00ff0000 ) >> 16 );
+            int l = (int)( ( 54 * r + 183 * g + 19 * b + 127 ) >> 8 );
+            PALDITHER_ASSERT( l <= 0xff && l >= 0, "Value out of range" );
+
+            paldither_mix_t const* best_mix = 0;
+            int pal_index = pal_map[ ( r >> 4 ) * 16 * 16 + ( g >> 4 ) * 16 + ( b >> 4 ) ];
+            int count = pal_list[ pal_index++ ];
+            if( count != 0 )
+                {
+                int best_diff = 0x7FFFFFFF;
+                int const* index = &pal_list[ pal_index ];
+                for( int i = 0; i < count; ++i, ++index )
+                    {
+                    paldither_mix_t const* m = &pal_mix[ *index ];
+                    int dr = r - m->r;
+                    int dg = g - m->g;
+                    int db = b - m->b;
+                    int dl = l - m->l;
+                    int d = ( ( ( dr*dr + dg*dg + db*db ) >> 1 ) + dl*dl) + ( m->d * 3 );
+                    if( i == 0 || d < best_diff ) { best_diff = d; best_mix = m; }
+                    }
+                }
+            else
+                {
+                int best_diff = 0x7FFFFFFF;
+                paldither_mix_t const* m = pal_mix;
+                for( int i = 0; i < pal_mix_count; ++i, ++m )
+                    {
+                    int dr = r - m->r;
+                    int dg = g - m->g;
+                    int db = b - m->b;
+                    int dl = l - m->l;
+                    int d = ( ( ( dr*dr + dg*dg + db*db ) >> 1 ) + dl*dl) + ( m->d * 3 );
+                    if( i == 0 || d < best_diff ) { best_diff = d; best_mix = m; }
+                    }
+                }
+
+
+            int ratio_max = dither_type == PALDITHER_TYPE_BAYER ? 17 : dither_type == PALDITHER_TYPE_DEFAULT ? 11 : 1;
+            int index = dither_pattern[ best_mix->ratio * 4 * 4 + ( x & 3 ) + ( y & 3 ) * 4 ] ?
+                best_mix->second : best_mix->first;
+
+            int d = 0;
+            {
+                PALDITHER_U32 f = palette->colortable[ best_mix->first ];
+                int fr = (int)( ( f & 0x000000ff ) );
+                int fg = (int)( ( f & 0x0000ff00 ) >> 8 );
+                int fb = (int)( ( f & 0x00ff0000 ) >> 16 );
+                int fl = (int)( ( 54 * fr + 183 * fg + 19 * fb + 127 ) >> 8 );
+                PALDITHER_U32 s = palette->colortable[ best_mix->second ];
+                int sr = (int)( ( s & 0x000000ff ) );
+                int sg = (int)( ( s & 0x0000ff00 ) >> 8 );
+                int sb = (int)( ( s & 0x00ff0000 ) >> 16 );
+                int sl = (int)( ( 54 * sr + 183 * sg + 19 * sb + 127 ) >> 8 );
+                d = abs( fl - sl );
+            }
+
+
+            if( d > 48 ) {
+                int best_diff = 0x7FFFFFFF;
+                int best_index = 0;
+                for( int i = 0; i < palette->color_count; ++i )
+                    {
+                    PALDITHER_U32 c = palette->colortable[ i ];
+                    int cr = (int)( ( c & 0x000000ff ) );
+                    int cg = (int)( ( c & 0x0000ff00 ) >> 8 );
+                    int cb = (int)( ( c & 0x00ff0000 ) >> 16 );
+                    int cl = (int)( ( 54 * cr + 183 * cg + 19 * cb + 127 ) >> 8 );
+                    int dr = r - cr;
+                    int dg = g - cg;
+                    int db = b - cb;
+                    int dl = l - cl;
+                    int d = ( ( ( dr*dr + dg*dg + db*db ) >> 1 ) + dl*dl);
+                    if( i == 0 || d < best_diff ) { best_diff = d; best_index = i; }
+                    }
+                index = best_index;
+                }
+
+            if( output) output[ x + y * width ] = (PALDITHER_U8) index;
+            abgr[ x + y * width ] = ( abgr[ x + y * width ] & 0xff000000 ) | ( palette->colortable[ index ] & 0x00ffffff );
+            }
+        }
+    }

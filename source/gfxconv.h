@@ -1273,6 +1273,52 @@ void dither_rgb8( uint32_t* pixels, int width, int height, bool use_bayer_dither
 }
 
 
+void atarist_palettize( PALDITHER_U32* abgr, int width, int height, paldither_palette_t const* palette,
+    paldither_type_t dither_type, PALDITHER_U8* output );
+
+void atari_st( uint32_t* pixels, int width, int height ) {
+
+    for( int y = 0; y < height; ++y ) {
+        uint32_t colors[ 1600 ];
+        for( int x = 0; x < width; ++x ) {
+            uint32_t src = pixels[ x + y * width ];
+            uint32_t sr = src & 0xff;
+            uint32_t sg = ( src >> 8 ) & 0xff;
+            uint32_t sb = ( src >> 16 ) & 0xff;
+            uint32_t dr = ( ( ( ( sr * 8 )  ) / 256 ) * 256 ) / 8 ;
+            uint32_t dg = ( ( ( ( sg * 8 )  ) / 256 ) * 256 ) / 8 ;
+            uint32_t db = ( ( ( ( sb * 8 )  ) / 256 ) * 256 ) / 8 ;
+            uint32_t dst = ( 255 << 24 ) | ( db << 16 ) | ( dg << 8 ) | dr;
+            colors[ x ] = dst;
+        }
+        static uint32_t palette[ 256 ];
+        int count = palettize_generate_palette_xbgr32( colors, width, 1, palette, 16, NULL );
+        if( count < 16 ) {
+            for( int i = 17; i < 256; ++i ) {
+                count = palettize_generate_palette_xbgr32( colors, width, 1, palette, i, NULL );
+                if( count >= 16 ) {
+                    if( count > 16 ) {
+                        palettize_generate_palette_xbgr32( colors, width, 1, palette, i - 1, NULL );
+                        count = 16;
+                    }
+                    break;
+                }
+            }
+        }
+        static uint32_t input[ 1600 * 4 ];
+        memcpy( input, pixels + ( y & (~3) ) * width, sizeof( uint32_t ) * width * 4 );
+        static uint8_t output[ 1600 * 4 ];
+        paldither_palette_t* paldither = paldither_palette_create( palette, 16, NULL, NULL );
+        atarist_palettize( input, width, 4, paldither, PALDITHER_TYPE_BAYER, output ); 
+        for( int x = 0; x < width; ++x ) {
+            pixels[ x + y * width ] = paldither->colortable[ output[ x + ( y & 3 ) * width ] ];
+        }
+        paldither_palette_destroy( paldither, NULL );
+    }
+}
+
+
+
 typedef struct qoi_data_t {
     uint32_t size;
     uint8_t data[ 1 ];
