@@ -10,6 +10,8 @@ typedef struct imgedit_image_t {
     uint32_t* sized_pixels;
     uint32_t* processed;
     uint32_t* prev_processed;
+    bool use_individual_settings;
+    process_settings_t settings;
 } imgedit_image_t;
 
 
@@ -59,6 +61,9 @@ void imgedit_load_img( imgedit_image_t* img ) {
         img->orig_pixels = (uint32_t*) malloc( w * h * sizeof( uint32_t ) );
         memcpy( img->orig_pixels, pixels, w * h * sizeof( uint32_t ) );
         stbi_image_free( pixels );
+
+        cstr_t ini_filename = cstr_cat( img->filename, ".ini" );
+        img->use_individual_settings = load_settings( &img->settings, ini_filename );
     } else {
         printf( "Failed to load image '%s'\n", img->filename );
     }
@@ -78,6 +83,9 @@ void imgedit_list_images( array_param(imgedit_image_t)* images, cstr_t folder, f
         if( dir_is_file( d ) ) {
             cstr_t name = cstr( dir_name( d ) );
             if( cstr_is_equal( name, "settings.ini" ) ) {
+                continue;
+            }
+            if( strrchr( name, '.' ) == NULL || stricmp( strrchr( name, '.' ), ".ini" ) == 0 ) {
                 continue;
             }
             cstr_t filename = cstr_cat( cstr_cat( folder, "/" ), name ); // TODO: cstr_join
@@ -123,18 +131,18 @@ void imgedit_list_palettes( array_param(cstr_t)* palettes ) {
 }
 
 
-APP_U32 imgedit_blend( APP_U32 x, APP_U32 y, APP_U32 a ) {
-    APP_U32 xr = ( x ) & 0xff;
-    APP_U32 xg = ( x >> 8 ) & 0xff;
-    APP_U32 xb = ( x >> 16 ) & 0xff;
-    APP_U32 yr = ( y ) & 0xff;
-    APP_U32 yg = ( y >> 8 ) & 0xff;
-    APP_U32 yb = ( y >> 16 ) & 0xff;
-    APP_U32 ia = 255 - ( a & 0xff );
-    APP_U32 r = ( xr * ia + yr * a ) >> 8;
-    APP_U32 g = ( xg * ia + yg * a ) >> 8;
-    APP_U32 b = ( xb * ia + yb * a ) >> 8;
-    return r | ( g << 8 ) | ( b << 16 );
+#ifdef _WIN32
+__forceinline
+#endif
+uint32_t imgedit_blend( uint32_t color1, uint32_t color2, uint8_t alpha ) {
+    uint64_t c1 = (uint64_t) color1;
+    uint64_t c2 = (uint64_t) color2;
+    uint64_t a = (uint64_t)( alpha );
+    // bit magic to alpha blend R G B with single mul
+    c1 = ( c1 | ( c1 << 24 ) ) & 0x00ff00ff00ffull;
+    c2 = ( c2 | ( c2 << 24 ) ) & 0x00ff00ff00ffull;
+    uint64_t o = ( ( ( ( c2 - c1 ) * a ) >> 8 ) + c1 ) & 0x00ff00ff00ffull; 
+    return (uint32_t) ( o | ( o >> 24 ) );
 }
 
 
@@ -282,6 +290,7 @@ typedef struct imgedit_panel_t {
 typedef enum imgedit_mode_t {
     IMGEDIT_MODE_IMAGES,
     IMGEDIT_MODE_FACES,
+    IMGEDIT_MODE_SINGLE,
 
     IMGEDIT_MODECOUNT,
 } imgedit_mode_t;
@@ -308,6 +317,8 @@ typedef struct imgedit_t {
     imgedit_dropdown_t dropdowns[ 1 ];
 
     int first_image;
+    int single_image;
+    int single_face;
 
     bool converting_palette;
     bool cancel_last_image;
@@ -355,6 +366,9 @@ int imgedit_process_thread( void* user_data ) {
         bool show_processed = imgedit->panels[ imgedit->mode ].show_processed;
         bool mode_faces = imgedit->mode == IMGEDIT_MODE_FACES;
         int first_image = imgedit->first_image;
+        int single_image = imgedit->single_image;
+        int single_face = imgedit->single_face;
+
         images_count = array_count( imgedit->images );
         if( images_count > images_capacity ) {
             images = (imgedit_image_t*) realloc( images, sizeof( imgedit_image_t ) * images_count );
@@ -412,28 +426,20 @@ int imgedit_process_thread( void* user_data ) {
 
         bool found = false;
         imgedit_image_t image = { NULL };
-
-        for( int i = 0; i < imglist_count; ++i ) {
-            int idx = ( i + first_image ) % imglist_count;
-            if( show_processed ) {
-                if( !imglist[ idx ].orig_pixels || !imglist[ idx ].processed ) {
-                    image = imglist[ idx ];
-                    found = true;
-                    break;
-                }
-            } else {
-                if( !imglist[ idx ].orig_pixels || !imglist[ idx ].sized_pixels ) {
-                    image = imglist[ idx ];
-                    found = true;
-                    break;
-                }
+        if( single_image >= 0 ) {
+            if( !imglist[ single_image ].orig_pixels || !imglist[ single_image ].sized_pixels || !imglist[ single_image ].processed ) {
+                image = imglist[ single_image ];
+                found = true;
             }
-        }
-
-        if( !found ) {
+        } else if( single_face >= 0 ) {
+            if( !imglist[ single_face ].orig_pixels || !imglist[ single_face ].sized_pixels || !imglist[ single_face ].processed ) {
+                image = imglist[ single_face ];
+                found = true;
+            }
+        } else {       
             for( int i = 0; i < imglist_count; ++i ) {
                 int idx = ( i + first_image ) % imglist_count;
-                if( !show_processed ) {
+                if( show_processed ) {
                     if( !imglist[ idx ].orig_pixels || !imglist[ idx ].processed ) {
                         image = imglist[ idx ];
                         found = true;
@@ -447,19 +453,38 @@ int imgedit_process_thread( void* user_data ) {
                     }
                 }
             }
-        }
 
-        if( !found ) {
-            is_image = mode_faces;
-            imglist = !mode_faces ? faces : images;
-            imglist_count = !mode_faces ? faces_count : images_count;
+            if( !found ) {
+                for( int i = 0; i < imglist_count; ++i ) {
+                    int idx = ( i + first_image ) % imglist_count;
+                    if( !show_processed ) {
+                        if( !imglist[ idx ].orig_pixels || !imglist[ idx ].processed ) {
+                            image = imglist[ idx ];
+                            found = true;
+                            break;
+                        }
+                    } else {
+                        if( !imglist[ idx ].orig_pixels || !imglist[ idx ].sized_pixels ) {
+                            image = imglist[ idx ];
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+            }
 
-            for( int i = 0; i < imglist_count; ++i ) {
-                int idx = ( i + first_image ) % imglist_count;
-                if( !imglist[ idx ].orig_pixels || !imglist[ idx ].sized_pixels || !imglist[ idx ].processed ) {
-                    image = imglist[ idx ];
-                    found = true;
-                    break;
+            if( !found ) {
+                is_image = mode_faces;
+                imglist = !mode_faces ? faces : images;
+                imglist_count = !mode_faces ? faces_count : images_count;
+
+                for( int i = 0; i < imglist_count; ++i ) {
+                    int idx = ( i + first_image ) % imglist_count;
+                    if( !imglist[ idx ].orig_pixels || !imglist[ idx ].sized_pixels || !imglist[ idx ].processed ) {
+                        image = imglist[ idx ];
+                        found = true;
+                        break;
+                    }
                 }
             }
         }
@@ -479,20 +504,20 @@ int imgedit_process_thread( void* user_data ) {
                 memcpy( img, image.orig_pixels, sizeof( uint32_t ) * image.orig_width *image.orig_height );
                 if( is_image ) {
                     if( settings[ IMGEDIT_MODE_IMAGES ].use_portrait_processor ) {
-                        process_face( img, image.orig_width, image.orig_height, pixels, outw, outh, palette, &settings[ IMGEDIT_MODE_IMAGES ] );
+                        process_face( img, image.orig_width, image.orig_height, pixels, outw, outh, palette, image.use_individual_settings ? &image.settings : &settings[ IMGEDIT_MODE_IMAGES ] );
                     } else {
-                        process_image( img, image.orig_width, image.orig_height, pixels, outw, outh, palette, &settings[ IMGEDIT_MODE_IMAGES ], resolution_scale );
+                        process_image( img, image.orig_width, image.orig_height, pixels, outw, outh, palette, image.use_individual_settings ? &image.settings : &settings[ IMGEDIT_MODE_IMAGES ], resolution_scale );
                     }
                 } else {
                     if( settings[ IMGEDIT_MODE_FACES ].use_portrait_processor ) {
-                        process_face( img, image.orig_width, image.orig_height, pixels, outw, outh, palette, &settings[ IMGEDIT_MODE_FACES ] );
+                        process_face( img, image.orig_width, image.orig_height, pixels, outw, outh, palette, image.use_individual_settings ? &image.settings : &settings[ IMGEDIT_MODE_FACES ] );
                     } else {
-                        process_image( img, image.orig_width, image.orig_height, pixels, outw, outh, palette, &settings[ IMGEDIT_MODE_FACES ], resolution_scale );
+                        process_image( img, image.orig_width, image.orig_height, pixels, outw, outh, palette, image.use_individual_settings ? &image.settings : &settings[ IMGEDIT_MODE_FACES ], resolution_scale );
                     }
                 }
 
                 if( selected_palette == 1 ) {
-                    dither_rgb9( img, outw, outh, false, resolution_scale );
+                    dither_rgb9( img, outw, outh, settings[ is_image ? IMGEDIT_MODE_IMAGES : IMGEDIT_MODE_FACES ].bayer_dither, resolution_scale );
                 }
 
                 image.processed = (uint32_t*) malloc( sizeof( uint32_t ) * outw * outh ); 
@@ -528,17 +553,24 @@ int imgedit_process_thread( void* user_data ) {
         if( is_image ) {
             list = ARRAY_CAST( imgedit->images );
         }
-
-        for( int i = 0; i < list->count; ++i ) {
-            if( cstr_is_equal( list->items[ i ].filename, image.filename ) ) {
-                if( list->items[ i ].processed == NULL && image.processed != NULL && imgedit->cancel_last_image ) {
-                    free( image.processed );
-                    image.processed = NULL;
+        if( single_image >= 0 ) {
+            image.prev_processed = list->items[ single_image ].prev_processed;
+            list->items[ single_image ] = image;
+        } else if( single_face >= 0 ) {
+            image.prev_processed = list->items[ single_face ].prev_processed;
+            list->items[ single_face ] = image;
+        } else {
+            for( int i = 0; i < list->count; ++i ) {
+                if( cstr_is_equal( list->items[ i ].filename, image.filename ) ) {
+                    if( list->items[ i ].processed == NULL && image.processed != NULL && imgedit->cancel_last_image ) {
+                        free( image.processed );
+                        image.processed = NULL;
+                        break;
+                    }
+                    image.prev_processed = list->items[ i ].prev_processed;
+                    list->items[ i ] = image;
                     break;
                 }
-                image.prev_processed = list->items[ i ].prev_processed;
-                list->items[ i ] = image;
-                break;
             }
         }
     }
@@ -548,6 +580,18 @@ int imgedit_process_thread( void* user_data ) {
     free( images );
     free( faces );
     return 0;
+}
+
+
+void imgedit_invalidate_image( imgedit_image_t* image ) {
+    if( image->processed ) {
+        if( image->prev_processed ) {
+            free( image->prev_processed );
+            image->prev_processed = NULL;
+        }
+        image->prev_processed = image->processed;
+    }
+    image->processed = NULL;
 }
 
 
@@ -570,79 +614,6 @@ void imgedit_invalidate( imgedit_t* imgedit, imgedit_mode_t mode ) {
     }
 
     imgedit->cancel_last_image = true;
-}
-
-
-void imgedit_images( imgedit_t* imgedit, app_input_t input ) {
-    float scroll_delta = 0.0f;
-    for( int i = 0; i < input.count; ++i ) {
-        app_input_event_t* event = &input.events[ i ];
-        if( event->type == APP_INPUT_SCROLL_WHEEL ) {
-            scroll_delta -= event->data.wheel_delta;
-        }
-    }
-
-    array(imgedit_image_t)* imglist = ARRAY_CAST( imgedit->images );
-    if( imgedit->mode == IMGEDIT_MODE_FACES ) {
-        imglist = ARRAY_CAST( imgedit->faces );
-    }
-
-    float scale_factors[] = { 1.0f, 1.25f, 1.5f, 2.0f, 4.5f };
-    float resolution_scale = scale_factors[ imgedit->resolution ];
-    int w = (int)( ( imgedit->mode == IMGEDIT_MODE_FACES ? 112 : 192 ) * resolution_scale );
-    int h = (int)( ( imgedit->mode == IMGEDIT_MODE_FACES ? 112 : 128 ) * resolution_scale );
-
-    imgedit->panels[ imgedit->mode ].scroll += (int)( scroll_delta * 100.0f );
-    int hcount = imgedit->screen_width / ( ( w + 1 ) * imgedit->panels[ imgedit->mode ].scale );
-    hcount = hcount <= 0 ? 1 : hcount; 
-    int vcount = ( imglist->count + hcount - 1  ) / hcount;
-    int max_scroll = vcount * ( ( h + 1 )* imgedit->panels[ imgedit->mode ].scale ) - ( imgedit->screen_height - imgedit->panel_height ) + 8;
-    imgedit->panels[ imgedit->mode ].scroll = imgedit->panels[ imgedit->mode ].scroll > 0 ? imgedit->panels[ imgedit->mode ].scroll : 0;
-    imgedit->panels[ imgedit->mode ].scroll = imgedit->panels[ imgedit->mode ].scroll <= max_scroll ? imgedit->panels[ imgedit->mode ].scroll : max_scroll;
-
-    int screen_width = imgedit->screen_width;
-    int screen_height = imgedit->screen_height - imgedit->panel_height;
-    uint32_t* screen = imgedit->screen + screen_width * imgedit->panel_height;
-
-    for( int y = 0; y < screen_height; ++y ) {
-        for( int x = 0; x < screen_width; ++x ) {
-            int c = ( ( x / ( 10 * imgedit->panels[ imgedit->mode ].scale ) ) + ( ( y - imgedit->panels[ imgedit->mode ].scroll + max_scroll ) / ( 10 * imgedit->panels[ imgedit->mode ].scale ) ) ) % 2;
-            screen[ x + y * screen_width ] = 0x505050 + c * 0x101010;
-        }
-    }
-
-    int xp = 0;
-    int yp = -imgedit->panels[ imgedit->mode ].scroll;
-    int first_image = -1;
-    for( int i = 0; i < imglist->count; ++i ) {
-        imgedit_image_t* image = &imglist->items[ i ];
-        if( xp + image->sized_width * imgedit->panels[ imgedit->mode ].scale >= screen_width ) {
-            xp = 0;
-            yp += ( image->sized_height + 1 ) * imgedit->panels[ imgedit->mode ].scale;
-            if( yp >= screen_height ) {
-                break;
-            }
-        }      
-        if( yp + image->sized_height * imgedit->panels[ imgedit->mode ].scale >= 0 ) {
-            if( first_image == -1 ) {
-                first_image = i;
-            }
-            if( imgedit->panels[ imgedit->mode ].show_processed ) {
-                if( image->processed ) {
-                    imgedit_blit( image->processed, image->sized_width, image->sized_height, xp, yp, imgedit->panels[ imgedit->mode ].scale, screen, screen_width, screen_height );
-                } else if( image->prev_processed ) {
-                    imgedit_blit( image->prev_processed, image->sized_width, image->sized_height, xp, yp, imgedit->panels[ imgedit->mode ].scale, screen, screen_width, screen_height );
-                }
-            } else {
-                if( image->sized_pixels ) {
-                    imgedit_blit( image->sized_pixels, image->sized_width, image->sized_height, xp, yp, imgedit->panels[ imgedit->mode ].scale, screen, screen_width, screen_height );
-                }
-            }
-        }
-        xp += ( image->sized_width + 1 ) * imgedit->panels[ imgedit->mode ].scale;
-    }
-
-    imgedit->first_image = first_image < 0 ? 0 : first_image;
 }
 
 
@@ -788,7 +759,6 @@ void imgedit_disc( imgedit_t* imgedit, int x, int y, int r, uint32_t color ) {
 	}
 }
 
-
 typedef struct imgedit_input_t {
     bool clicked;
     int mouse_x;
@@ -797,7 +767,171 @@ typedef struct imgedit_input_t {
     bool lbutton;
     int lbutton_x;
     int lbutton_y;
+    float scroll_delta;
+    bool esc;
 } imgedit_input_t;
+
+
+void imgedit_images( imgedit_t* imgedit, imgedit_input_t const* input ) {
+    float scroll_delta = input->scroll_delta;
+
+    array(imgedit_image_t)* imglist = ARRAY_CAST( imgedit->images );
+    if( imgedit->mode == IMGEDIT_MODE_FACES ) {
+        imglist = ARRAY_CAST( imgedit->faces );
+    }
+
+    float scale_factors[] = { 1.0f, 1.25f, 1.5f, 2.0f, 4.5f };
+    float resolution_scale = scale_factors[ imgedit->resolution ];
+    int w = (int)( ( imgedit->mode == IMGEDIT_MODE_FACES ? 112 : 192 ) * resolution_scale );
+    int h = (int)( ( imgedit->mode == IMGEDIT_MODE_FACES ? 112 : 128 ) * resolution_scale );
+
+    imgedit->panels[ imgedit->mode ].scroll += (int)( scroll_delta * 100.0f );
+    int hcount = imgedit->screen_width / ( ( w + 1 ) * imgedit->panels[ imgedit->mode ].scale );
+    hcount = hcount <= 0 ? 1 : hcount; 
+    int vcount = ( imglist->count + hcount - 1  ) / hcount;
+    int max_scroll = vcount * ( ( h + 1 )* imgedit->panels[ imgedit->mode ].scale ) - ( imgedit->screen_height - imgedit->panel_height ) + 8;
+    imgedit->panels[ imgedit->mode ].scroll = imgedit->panels[ imgedit->mode ].scroll > 0 ? imgedit->panels[ imgedit->mode ].scroll : 0;
+    imgedit->panels[ imgedit->mode ].scroll = imgedit->panels[ imgedit->mode ].scroll <= max_scroll ? imgedit->panels[ imgedit->mode ].scroll : max_scroll;
+
+    int screen_width = imgedit->screen_width;
+    int screen_height = imgedit->screen_height - imgedit->panel_height;
+    uint32_t* screen = imgedit->screen + screen_width * imgedit->panel_height;
+
+    for( int y = 0; y < screen_height; ++y ) {
+        for( int x = 0; x < screen_width; ++x ) {
+            int c = ( ( x / ( 10 * imgedit->panels[ imgedit->mode ].scale ) ) + ( ( y - imgedit->panels[ imgedit->mode ].scroll + max_scroll ) / ( 10 * imgedit->panels[ imgedit->mode ].scale ) ) ) % 2;
+            screen[ x + y * screen_width ] = 0x505050 + c * 0x101010;
+        }
+    }
+
+    int xp = 0;
+    int yp = -imgedit->panels[ imgedit->mode ].scroll;
+    int first_image = -1;
+    for( int i = 0; i < imglist->count; ++i ) {
+        imgedit_image_t* image = &imglist->items[ i ];
+        if( xp + image->sized_width * imgedit->panels[ imgedit->mode ].scale >= screen_width ) {
+            xp = 0;
+            yp += ( image->sized_height + 1 ) * imgedit->panels[ imgedit->mode ].scale;
+            if( yp >= screen_height ) {
+                break;
+            }
+        }      
+        if( yp + image->sized_height * imgedit->panels[ imgedit->mode ].scale >= 0 ) {
+            if( first_image == -1 ) {
+                first_image = i;
+            }
+            if( imgedit->panels[ imgedit->mode ].show_processed ) {
+                if( image->processed ) {
+                    imgedit_blit( image->processed, image->sized_width, image->sized_height, xp, yp, imgedit->panels[ imgedit->mode ].scale, screen, screen_width, screen_height );
+                } else if( image->prev_processed ) {
+                    imgedit_blit( image->prev_processed, image->sized_width, image->sized_height, xp, yp, imgedit->panels[ imgedit->mode ].scale, screen, screen_width, screen_height );
+                }
+            } else {
+                if( image->sized_pixels ) {
+                    imgedit_blit( image->sized_pixels, image->sized_width, image->sized_height, xp, yp, imgedit->panels[ imgedit->mode ].scale, screen, screen_width, screen_height );
+                }
+            }
+
+            if( image->use_individual_settings ) {
+                imgedit_rect( imgedit, xp, ( yp + imgedit->panel_height ), image->sized_width * imgedit->panels[ imgedit->mode ].scale - 1, image->sized_height * imgedit->panels[ imgedit->mode ].scale - 1, 0xff00ff00 );
+                imgedit_rect( imgedit, xp + 1, ( yp + imgedit->panel_height ) + 1, image->sized_width * imgedit->panels[ imgedit->mode ].scale - 3, image->sized_height * imgedit->panels[ imgedit->mode ].scale - 3, 0xff00ff00 );
+            }
+
+            int mouse_x = input->mouse_x;
+            int mouse_y = input->mouse_y;
+            if( mouse_x >= xp && mouse_y >= ( yp + imgedit->panel_height ) && mouse_y > imgedit->panel_height && mouse_x < xp + image->sized_width * imgedit->panels[ imgedit->mode ].scale && mouse_y < ( yp + imgedit->panel_height ) + image->sized_height * imgedit->panels[ imgedit->mode ].scale ) {
+                imgedit_rect( imgedit, xp, ( yp + imgedit->panel_height ), image->sized_width * imgedit->panels[ imgedit->mode ].scale - 1, image->sized_height * imgedit->panels[ imgedit->mode ].scale - 1, 0xff00ffff );
+                imgedit_rect( imgedit, xp + 1, ( yp + imgedit->panel_height ) + 1, image->sized_width * imgedit->panels[ imgedit->mode ].scale - 3, image->sized_height * imgedit->panels[ imgedit->mode ].scale - 3, 0xff00ffff );
+                for( int y = -1; y < 2; ++y ) {
+                    for( int x = -1; x < 2; ++x ) {
+                        imgedit_text( imgedit, xp + ( x == 0 ? 2 : x ) + ( image->sized_width * imgedit->panels[ imgedit->mode ].scale / 2 ) - ( ( strlen( image->name ) * 9 ) / 2 ), ( yp + imgedit->panel_height ) + ( y == 0 ? 2 : y )  + 2, image->name, 0xff000000 );
+                    }
+                }
+                imgedit_text( imgedit, xp + 0 + ( image->sized_width * imgedit->panels[ imgedit->mode ].scale / 2 ) - ( ( strlen( image->name ) * 9 ) / 2 ), ( yp + imgedit->panel_height ) + 0 + 2, image->name, 0xff00ffff );
+                if( input->clicked ) {
+                    if( imgedit->mode == IMGEDIT_MODE_IMAGES ) {
+                        imgedit->single_image = i;
+                        imgedit->panels[ IMGEDIT_MODE_SINGLE ].settings = imgedit->panels[ IMGEDIT_MODE_IMAGES ].settings;
+                    } else if( imgedit->mode == IMGEDIT_MODE_FACES ) {
+                        imgedit->single_face = i;
+                        imgedit->panels[ IMGEDIT_MODE_SINGLE ].settings = imgedit->panels[ IMGEDIT_MODE_FACES ].settings;
+                    }
+                    if( image->use_individual_settings ) {
+                        imgedit->panels[ IMGEDIT_MODE_SINGLE ].settings = image->settings;
+                    }
+                    imgedit->panels[ IMGEDIT_MODE_SINGLE ].pending_settings = imgedit->panels[ IMGEDIT_MODE_SINGLE ].settings;
+                }
+            }
+        }
+        xp += ( image->sized_width + 1 ) * imgedit->panels[ imgedit->mode ].scale;
+    }
+
+    imgedit->first_image = first_image < 0 ? 0 : first_image;
+}
+
+
+void imgedit_single_image( imgedit_t* imgedit, imgedit_input_t const* input ) {
+    if( input->esc ) {
+        imgedit->single_image = -1;
+        imgedit->single_face = -1;
+        return;
+    }
+
+    int img_index = imgedit->single_image;
+    array(imgedit_image_t)* imglist = ARRAY_CAST( imgedit->images );
+    if( imgedit->single_face >= 0 ) {
+        img_index = imgedit->single_face;
+        imglist = ARRAY_CAST( imgedit->faces );
+    }
+
+    int screen_width = imgedit->screen_width;
+    int screen_height = imgedit->screen_height - imgedit->panel_height;
+    uint32_t* screen = imgedit->screen + screen_width * imgedit->panel_height;
+
+    for( int y = 0; y < screen_height; ++y ) {
+        for( int x = 0; x < screen_width; ++x ) {
+            int c = ( ( x / ( 10 * imgedit->panels[ IMGEDIT_MODE_SINGLE ].scale ) ) + ( ( y ) / ( 10 * imgedit->panels[ IMGEDIT_MODE_SINGLE ].scale ) ) ) % 2;
+            screen[ x + y * screen_width ] = 0x202020 + c * 0x080808;
+        }
+    }
+
+    imgedit_image_t* image = &imglist->items[ img_index ];
+    int xp = ( screen_width - image->sized_width * imgedit->panels[ IMGEDIT_MODE_SINGLE ].scale ) / 2; 
+    int yp = 20;
+    if( imgedit->panels[ IMGEDIT_MODE_SINGLE ].show_processed ) {
+        if( image->processed ) {
+            imgedit_blit( image->processed, image->sized_width, image->sized_height, xp, yp, imgedit->panels[ IMGEDIT_MODE_SINGLE ].scale, screen, screen_width, screen_height );
+        } else if( image->prev_processed ) {
+            imgedit_blit( image->prev_processed, image->sized_width, image->sized_height, xp, yp, imgedit->panels[ IMGEDIT_MODE_SINGLE ].scale, screen, screen_width, screen_height );
+        }
+    } else {
+        if( image->sized_pixels ) {
+            imgedit_blit( image->sized_pixels, image->sized_width, image->sized_height, xp, yp, imgedit->panels[ IMGEDIT_MODE_SINGLE ].scale, screen, screen_width, screen_height );
+        }
+    }
+    
+    for( int y = -1; y < 2; ++y ) {
+        for( int x = -1; x < 2; ++x ) {
+            imgedit_text( imgedit, xp + ( x == 0 ? 2 : x ) + ( image->sized_width * imgedit->panels[ IMGEDIT_MODE_SINGLE ].scale / 2 ) - ( ( strlen( image->filename ) * 9 ) / 2 ), ( yp + imgedit->panel_height ) + image->sized_height * imgedit->panels[ IMGEDIT_MODE_SINGLE ].scale + 10 + ( y == 0 ? 2 : y )  + 2, image->filename, 0xff000000 );
+        }
+    }
+    imgedit_text( imgedit, xp + 0 + ( image->sized_width * imgedit->panels[ IMGEDIT_MODE_SINGLE ].scale / 2 ) - ( ( strlen( image->filename ) * 9 ) / 2 ), ( yp + imgedit->panel_height ) + image->sized_height * imgedit->panels[ IMGEDIT_MODE_SINGLE ].scale + 10 + 2, image->filename, 0xffffffff );
+
+    uint32_t col = 0xffffffff;
+    if( input->mouse_x >= xp - 50 && input->mouse_y >= imgedit->panel_height + 10 && input->mouse_x <= xp && input->mouse_y <= imgedit->panel_height + 50 ) {
+        col = 0xff00ffff;
+        if( input->clicked ) {
+            imgedit->single_image = -1;
+            imgedit->single_face = -1;
+            return;
+        }
+    }
+
+    imgedit_line( imgedit, xp - 50 + 10, 20 + imgedit->panel_height, xp - 50 + 30, 40 + imgedit->panel_height, col );
+    imgedit_line( imgedit, xp - 50 + 11, 20 + imgedit->panel_height, xp - 50 + 31, 40 + imgedit->panel_height, col );
+    imgedit_line( imgedit, xp - 50 + 30, 20 + imgedit->panel_height, xp - 50 + 10, 40 + imgedit->panel_height, col );
+    imgedit_line( imgedit, xp - 50 + 31, 20 + imgedit->panel_height, xp - 50 + 11, 40 + imgedit->panel_height, col );
+}
 
 
 bool imgedit_button( imgedit_t* imgedit, int x, int y, char const* text, bool enabled, imgedit_input_t* input ) {
@@ -1061,6 +1195,16 @@ void imgedit_redo( imgedit_t* imgedit ) {
 
 void imgedit_panel( imgedit_t* imgedit, imgedit_input_t* input ) {
     imgedit_panel_t* panel = &imgedit->panels[ imgedit->mode ];
+    imgedit_image_t* image = NULL;
+    if( imgedit->single_image >= 0 || imgedit->single_face >= 0 ) {
+        panel = &imgedit->panels[ IMGEDIT_MODE_SINGLE ];
+        array(imgedit_image_t)* imglist = ARRAY_CAST( imgedit->images );
+        image = &imglist->items[ imgedit->single_image ];
+        if( imgedit->single_face >= 0 ) {
+            imglist = ARRAY_CAST( imgedit->faces );
+            image = &imglist->items[ imgedit->single_face ];
+        }
+    }
 
     imgedit_input_t dropdown_input = *input;
     if( imgedit->dropdowns[ 0 ].active ) {
@@ -1071,8 +1215,19 @@ void imgedit_panel( imgedit_t* imgedit, imgedit_input_t* input ) {
 
     imgedit_box( imgedit, 0, 0, imgedit->screen_width, imgedit->panel_height, 0xff706860 );
 
-    char const* tabs[] = { "Images", "Faces" };
-    imgedit->mode = (imgedit_mode_t) imgedit_tabs( imgedit, 0, 0, imgedit->screen_width, 26, tabs, sizeof( tabs ) / sizeof( *tabs ), imgedit->mode, input );
+    if( imgedit->single_image < 0 && imgedit->single_face < 0 ) {
+        char const* tabs[] = { "Images", "Faces" };
+        int prev_mode = imgedit->mode;
+        imgedit->mode = (imgedit_mode_t) imgedit_tabs( imgedit, 0, 0, imgedit->screen_width, 26, tabs, sizeof( tabs ) / sizeof( *tabs ), imgedit->mode, input );
+        if( imgedit->mode != prev_mode ) {
+            imgedit->single_image = -1;
+            imgedit->single_face = -1;
+        }
+    } else {
+        char const* tabs[ 1 ];
+        tabs[ 0 ] = image->name;
+        imgedit_tabs( imgedit, 0, 0, imgedit->screen_width, 26, tabs, sizeof( tabs ) / sizeof( *tabs ), 0, input );
+    }
 
     panel->show_processed = imgedit_checkbox( imgedit, 10, 40, "Show processed", panel->show_processed, input );     
 
@@ -1097,28 +1252,40 @@ void imgedit_panel( imgedit_t* imgedit, imgedit_input_t* input ) {
     char const* resolutions[] = { "Retro", "Low", "Medium", "High", };
     imgedit->resolution = imgedit_radiobuttons( imgedit, 1180, 40, resolutions, sizeof( resolutions ) / sizeof( *resolutions ), imgedit->resolution, input );
    
-    imgedit_text( imgedit, 230, 5, "Palette", 0xffffffff );
-    int new_selected_palette = imgedit_dropdown( imgedit, 300, 2, array_item( imgedit->palettes, 0 ), array_count( imgedit->palettes ), &imgedit->dropdowns[ 0 ], imgedit->selected_palette, !imgedit->converting_palette, &dropdown_input );     
-    if( imgedit->converting_palette ) {
-        static int c = 0;
-        ++c;
-        char const* paltxt[] = { "Generating palettte LUT", "Generating palettte LUT.","Generating palettte LUT..","Generating palettte LUT..." };
-        imgedit_text( imgedit, 540, 6, paltxt[ ( c / 8 ) % 4 ], 0xff40ff40 );
+    int new_selected_palette = imgedit->selected_palette;
+    if( imgedit->single_image < 0 && imgedit->single_face < 0 ) {
+        imgedit_text( imgedit, 230, 5, "Palette", 0xffffffff );
+        int new_selected_palette = imgedit_dropdown( imgedit, 300, 2, array_item( imgedit->palettes, 0 ), array_count( imgedit->palettes ), &imgedit->dropdowns[ 0 ], imgedit->selected_palette, !imgedit->converting_palette, &dropdown_input );     
+        if( imgedit->converting_palette ) {
+            static int c = 0;
+            ++c;
+            char const* paltxt[] = { "Generating palettte LUT", "Generating palettte LUT.","Generating palettte LUT..","Generating palettte LUT..." };
+            imgedit_text( imgedit, 540, 6, paltxt[ ( c / 8 ) % 4 ], 0xff40ff40 );
+        }
     }
 
     bool apply = imgedit_button( imgedit, 10, 125, "Apply", !panel->preview_changes, input );
 
     if( imgedit_button( imgedit, 90, 125, "Reset", true, input ) ) {
-        panel->pending_settings.use_portrait_processor = ( imgedit->mode == IMGEDIT_MODE_FACES );
-        panel->pending_settings.bayer_dither = false;
-        panel->pending_settings.brightness = 0.5f;
-        panel->pending_settings.contrast = 0.5f;
-        panel->pending_settings.saturation = 0.5f;
-        panel->pending_settings.auto_contrast = ( imgedit->mode == IMGEDIT_MODE_FACES ) ? 0.0f : 1.0f;
-        panel->pending_settings.sharpen_radius = ( imgedit->mode == IMGEDIT_MODE_FACES ) ? 0.0f : 0.15f;
-        panel->pending_settings.sharpen_strength = ( imgedit->mode == IMGEDIT_MODE_FACES ) ? 0.0f : 1.0f;
-        panel->pending_settings.vignette_size = 0.0f;
-        panel->pending_settings.vignette_opacity = 0.0f;
+        if( imgedit->single_image < 0 && imgedit->single_face < 0 ) {
+            panel->pending_settings.use_portrait_processor = ( imgedit->mode == IMGEDIT_MODE_FACES );
+            panel->pending_settings.bayer_dither = false;
+            panel->pending_settings.brightness = 0.5f;
+            panel->pending_settings.contrast = 0.5f;
+            panel->pending_settings.saturation = 0.5f;
+            panel->pending_settings.auto_contrast = ( imgedit->mode == IMGEDIT_MODE_FACES ) ? 0.0f : 1.0f;
+            panel->pending_settings.sharpen_radius = ( imgedit->mode == IMGEDIT_MODE_FACES ) ? 0.0f : 0.15f;
+            panel->pending_settings.sharpen_strength = ( imgedit->mode == IMGEDIT_MODE_FACES ) ? 0.0f : 1.0f;
+            panel->pending_settings.vignette_size = 0.0f;
+            panel->pending_settings.vignette_opacity = 0.0f;
+        } else {
+            image->use_individual_settings = false;
+            panel->settings = imgedit->single_image >= 0 ? imgedit->panels[ IMGEDIT_MODE_IMAGES ].settings : imgedit->panels[ IMGEDIT_MODE_FACES ].settings;
+            panel->pending_settings = panel->settings;
+            cstr_t ini_filename = cstr_cat( image->filename, ".ini"  );
+            delete_file( ini_filename );
+            imgedit_invalidate_image( image );
+        }
     }
 
     bool changes = false;
@@ -1133,7 +1300,6 @@ void imgedit_panel( imgedit_t* imgedit, imgedit_input_t* input ) {
     changes |= panel->pending_settings.vignette_size != panel->settings.vignette_size;
     changes |= panel->pending_settings.vignette_opacity != panel->settings.vignette_opacity;
     if( changes && ( panel->preview_changes || apply ) ) {
-        imgedit_invalidate( imgedit, imgedit->mode );
         process_settings_t undo = panel->pending_settings;
         if( panel->sliders[ 0 ].active ) undo.brightness = panel->sliders[ 0 ].start_value;
         if( panel->sliders[ 1 ].active ) undo.contrast = panel->sliders[ 1 ].start_value;
@@ -1145,7 +1311,16 @@ void imgedit_panel( imgedit_t* imgedit, imgedit_input_t* input ) {
         if( panel->sliders[ 7 ].active ) undo.vignette_opacity = panel->sliders[ 7 ].start_value;
         imgedit_add_undo_state( panel, undo );
         panel->settings = panel->pending_settings;
-        imgedit_save_settings( panel->settings, imgedit->mode == IMGEDIT_MODE_IMAGES ? "images/settings.ini" : "faces/settings.ini" );
+        if( imgedit->single_image >= 0 || imgedit->single_face >= 0 ) {
+            cstr_t ini_filename = cstr_cat( image->filename, ".ini"  );
+            imgedit_save_settings( panel->settings, ini_filename );
+            image->settings = panel->settings;
+            image->use_individual_settings = true;
+            imgedit_invalidate_image( image );
+        } else {
+            imgedit_invalidate( imgedit, imgedit->mode );
+            imgedit_save_settings( panel->settings, imgedit->mode == IMGEDIT_MODE_IMAGES ? "images/settings.ini" : "faces/settings.ini" );
+        }
     }
     if( new_selected_palette != imgedit->selected_palette ) {
         imgedit_invalidate( imgedit, IMGEDIT_MODE_IMAGES );
@@ -1190,6 +1365,8 @@ int imgedit_proc( app_t* app, void* user_data ) {
     app_title( app, "Yarnspin Image Editor" );
 
     imgedit_t imgedit = { 0 };
+    imgedit.single_image = -1;
+    imgedit.single_face = -1;
     imgedit.resolution = ini_resolution;
 
     imgedit.palettes = array_create( cstr_t );
@@ -1238,7 +1415,7 @@ int imgedit_proc( app_t* app, void* user_data ) {
     for( int i = 0; i < IMGEDIT_MODECOUNT; ++i ) {
         imgedit.panels[ i ].show_processed = false;
         imgedit.panels[ i ].preview_changes = true;
-        imgedit.panels[ i ].scale = 2;
+        imgedit.panels[ i ].scale = i == IMGEDIT_MODE_SINGLE ? 3 : 2;
         imgedit.panels[ i ].scroll = 0;
         imgedit.panels[ i ].settings.use_portrait_processor = ( i == IMGEDIT_MODE_FACES );
         imgedit.panels[ i ].settings.brightness = 0.5f;
@@ -1286,11 +1463,10 @@ int imgedit_proc( app_t* app, void* user_data ) {
 
         thread_mutex_lock( &imgedit.mutex );
         
-        imgedit_images( &imgedit, input );
-
         imgedit_input_t imgedit_input = { false };
         imgedit_input.mouse_x = app_pointer_x( app );
         imgedit_input.mouse_y = app_pointer_y( app );
+
         for( int i = 0; i < input.count; ++i ) {
             app_input_event_t* event = &input.events[ i ];
             if( event->type == APP_INPUT_KEY_DOWN ) {
@@ -1299,6 +1475,9 @@ int imgedit_proc( app_t* app, void* user_data ) {
                     lbutton = true;
                     lbutton_x = imgedit_input.mouse_x;
                     lbutton_y = imgedit_input.mouse_y;
+                }
+                if( event->data.key == APP_KEY_ESCAPE ) {
+                    imgedit_input.esc = true;
                 }
                 if( event->data.key == APP_KEY_SHIFT ) {
                     shift = true;
@@ -1328,10 +1507,19 @@ int imgedit_proc( app_t* app, void* user_data ) {
                     ctrl = false;
                 }
             }
+            if( event->type == APP_INPUT_SCROLL_WHEEL ) {
+                imgedit_input.scroll_delta -= event->data.wheel_delta;
+            }
         }
         imgedit_input.lbutton = lbutton;
         imgedit_input.lbutton_x = lbutton_x;
         imgedit_input.lbutton_y = lbutton_y;
+
+        if( imgedit.single_image >= 0 || imgedit.single_face >= 0 ) {
+            imgedit_single_image( &imgedit, &imgedit_input );
+        } else {
+            imgedit_images( &imgedit, &imgedit_input );
+        }
 
         imgedit_panel( &imgedit, &imgedit_input );
 

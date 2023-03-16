@@ -64,6 +64,7 @@ int g_cache_version = 0;
 char const* cextname( char const* path );
 char const* cbasename( char const* path );
 
+void delete_file( char const* filename );
 void create_path( char const* path, int pos );
 int file_more_recent( char const* source_path, char const* output_path );
 int file_exists( char const* filename );
@@ -784,6 +785,14 @@ void makedir( char const* path ) {
     #endif
 }
 
+
+void delete_file( char const* filename ) {
+    #ifdef _WIN32
+        DeleteFileA( filename );
+    #else
+        remove( filename );
+    #endif
+}
 
 void create_path( char const* path, int pos ) {
     pos = cstr_find( path, "/", pos );

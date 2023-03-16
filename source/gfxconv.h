@@ -957,6 +957,8 @@ paldither_palette_t* convert_palette( string palette_filename, size_t* palette_s
 
 
 palrle_data_t* convert_bitmap( string image_filename, int width, int height, string palette_filename, paldither_palette_t* palette, float resolution_scale ) {
+    string ini_filename = cstr_cat( image_filename, ".ini" ); 
+
     bool is_face = false;
     if( cstr_starts( image_filename, "faces/" ) ) {
         is_face = true;
@@ -979,7 +981,8 @@ palrle_data_t* convert_bitmap( string image_filename, int width, int height, str
         g_cache_version != YARNSPIN_VERSION ||
         file_more_recent( cstr_cat( is_face ? "faces/" : "images/", image_filename ), processed_filename ) ||
         file_more_recent( cstr_cat( is_face ? "faces/" : "images/", image_filename ), intermediate_processed_filename ) ||
-        file_more_recent( is_face ? "faces/settings.ini" : "images/settings.ini", processed_filename ) ) {
+        file_more_recent( is_face ? "faces/settings.ini" : "images/settings.ini", processed_filename ) || 
+        ( file_exists( ini_filename ) && file_more_recent( ini_filename, processed_filename ) ) ) {
 
         int w, h, c;
         stbi_uc* img = stbi_load( cstr_cat( is_face ? "faces/" : "images/", image_filename ), &w, &h, &c, 4 );
@@ -998,6 +1001,9 @@ palrle_data_t* convert_bitmap( string image_filename, int width, int height, str
 
         process_settings_t settings;
         bool have_settings = load_settings( &settings, is_face ? "faces/settings.ini" : "images/settings.ini" );
+        if( file_exists( ini_filename ) ) {
+            load_settings( &settings, ini_filename );
+        }
 
         bool use_portrait_processor = is_face;
         if( have_settings ) use_portrait_processor = settings.use_portrait_processor;
@@ -1326,6 +1332,8 @@ typedef struct qoi_data_t {
 
 
 qoi_data_t* convert_rgb( string image_filename, int width, int height, int bpp, float resolution_scale ) {
+    string ini_filename = cstr_cat( image_filename, ".ini" ); 
+
     bool is_face = false;
     if( cstr_starts( image_filename, "faces/" ) ) {
         is_face = true;
@@ -1347,7 +1355,8 @@ qoi_data_t* convert_rgb( string image_filename, int width, int height, int bpp, 
         g_cache_version != YARNSPIN_VERSION ||
         file_more_recent( cstr_cat( is_face ? "faces/" : "images/", image_filename ), processed_filename ) ||
         file_more_recent( cstr_cat( is_face ? "faces/" : "images/", image_filename ), intermediate_processed_filename ) ||
-        file_more_recent( is_face ? "faces/settings.ini" : "images/settings.ini", processed_filename ) ) {
+        file_more_recent( is_face ? "faces/settings.ini" : "images/settings.ini", processed_filename ) ||
+        ( file_exists( ini_filename ) && file_more_recent( ini_filename, processed_filename ) ) ) {
 
         int w, h, c;
         stbi_uc* img = stbi_load( cstr_cat( is_face ? "faces/" : "images/", image_filename ), &w, &h, &c, 4 );
@@ -1364,6 +1373,9 @@ qoi_data_t* convert_rgb( string image_filename, int width, int height, int bpp, 
 
         process_settings_t settings;
         bool have_settings = load_settings( &settings, is_face ? "faces/settings.ini" : "images/settings.ini" );
+        if( file_exists( ini_filename ) ) {
+            load_settings( &settings, ini_filename );
+        }
 
         bool use_portrait_processor = is_face;
         if( have_settings ) use_portrait_processor = settings.use_portrait_processor;
