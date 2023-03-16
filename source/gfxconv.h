@@ -1167,11 +1167,7 @@ unsigned char custom_dither_pattern[ 4 * 4 * 7 ] =  {
 	1,1,1,1,
 };
 
-void dither_rgb9( uint32_t* pixels, int width, int height, bool use_bayer_dither, float resolution_scale ) {
-    img_t sobel_img = img_from_abgr32( pixels, width, height );
-    float radius = resolution_scale / 3.0f;
-    sobel( &sobel_img, radius, 0.5f );
-    
+void dither_rgb9( uint32_t* pixels, int width, int height, bool use_bayer_dither ) {
     for( int y = 0; y < height; ++y ) {
         for( int x = 0; x < width; ++x ) {
             uint32_t src = pixels[ x + y * width ];
@@ -1196,12 +1192,6 @@ void dither_rgb9( uint32_t* pixels, int width, int height, bool use_bayer_dither
             int diff_g = sg - dg;
             int diff_b = sb - db;
 
-            if( sobel_img.pixels[ x + y * width ].r < 0.75f || sobel_img.pixels[ x + y * width ].g < 0.75f || sobel_img.pixels[ x + y * width ].b < 0.75f) {
-                diff_r = diff_r < 16 ? 0 : 31;
-                diff_g = diff_g < 16 ? 0 : 31;
-                diff_b = diff_b < 16 ? 0 : 31;
-            }
-
             if( use_bayer_dither ) {
                 dr = bayer_dither_pattern[ ( ( diff_r * 17 ) / 32 ) * 4 * 4 + ( x % 4 ) + ( y % 4 ) * 4 ] ? br : dr;
                 dg = bayer_dither_pattern[ ( ( diff_g * 17 ) / 32 ) * 4 * 4 + ( x % 4 ) + ( y % 4 ) * 4 ] ? bg : dg;
@@ -1211,15 +1201,11 @@ void dither_rgb9( uint32_t* pixels, int width, int height, bool use_bayer_dither
                 dg = custom_dither_pattern[ ( ( diff_g * 7 ) / 32 ) * 4 * 4 + ( x % 4 ) + ( y % 4 ) * 4 ] ? bg : dg;
                 db = custom_dither_pattern[ ( ( diff_b * 7 ) / 32 ) * 4 * 4 + ( x % 4 ) + ( y % 4 ) * 4 ] ? bb : db;
             }
-            //dr = (uint32_t)( 255.0f * sobel_img.pixels[ x + y * width ].r );
-            //dg = (uint32_t)( 255.0f * sobel_img.pixels[ x + y * width ].g );
-            //db = (uint32_t)( 255.0f * sobel_img.pixels[ x + y * width ].b );
 
             uint32_t dst = ( a << 24 ) | ( db << 16 ) | ( dg << 8 ) | dr;
             pixels[ x + y * width ] = dst;
         }
     }
-    img_free( &sobel_img );
 }
 
 
@@ -1389,7 +1375,7 @@ qoi_data_t* convert_rgb( string image_filename, int width, int height, int bpp, 
             dither_rgb8( (uint32_t*) img, outw, outh, false, resolution_scale );
         }
         if( bpp == 9 ) {
-            dither_rgb9( (uint32_t*) img, outw, outh, false, resolution_scale );
+            dither_rgb9( (uint32_t*) img, outw, outh, false );
         }
 
         create_path( processed_filename, 0 );

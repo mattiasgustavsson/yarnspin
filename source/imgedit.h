@@ -503,13 +503,13 @@ int imgedit_process_thread( void* user_data ) {
                 uint32_t* img = (uint32_t*) malloc( sizeof( uint32_t ) * image.orig_width *image.orig_height );
                 memcpy( img, image.orig_pixels, sizeof( uint32_t ) * image.orig_width *image.orig_height );
                 if( is_image ) {
-                    if( settings[ IMGEDIT_MODE_IMAGES ].use_portrait_processor ) {
+                    if( settings[ single_image >= 0 ? IMGEDIT_MODE_SINGLE : IMGEDIT_MODE_IMAGES ].use_portrait_processor ) {
                         process_face( img, image.orig_width, image.orig_height, pixels, outw, outh, palette, image.use_individual_settings ? &image.settings : &settings[ IMGEDIT_MODE_IMAGES ] );
                     } else {
                         process_image( img, image.orig_width, image.orig_height, pixels, outw, outh, palette, image.use_individual_settings ? &image.settings : &settings[ IMGEDIT_MODE_IMAGES ], resolution_scale );
                     }
                 } else {
-                    if( settings[ IMGEDIT_MODE_FACES ].use_portrait_processor ) {
+                    if( settings[ single_face >= -0 ? IMGEDIT_MODE_SINGLE :IMGEDIT_MODE_FACES ].use_portrait_processor ) {
                         process_face( img, image.orig_width, image.orig_height, pixels, outw, outh, palette, image.use_individual_settings ? &image.settings : &settings[ IMGEDIT_MODE_FACES ] );
                     } else {
                         process_image( img, image.orig_width, image.orig_height, pixels, outw, outh, palette, image.use_individual_settings ? &image.settings : &settings[ IMGEDIT_MODE_FACES ], resolution_scale );
@@ -517,7 +517,7 @@ int imgedit_process_thread( void* user_data ) {
                 }
 
                 if( selected_palette == 1 ) {
-                    dither_rgb9( img, outw, outh, settings[ is_image ? IMGEDIT_MODE_IMAGES : IMGEDIT_MODE_FACES ].bayer_dither, resolution_scale );
+                    dither_rgb9( img, outw, outh, settings[ single_image >= 0 || single_face >= 0 ? IMGEDIT_MODE_SINGLE : is_image ? IMGEDIT_MODE_IMAGES : IMGEDIT_MODE_FACES ].bayer_dither );
                 }
 
                 image.processed = (uint32_t*) malloc( sizeof( uint32_t ) * outw * outh ); 
