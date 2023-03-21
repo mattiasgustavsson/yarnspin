@@ -35,6 +35,8 @@ typedef struct stack_entry_t {
 typedef struct game_t {
     bool exit_flag;
     bool exit_requested;
+    bool restart_requested;    
+    bool quickload_requested;
     gamestate_t current_state;
     gamestate_t new_state;
     bool disable_transition;
@@ -77,34 +79,34 @@ typedef struct game_t {
         array(bool)* flags;
         array(int)* items;
         array(stack_entry_t)* section_stack;
-    } state;
+    } state, quicksave;
     rgbimage_t** rgbimages;
 } game_t;
 
 
-void game_init( game_t* game, yarn_t* yarn, input_t* input, uint8_t* screen, uint32_t* screen_rgb, int width, int height ) {
+void game_restart( game_t* game ) {
     game->state.current_location = -1;
     game->state.current_dialog = -1;
     game->state.current_image = -1;
     game->state.logo_index = 0;
-    game->state.flags = managed_array( bool );
-    game->state.items = managed_array( int );
-    game->state.section_stack = managed_array( stack_entry_t );
-    game->state.current_location = yarn->start_location;
-    game->state.current_dialog = yarn->start_dialog;
-    if( yarn->is_debug && yarn->debug_start_location >= 0 ) {
-        game->state.current_location = yarn->debug_start_location;
+    array_clear( game->state.flags );
+    array_clear( game->state.items  );
+    array_clear( game->state.section_stack );
+    game->state.current_location = game->yarn->start_location;
+    game->state.current_dialog = game->yarn->start_dialog;
+    if( game->yarn->is_debug && game->yarn->debug_start_location >= 0 ) {
+        game->state.current_location = game->yarn->debug_start_location;
         game->state.current_dialog = -1;
     }
-    if( yarn->is_debug && yarn->debug_start_dialog  >= 0 ) {
-        game->state.current_dialog = yarn->debug_start_dialog;
+    if( game->yarn->is_debug && game->yarn->debug_start_dialog  >= 0 ) {
+        game->state.current_dialog = game->yarn->debug_start_dialog;
         game->state.current_location = -1;
     }
-    for( int i = 0; i < yarn->flag_ids->count; ++i ) {
+    for( int i = 0; i < game->yarn->flag_ids->count; ++i ) {
         bool value = false;
-        if( yarn->is_debug ) {
-            for( int j = 0; j < yarn->globals.debug_set_flags->count; ++j ) {
-                if( CMP( yarn->flag_ids->items[ i ], yarn->globals.debug_set_flags->items[ j ] ) ) {
+        if( game->yarn->is_debug ) {
+            for( int j = 0; j < game->yarn->globals.debug_set_flags->count; ++j ) {
+                if( CMP( game->yarn->flag_ids->items[ i ], game->yarn->globals.debug_set_flags->items[ j ] ) ) {
                     value = true;
                     break;
                 }
@@ -113,16 +115,96 @@ void game_init( game_t* game, yarn_t* yarn, input_t* input, uint8_t* screen, uin
         array_add( game->state.flags, &value );
     }
 
-    for( int i = 0; i < yarn->item_ids->count; ++i ) {
-        if( yarn->is_debug ) {
-            for( int j = 0; j < yarn->globals.debug_get_items->count; ++j ) {
-                if( CMP( yarn->item_ids->items[ i ], yarn->globals.debug_get_items->items[ j ] ) ) {
+    for( int i = 0; i < game->yarn->item_ids->count; ++i ) {
+        if( game->yarn->is_debug ) {
+            for( int j = 0; j < game->yarn->globals.debug_get_items->count; ++j ) {
+                if( CMP( game->yarn->item_ids->items[ i ], game->yarn->globals.debug_get_items->items[ j ] ) ) {
                     array_add( game->state.items, &i );
                     break;
                 }
             }
         }
     }
+
+    game->current_state = GAMESTATE_NO_CHANGE;
+    game->new_state = GAMESTATE_BOOT;
+    game->disable_transition = false;
+    game->transition_counter = 10;
+    game->queued_location = -1;
+    game->queued_dialog = -1;
+    game->restart_requested = false;    
+    game->quickload_requested = false;
+}
+
+
+void game_quicksave( game_t* game ) {
+    game->quicksave.current_location = game->state.current_location;    
+    game->quicksave.current_dialog = game->state.current_dialog;    
+    game->quicksave.current_image = game->state.current_image;    
+    game->quicksave.logo_index = game->state.logo_index;    
+    array_clear( game->quicksave.flags );
+    for( int i = 0; i < game->state.flags->count; ++i ) {
+        array_add( game->quicksave.flags, &game->state.flags->items[ i ] );
+    }
+    array_clear( game->quicksave.items );
+    for( int i = 0; i < game->state.items->count; ++i ) {
+        array_add( game->quicksave.items, &game->state.items->items[ i ] );
+    }
+    array_clear( game->quicksave.section_stack );
+    for( int i = 0; i < game->state.section_stack->count; ++i ) {
+        array_add( game->quicksave.section_stack, &game->state.section_stack->items[ i ] );
+    }
+}
+
+
+void game_quickload( game_t* game ) {
+    game_restart( game );
+    game->quickload_requested = false;
+
+    game->state.current_location = game->quicksave.current_location;    
+    game->state.current_dialog = game->quicksave.current_dialog;    
+    game->state.current_image = game->quicksave.current_image;    
+    game->state.logo_index = game->quicksave.logo_index;    
+    array_clear( game->state.flags );
+    for( int i = 0; i < game->quicksave.flags->count; ++i ) {
+        array_add( game->state.flags, &game->quicksave.flags->items[ i ] );
+    }
+    array_clear( game->state.items );
+    for( int i = 0; i < game->quicksave.items->count; ++i ) {
+        array_add( game->state.items, &game->quicksave.items->items[ i ] );
+    }
+    array_clear( game->state.section_stack );
+    for( int i = 0; i < game->quicksave.section_stack->count; ++i ) {
+        array_add( game->state.section_stack, &game->quicksave.section_stack->items[ i ] );
+    }
+
+    if( game->state.current_location >= 0 ) {
+        game->new_state = GAMESTATE_LOCATION;
+    } else if( game->state.current_dialog >= 0 ) {
+        game->new_state = GAMESTATE_DIALOG;
+    }
+}
+
+
+void game_init( game_t* game, yarn_t* yarn, input_t* input, uint8_t* screen, uint32_t* screen_rgb, int width, int height ) {
+    game->exit_flag = false;
+    game->exit_requested = false;
+    game->screen = screen;
+    game->screen_rgb = screen_rgb;
+    game->screen_width = width;
+    game->screen_height = height;
+    game->input = input;
+    game->yarn = yarn;
+    
+    game->state.flags = managed_array( bool );
+    game->state.items = managed_array( int );
+    game->state.section_stack = managed_array( stack_entry_t );
+
+    game->quicksave.flags = managed_array( bool );
+    game->quicksave.items = managed_array( int );
+    game->quicksave.section_stack = managed_array( stack_entry_t );
+
+    game_restart( game );
 
     int darkest_index = 0;
     int darkest_luma = 65536;
@@ -161,20 +243,6 @@ void game_init( game_t* game, yarn_t* yarn, input_t* input, uint8_t* screen, uin
         }
     }
 
-    game->exit_flag = false;
-    game->exit_requested = false;
-    game->current_state = GAMESTATE_NO_CHANGE;
-    game->new_state = GAMESTATE_BOOT;
-    game->disable_transition = false;
-    game->transition_counter = 10;
-    game->screen = screen;
-    game->screen_rgb = screen_rgb;
-    game->screen_width = width;
-    game->screen_height = height;
-    game->input = input;
-    game->yarn = yarn;
-    game->queued_location = -1;
-    game->queued_dialog = -1;
     game->font_txt = yarn->assets.font_description;
     game->font_opt = yarn->assets.font_options;
     game->font_chr = yarn->assets.font_characters;
@@ -262,6 +330,14 @@ void game_update( game_t* game ) {
                 new_state = terminate_init( game );
                 break;
         }
+        if( game->restart_requested ) {
+            game_restart( game );
+            return;
+        }
+        if( game->quickload_requested ) {
+            game_quickload( game );
+            return;
+        }
         game->new_state = new_state;
         return;
     }
@@ -295,6 +371,14 @@ void game_update( game_t* game ) {
         case GAMESTATE_TERMINATE:
             new_state = terminate_update( game );
             break;
+    }
+    if( game->restart_requested ) {
+        game_restart( game );
+        return;
+    }
+    if( game->quickload_requested ) {
+        game_quickload( game );
+        return;
     }
     game->new_state = new_state;
     if( game->exit_requested ) {
@@ -542,6 +626,15 @@ void do_actions( game_t* game, array_param(yarn_act_t)* act_param ) {
                         game->queued_dialog = entry.index;
                     }
                 }
+            } break;
+            case ACTION_TYPE_RESTART: {
+                game->restart_requested = true;    
+            } break;
+            case ACTION_TYPE_QUICKSAVE: {
+                game_quicksave( game );
+            } break;
+            case ACTION_TYPE_QUICKLOAD: {
+                game->quickload_requested = true;
             } break;
             case ACTION_TYPE_FLAG_SET: {
                 game->state.flags->items[ action->param_flag_index ] = true;

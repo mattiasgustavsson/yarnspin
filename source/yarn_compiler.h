@@ -366,6 +366,12 @@ bool compile_action( array_param(string)* data_param, yarn_act_t* compiled_actio
         compiled_action->type = ACTION_TYPE_EXIT;
     } else if( CMP( command, "return" ) ) {
         compiled_action->type = ACTION_TYPE_RETURN;
+    } else if( CMP( command, "restart" ) ) {
+        compiled_action->type = ACTION_TYPE_RESTART;
+    } else if( CMP( command, "quicksave" ) ) {
+        compiled_action->type = ACTION_TYPE_QUICKSAVE;
+    } else if( CMP( command, "quickload" ) ) {
+        compiled_action->type = ACTION_TYPE_QUICKLOAD;
     } else if( skip_word_if_match( &command, "set" ) ) {
         compiled_action->type = ACTION_TYPE_FLAG_SET;
         int flag_index = find_flag_index( command, yarn );
