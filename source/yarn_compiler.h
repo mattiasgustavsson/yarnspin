@@ -271,6 +271,18 @@ bool extract_declaration_fields( parser_section_t* section, yarn_t* yarn, compil
                     item.line_number = decl->line_number;
                     add_unique_item( context->items_dropped, &item );
                     add_unique_id( yarn->item_ids, str );
+                } else if( skip_word_if_match( &str, "attach" ) ) {
+                    char_t chr;
+                    chr.id = str;
+                    chr.filename = decl->filename;
+                    chr.line_number = decl->line_number;
+                    add_unique_char( context->chars_referenced, &chr );
+                } else if( skip_word_if_match( &str, "detach" ) ) {
+                    char_t chr;
+                    chr.id = str;
+                    chr.filename = decl->filename;
+                    chr.line_number = decl->line_number;
+                    add_unique_char( context->chars_referenced, &chr );
                 }
             }
         } else if( CMP( decl->keyword, "use" ) ) {
@@ -392,6 +404,14 @@ bool compile_action( array_param(string)* data_param, yarn_act_t* compiled_actio
         compiled_action->type = ACTION_TYPE_ITEM_DROP;
         int item_index = find_item_index( command, yarn );
         compiled_action->param_item_index = item_index;
+    } else if( skip_word_if_match( &command, "attach" ) ) {
+        compiled_action->type = ACTION_TYPE_CHAR_ATTACH;
+        int char_index = find_character_index( command, context );
+        compiled_action->param_char_index = char_index;
+    } else if( skip_word_if_match( &command, "detach" ) ) {
+        compiled_action->type = ACTION_TYPE_CHAR_DETACH;
+        int char_index = find_character_index( command, context );
+        compiled_action->param_char_index = char_index;
     } else if( find_location_index( command, context ) >= 0 ) {
         compiled_action->type = ACTION_TYPE_GOTO_LOCATION;
         int location_index = find_location_index( command, context );
@@ -722,6 +742,7 @@ bool compile_character( parser_section_t* section, yarn_t* yarn ) {
     bool no_error = true;
 
     yarn_character_t* character = array_add( yarn->characters, empty_character() ) ;
+    character->id = section->id;
     for( int i = 0; i < section->declarations->count; ++i ) {
         parser_declaration_t* decl = &section->declarations->items[ i ];
         if( CMP( decl->keyword, "name" ) ) {
@@ -924,6 +945,16 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
                     array_add( yarn->globals.debug_get_items, &item );
                 } else {
                     printf( "%s(%d): invalid debug_get_items declaration '%s: %s'. Item index %d is empty\n", global->filename, global->line_number, global->keyword, concat_data( global->data ), j + 1 );
+                    no_error = false;
+                }
+            }
+        } else if( CMP( global->keyword, "debug_attach_chars" ) ) {
+            for( int j = 0; j < global->data->count; ++j ) {
+                if( cstr_len( cstr_trim( global->data->items[ j ] ) ) > 0 ) {
+                    string_id char_id = cstr_trim( global->data->items[ j ] );
+                    array_add( yarn->globals.debug_attach_chars, &char_id );
+                } else {
+                    printf( "%s(%d): invalid debug_attach_chars declaration '%s: %s'. Char index %d is empty\n", global->filename, global->line_number, global->keyword, concat_data( global->data ), j + 1 );
                     no_error = false;
                 }
             }

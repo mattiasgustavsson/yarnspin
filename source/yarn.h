@@ -47,6 +47,15 @@ void read_string_array( buffer_t* in, array_param(string)* array ) {
 }
 
 
+void read_int_array( buffer_t* in, array_param(int)* array ) {
+    int count = read_int( in );
+    for( int i = 0; i < count; ++i ) {
+        int value = read_int( in );
+        array_add( array, &value );
+    }
+}
+
+
 typedef struct yarn_cond_flag_t {
     bool is_not;
     int flag_index;
@@ -126,6 +135,8 @@ typedef enum yarn_action_type_t {
     ACTION_TYPE_FLAG_TOGGLE,
     ACTION_TYPE_ITEM_GET,
     ACTION_TYPE_ITEM_DROP,
+    ACTION_TYPE_CHAR_ATTACH,
+    ACTION_TYPE_CHAR_DETACH,
 } yarn_action_type_t;
 
 
@@ -136,6 +147,7 @@ typedef struct yarn_act_t {
     int param_dialog_index;
     int param_flag_index;
     int param_item_index;
+    int param_char_index;
 } yarn_act_t;
 
 
@@ -147,6 +159,7 @@ yarn_act_t* empty_act( void ) {
     act.param_dialog_index = -1;
     act.param_flag_index = -1;
     act.param_item_index = -1;
+    act.param_char_index = -1;
     return &act;
 }
 
@@ -159,6 +172,7 @@ void save_act( buffer_t* out, yarn_act_t* act ) {
     buffer_write_i32( out, &act->param_dialog_index, 1 );
     buffer_write_i32( out, &act->param_flag_index, 1 );
     buffer_write_i32( out, &act->param_item_index, 1 );
+    buffer_write_i32( out, &act->param_char_index, 1 );
 }
 
 
@@ -169,6 +183,7 @@ void load_act( buffer_t* in, yarn_act_t* act ) {
     act->param_dialog_index = read_int( in );
     act->param_flag_index = read_int( in );
     act->param_item_index = read_int( in );
+    act->param_char_index = read_int( in );
 }
 
 
@@ -586,6 +601,7 @@ void load_dialog( buffer_t* in, yarn_dialog_t* dialog ) {
 
 
 typedef struct yarn_character_t {
+    string id;
     string name;
     string short_name;
     int face_index;
@@ -594,6 +610,7 @@ typedef struct yarn_character_t {
 
 yarn_character_t* empty_character( void ) {
     static yarn_character_t character;
+    character.id = NULL;
     character.name = NULL;
     character.short_name = NULL;
     character.face_index = -1;
@@ -602,6 +619,7 @@ yarn_character_t* empty_character( void ) {
 
 
 void save_character( buffer_t* out, yarn_character_t* character ) {
+    buffer_write_string( out, &character->id, 1 );
     buffer_write_string( out, &character->name, 1 );
     buffer_write_string( out, &character->short_name, 1 );
     buffer_write_i32( out, &character->face_index, 1 );
@@ -609,6 +627,7 @@ void save_character( buffer_t* out, yarn_character_t* character ) {
 
 
 void load_character( buffer_t* in, yarn_character_t* character ) {
+    character->id = read_string( in );
     character->name = read_string( in );
     character->short_name = read_string( in );
     character->face_index = read_int( in );
@@ -679,6 +698,7 @@ typedef struct yarn_globals_t {
 
     array(string_id)* debug_set_flags;
     array(string_id)* debug_get_items;
+    array(string_id)* debug_attach_chars;
 } yarn_globals_t;
 
 
@@ -720,6 +740,7 @@ yarn_globals_t* empty_globals( void ) {
     globals.items = managed_array(string_id);
     globals.debug_set_flags = managed_array(string_id);
     globals.debug_get_items = managed_array(string_id);
+    globals.debug_attach_chars = managed_array(string_id);
     return &globals;
 }
 
@@ -779,6 +800,9 @@ void save_globals( buffer_t* out, yarn_globals_t* globals ) {
 
     buffer_write_i32( out, &globals->debug_get_items->count, 1 );
     buffer_write_string( out, globals->debug_get_items->items, globals->debug_get_items->count );
+
+    buffer_write_i32( out, &globals->debug_attach_chars->count, 1 );
+    buffer_write_string( out, globals->debug_attach_chars->items, globals->debug_attach_chars->count );
 }
 
 
@@ -840,6 +864,9 @@ void load_globals( buffer_t* in, yarn_globals_t* globals ) {
 
     globals->debug_get_items = managed_array(string_id);
     read_string_array( in, globals->debug_get_items );
+
+    globals->debug_attach_chars = managed_array(string_id);
+    read_string_array( in, globals->debug_attach_chars );
 }
 
 typedef struct yarn_assets_t {

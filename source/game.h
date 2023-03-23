@@ -78,6 +78,7 @@ typedef struct game_t {
         int logo_index;
         array(bool)* flags;
         array(int)* items;
+        array(int)* chars;
         array(stack_entry_t)* section_stack;
     } state, quicksave;
     rgbimage_t** rgbimages;
@@ -91,6 +92,7 @@ void game_restart( game_t* game ) {
     game->state.logo_index = 0;
     array_clear( game->state.flags );
     array_clear( game->state.items  );
+    array_clear( game->state.chars  );
     array_clear( game->state.section_stack );
     game->state.current_location = game->yarn->start_location;
     game->state.current_dialog = game->yarn->start_dialog;
@@ -126,6 +128,17 @@ void game_restart( game_t* game ) {
         }
     }
 
+    if( game->yarn->is_debug ) {
+        for( int i = 0; i < game->yarn->globals.debug_attach_chars->count; ++i ) {
+            for( int j = 0; j < game->yarn->characters->count; ++j ) {
+                if( CMP( game->yarn->characters->items[ j ].id, game->yarn->globals.debug_attach_chars->items[ i ] ) ) {
+                    array_add( game->state.chars, &j );
+                    break;
+                }
+            }
+        }
+    }
+
     game->current_state = GAMESTATE_NO_CHANGE;
     game->new_state = GAMESTATE_BOOT;
     game->disable_transition = false;
@@ -150,6 +163,10 @@ void game_quicksave( game_t* game ) {
     for( int i = 0; i < game->state.items->count; ++i ) {
         array_add( game->quicksave.items, &game->state.items->items[ i ] );
     }
+    array_clear( game->quicksave.chars );
+    for( int i = 0; i < game->state.chars->count; ++i ) {
+        array_add( game->quicksave.chars, &game->state.chars->items[ i ] );
+    }
     array_clear( game->quicksave.section_stack );
     for( int i = 0; i < game->state.section_stack->count; ++i ) {
         array_add( game->quicksave.section_stack, &game->state.section_stack->items[ i ] );
@@ -172,6 +189,10 @@ void game_quickload( game_t* game ) {
     array_clear( game->state.items );
     for( int i = 0; i < game->quicksave.items->count; ++i ) {
         array_add( game->state.items, &game->quicksave.items->items[ i ] );
+    }
+    array_clear( game->state.chars );
+    for( int i = 0; i < game->quicksave.chars->count; ++i ) {
+        array_add( game->state.chars, &game->quicksave.chars->items[ i ] );
     }
     array_clear( game->state.section_stack );
     for( int i = 0; i < game->quicksave.section_stack->count; ++i ) {
@@ -198,6 +219,7 @@ void game_init( game_t* game, yarn_t* yarn, input_t* input, uint8_t* screen, uin
     
     game->state.flags = managed_array( bool );
     game->state.items = managed_array( int );
+    game->state.chars = managed_array( int );
     game->state.section_stack = managed_array( stack_entry_t );
 
     game->quicksave.flags = managed_array( bool );
@@ -665,6 +687,26 @@ void do_actions( game_t* game, array_param(yarn_act_t)* act_param ) {
                     }
                 }
             } break;
+            case ACTION_TYPE_CHAR_ATTACH: {
+                bool found = false;
+                for( int j = 0;  j < game->state.chars->count; ++j ) {
+                    if( game->state.chars->items[ j ] == action->param_char_index ) {
+                        found = true;
+                        break;
+                    }
+                }
+                if( !found ) {
+                    array_add( game->state.chars, &action->param_char_index );
+                }
+            } break;
+            case ACTION_TYPE_CHAR_DETACH: {
+                for( int j = 0;  j < game->state.chars->count; ++j ) {
+                    if( game->state.chars->items[ j ] == action->param_char_index ) {
+                        array_remove( game->state.chars, j );
+                        break;
+                    }
+                }
+            } break;
             case ACTION_TYPE_NONE: {
                 break;
             }
@@ -895,6 +937,23 @@ gamestate_t location_update( game_t* game ) {
         center_wrap( game,  game->font_chr, yarn->globals.alone_text, 32, ypos, game->color_disabled, 56 );
     }
 
+    // companions
+    for( int i = 0; i < game->state.chars->count; ++i ) {
+        bool found = false;
+        for( int j = 0; j < location->chr->count; ++j ) {
+            if( game->state.chars->items[ i ] == location->chr->items[ j ].chr_indices->items[ 0 ] && test_cond( game, &location->chr->items[ j ].cond ) ) {
+                found = true;
+                break;
+            }
+        }
+
+        if( !found ) {
+            int ypos = 4 + ( ( 117 - ( chr_count * font_height( game, game->font_chr->height ) ) ) / 2 ) + c * font_height( game, game->font_chr->height );
+            int color = game->color_disabled;
+            pixelfont_bounds_t b = center( game,  game->font_chr, game->yarn->characters->items[ game->state.chars->items[ i ] ].short_name, 32, ypos, color );
+            ++c;
+        }
+    }
 
     if( was_key_pressed( game, APP_KEY_ESCAPE ) ) {
         return GAMESTATE_TERMINATE;
