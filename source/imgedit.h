@@ -131,7 +131,7 @@ void imgedit_list_palettes( array_param(cstr_t)* palettes ) {
 }
 
 
-#ifdef _WIN32
+#if defined( _WIN32 ) && !( defined( __clang__ ) || defined( __TINYC__ ) )
 __forceinline
 #endif
 uint32_t imgedit_blend( uint32_t color1, uint32_t color2, uint8_t alpha ) {
