@@ -20,6 +20,7 @@ typedef enum gamestate_t {
     GAMESTATE_TERMINATE,
 } gamestate_t;
 
+
 typedef struct rgbimage_t {
     uint32_t width;
     uint32_t height;
@@ -33,6 +34,7 @@ typedef struct stack_entry_t {
 } stack_entry_t;
 
 typedef struct game_t {
+    float delta_time;
     bool exit_flag;
     bool exit_requested;
     bool restart_requested;    
@@ -75,12 +77,21 @@ typedef struct game_t {
         int current_location;
         int current_dialog;
         int current_image;
+        int current_music;
+        //float music_volume;
         int logo_index;
         array(bool)* flags;
         array(int)* items;
         array(int)* chars;
         array(stack_entry_t)* section_stack;
     } state, quicksave;
+    struct {
+        int current_music;
+        //float music_volume;
+        stb_vorbis* current_vorbis;
+        stb_vorbis* next_vorbis;
+        stb_vorbis* prev_vorbis;
+    } sound_state;
     rgbimage_t** rgbimages;
 } game_t;
 
@@ -89,6 +100,8 @@ void game_restart( game_t* game ) {
     game->state.current_location = -1;
     game->state.current_dialog = -1;
     game->state.current_image = -1;
+    game->state.current_music = -1;
+    //game->state.music_volume = 1.0f;
     game->state.logo_index = 0;
     array_clear( game->state.flags );
     array_clear( game->state.items  );
@@ -208,6 +221,8 @@ void game_quickload( game_t* game ) {
 
 
 void game_init( game_t* game, yarn_t* yarn, input_t* input, uint8_t* screen, uint32_t* screen_rgb, int width, int height ) {
+    memset( game, 0, sizeof( *game ) );
+    game->delta_time = 0.0f;
     game->exit_flag = false;
     game->exit_requested = false;
     game->screen = screen;
@@ -224,9 +239,13 @@ void game_init( game_t* game, yarn_t* yarn, input_t* input, uint8_t* screen, uin
 
     game->quicksave.flags = managed_array( bool );
     game->quicksave.items = managed_array( int );
+    game->quicksave.chars = managed_array( int );
     game->quicksave.section_stack = managed_array( stack_entry_t );
 
     game_restart( game );
+
+    game->sound_state.current_music = -1;
+    //game->sound_state.music_volume = 1.0f;
 
     int darkest_index = 0;
     int darkest_luma = 65536;
@@ -290,20 +309,32 @@ void game_init( game_t* game, yarn_t* yarn, input_t* input, uint8_t* screen, uin
 
     game->rgbimages = (rgbimage_t**)manage_alloc( malloc( sizeof( rgbimage_t* ) * game->yarn->assets.bitmaps->count ) );
     for( int i = 0; i < game->yarn->assets.bitmaps->count; ++i ) {
+        bool jpeg = game->yarn->globals.colormode == YARN_COLORMODE_RGB && game->yarn->globals.resolution == YARN_RESOLUTION_FULL;
         qoi_data_t* qoi = (qoi_data_t*)game->yarn->assets.bitmaps->items[ i ];
-        qoi_desc desc;
-        uint32_t* pixels = (uint32_t*)qoi_decode( qoi->data, qoi->size, &desc, 4 ); 
-        rgbimage_t* image = (rgbimage_t*)manage_alloc( malloc( sizeof( rgbimage_t) + ( desc.width * desc.height - 1 ) * sizeof( uint32_t ) ) );
-        image->width = desc.width;
-        image->height = desc.height;
-        uint32_t bgcolor = game->yarn->assets.palette[ game->color_background ];
-        for( int i = 0; i < image->width * image->height; ++i ) {
-            uint32_t c = pixels[ i ];
-            uint8_t a = (uint8_t)( c >> 24 );
-            image->pixels[ i ] = blend_rgb( bgcolor, c, a );
+        if( !jpeg ) {        
+            qoi_desc desc;
+            uint32_t* pixels = (uint32_t*)qoi_decode( qoi->data, qoi->size, &desc, 4 ); 
+            rgbimage_t* image = (rgbimage_t*)manage_alloc( malloc( sizeof( rgbimage_t) + ( desc.width * desc.height - 1 ) * sizeof( uint32_t ) ) );
+            image->width = desc.width;
+            image->height = desc.height;
+            uint32_t bgcolor = game->yarn->assets.palette[ game->color_background ];
+            for( int i = 0; i < image->width * image->height; ++i ) {
+                uint32_t c = pixels[ i ];
+                uint8_t a = (uint8_t)( c >> 24 );
+                image->pixels[ i ] = blend_rgb( bgcolor, c, a );
+            }
+            game->rgbimages[ i ] = image;
+            free( pixels );
+        } else {
+            int width, height, c;
+            stbi_uc* pixels = stbi_load_from_memory( qoi->data, qoi->size, &width, &height, &c, 4 );
+            rgbimage_t* image = (rgbimage_t*)manage_alloc( malloc( sizeof( rgbimage_t) + ( width * height - 1 ) * sizeof( uint32_t ) ) );
+            image->width = width;
+            image->height = height;
+            memcpy( image->pixels, pixels, width * height * sizeof( uint32_t ) );
+            game->rgbimages[ i ] = image;
+            free( pixels );
         }
-        game->rgbimages[ i ] = image;
-        free( pixels );
     }
 }
 
@@ -322,7 +353,39 @@ gamestate_t terminate_init( game_t* game );
 gamestate_t terminate_update( game_t* game );
 
 
-void game_update( game_t* game ) {
+void game_update( game_t* game, float delta_time ) {
+    if( game->state.current_music != game->sound_state.current_music ) {
+        if( game->sound_state.prev_vorbis ) {
+            stb_vorbis_close( game->sound_state.prev_vorbis );
+            game->sound_state.prev_vorbis = NULL;
+        }
+
+        game->sound_state.current_music = game->state.current_music;
+
+        if( game->sound_state.current_music >= 0 ) {
+            music_data_t* music_data = game->yarn->assets.music->items[ game->sound_state.current_music ];
+            int error = 0;
+            stb_vorbis* vorbis = stb_vorbis_open_memory( music_data->data, music_data->size, &error, NULL );
+            if( vorbis ) {
+                if( game->sound_state.next_vorbis ) {
+                    stb_vorbis_close( game->sound_state.next_vorbis );
+                    game->sound_state.next_vorbis = NULL;
+                }
+                game->sound_state.next_vorbis = vorbis;
+            }
+        } else {
+            if( game->sound_state.next_vorbis ) {
+                stb_vorbis_close( game->sound_state.next_vorbis );
+                game->sound_state.next_vorbis = NULL;
+            }
+            if( game->sound_state.current_vorbis ) {
+                stb_vorbis_close( game->sound_state.current_vorbis );
+                game->sound_state.current_vorbis = NULL;
+            }
+        }
+    }
+
+    game->delta_time = delta_time;
     if( game->new_state != GAMESTATE_NO_CHANGE ) {
         if( !game->disable_transition ) {
             game->transition_counter = -10;
@@ -617,6 +680,27 @@ bool test_cond( game_t* game, yarn_cond_t* cond ) {
 }
 
 
+void do_music( game_t* game, array_param(yarn_mus_t)* mus_param ) {
+    array(yarn_mus_t)* mus = ARRAY_CAST( mus_param );
+    for( int i = 0; i < mus->count; ++i ) {
+        if( test_cond( game, &mus->items[ i ].cond ) )  {
+            if( mus->items[ i ].start ) {
+                if( game->state.current_music == mus->items[ i ].music_index ) {
+                    if( game->sound_state.current_vorbis ) {
+                        stb_vorbis_seek_start( game->sound_state.current_vorbis );
+                    }
+                }
+                game->state.current_music = mus->items[ i ].music_index;
+            } else if( mus->items[ i ].stop ) {
+                game->state.current_music = -1;
+            } else {
+                game->state.current_music = mus->items[ i ].music_index;
+            }
+        }
+    }
+}
+
+
 void do_actions( game_t* game, array_param(yarn_act_t)* act_param ) {
     array(yarn_act_t)* act = ARRAY_CAST( act_param );
     for( int i = 0; i < act->count; ++i ) {
@@ -720,6 +804,7 @@ gamestate_t boot_init( game_t* game ) {
     cls( game );
     game->state.logo_index = -1;
     if( game->yarn->screen_names->count > 0 && !( game->yarn->is_debug && ( game->yarn->debug_start_dialog >= 0 || game->yarn->debug_start_location >= 0  ) ) ) {
+        game->state.current_music = game->yarn->globals.logo_music;
         return GAMESTATE_TITLE;
     } else if( game->state.current_location >= 0 ) {
         return GAMESTATE_LOCATION;
@@ -776,6 +861,9 @@ gamestate_t location_init( game_t* game ) {
 
     yarn_t* yarn = game->yarn;
     yarn_location_t* location = &yarn->locations->items[ game->state.current_location ];
+
+    //  mus:
+    do_music( game, location->mus );
 
     // act:
     do_actions( game, location->act );
@@ -1028,7 +1116,7 @@ gamestate_t dialog_init( game_t* game ) {
     game->queued_location = -1;
     game->queued_dialog = -1;
 
-    game->dialog.limit = 0.0f;
+    game->dialog.limit = -30.0f;
     game->dialog.phrase_index = 0;
     game->dialog.phrase_len = -1;
     game->dialog.chr_index = -1;
@@ -1036,6 +1124,9 @@ gamestate_t dialog_init( game_t* game ) {
 
     yarn_t* yarn = game->yarn;
     yarn_dialog_t* dialog = &yarn->dialogs->items[ game->state.current_dialog ];
+
+    //  mus:
+    do_music( game, dialog->mus );
 
     // act:
     do_actions( game, dialog->act );
@@ -1051,6 +1142,11 @@ gamestate_t dialog_init( game_t* game ) {
             game->dialog.chr_index = dialog->phrase->items[ i ].character_index;
             break;
         }
+    }
+
+    if( game->dialog.phrase_len == 0 ) {
+        game->dialog.enable_options = 1;
+        game->dialog.limit = 0.0f;
     }
 
     return GAMESTATE_NO_CHANGE;
@@ -1088,18 +1184,18 @@ gamestate_t dialog_update( game_t* game ) {
             }
             game->dialog.phrase_len = (int) cstr_len( txt );
             if( dialog->phrase->items[ i ].character_index >= 0 ) {
-                wrap_limit( game, game->font_txt, txt, 5, 136, game->color_txt, 310, (int)game->dialog.limit );
+                wrap_limit( game, game->font_txt, txt, 5, 136, game->color_txt, 310, game->dialog.limit < 0.0f ? 0 : (int)game->dialog.limit );
             } else {
-                wrap_limit( game, game->font_opt, txt, 5, 197, game->color_txt, 310, (int)game->dialog.limit );
+                wrap_limit( game, game->font_opt, txt, 5, 197, game->color_txt, 310, game->dialog.limit < 0.0f ? 0 : (int)game->dialog.limit );
             }
         }
         ++phrase_count;
     }
-    game->dialog.limit += 1.0f;
+    game->dialog.limit += game->delta_time * 80.0f;
     if( game->dialog.limit > game->dialog.phrase_len && ( was_key_pressed( game, APP_KEY_LBUTTON) || was_key_pressed( game, APP_KEY_SPACE ) ) ) {
         if( game->dialog.phrase_index < phrase_count - 1 ) {
             ++game->dialog.phrase_index;
-            game->dialog.limit = 0;
+            game->dialog.limit = -30.0f;
         } else if( game->dialog.enable_options == 0 ) {
             game->dialog.enable_options = 1;
         }

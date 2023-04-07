@@ -1317,7 +1317,7 @@ typedef struct qoi_data_t {
 } qoi_data_t;
 
 
-qoi_data_t* convert_rgb( string image_filename, int width, int height, int bpp, float resolution_scale ) {
+qoi_data_t* convert_rgb( string image_filename, int width, int height, int bpp, float resolution_scale, bool jpeg ) {
     string ini_filename = cstr_cat( image_filename, ".ini" ); 
 
     bool is_face = false;
@@ -1334,7 +1334,7 @@ qoi_data_t* convert_rgb( string image_filename, int width, int height, int bpp, 
     string processed_filename_no_ext = cstr_format( ".cache/processed/%s/%dx%d/%s_%s", is_face ? "faces" : "images",
         width, height, cstr( cbasename( image_filename ) ), cstr_mid( cextname( image_filename ), 1, 0 ) ) ;
 
-    string processed_filename = cstr_cat( processed_filename_no_ext, ".qoi" );
+    string processed_filename = cstr_cat( processed_filename_no_ext, jpeg ? ".jpg" : ".qoi" );
     string intermediate_processed_filename = cstr_cat( processed_filename_no_ext, ".png" );
 
     if( !file_exists( processed_filename ) || !file_exists( intermediate_processed_filename ) ||
@@ -1382,12 +1382,16 @@ qoi_data_t* convert_rgb( string image_filename, int width, int height, int bpp, 
         
         stbi_write_png( intermediate_processed_filename, outw, outh, 4, (stbi_uc*)img, 4 * outw );
 
-        qoi_desc desc;
-        desc.width = outw;
-        desc.height = outh;
-        desc.channels = 4;
-        desc.colorspace = 0;
-        qoi_write( processed_filename, img, &desc );
+        if( !jpeg ) {
+            qoi_desc desc;
+            desc.width = outw;
+            desc.height = outh;
+            desc.channels = 4;
+            desc.colorspace = 0;
+            qoi_write( processed_filename, img, &desc );
+        } else {
+            stbi_write_jpg( processed_filename, outw, outh, 4, img, 80 );
+        }
     }
 
     file_t* file = file_load( processed_filename, FILE_MODE_BINARY, 0 );

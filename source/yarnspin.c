@@ -41,6 +41,7 @@
 #include "libs/stb_image_resize.h"
 #include "libs/stb_image_write.h"
 #include "libs/stb_truetype.h"
+#include "libs/stb_vorbis.h"
 #include "libs/sysfont.h"
 #include "libs/thread.h"
 
@@ -108,6 +109,39 @@ typedef cstr_t string;
 #include "yarn.h"
 #include "input.h"
 #include "game.h"
+
+
+thread_mutex_t g_sound_mutex;
+
+void sound_callback( APP_S16* sample_pairs, int sample_pairs_count, void* user_data ) {
+    thread_mutex_lock( &g_sound_mutex );
+
+    game_t* game = (game_t*) user_data;
+
+    if( game->sound_state.next_vorbis ) {
+        if( game->sound_state.prev_vorbis ) {
+            stb_vorbis_close( game->sound_state.prev_vorbis );
+            game->sound_state.prev_vorbis = NULL;
+        }
+        game->sound_state.prev_vorbis = game->sound_state.current_vorbis;
+        game->sound_state.current_vorbis = game->sound_state.next_vorbis;
+        game->sound_state.next_vorbis = NULL;
+    }
+    if( game->sound_state.current_vorbis ) {
+        while( sample_pairs_count > 0 ) {
+            int samples_decoded = stb_vorbis_get_samples_short_interleaved( game->sound_state.current_vorbis, 2, sample_pairs, sample_pairs_count * 2 );
+            if( samples_decoded < sample_pairs_count ) {
+                stb_vorbis_seek_start( game->sound_state.current_vorbis );
+            }
+            sample_pairs_count -= samples_decoded;
+            sample_pairs += samples_decoded * 2;
+        }
+    } else {
+        memset( sample_pairs, 0, sizeof( short ) * 2 * sample_pairs_count );
+    }
+
+    thread_mutex_unlock( &g_sound_mutex );
+}
 
 
 // main game loop and setup
@@ -208,12 +242,19 @@ int app_proc( app_t* app, void* user_data ) {
         game_init( &game, yarn, &input, NULL, canvas_rgb, screen_width, screen_height );
     }
 
+    thread_mutex_init( &g_sound_mutex );
+    app_sound( app, 735 * 16, sound_callback, &game );
+
     // main loop
     APP_U64 time = 0;
     while( app_yield( app ) != APP_STATE_EXIT_REQUESTED && !game.exit_flag ) {
         frametimer_update( frametimer );
         input_update( &input, screen_width, screen_height, crtemu_lite, crtemu_pc, crtemu );
-        game_update( &game );
+
+        thread_mutex_lock( &g_sound_mutex );
+        game_update( &game, frametimer_delta_time( frametimer ) );
+        thread_mutex_unlock( &g_sound_mutex );
+
 
         if( game.yarn->is_debug ) {
             char const* dbgstr = "debug";
@@ -359,6 +400,24 @@ int app_proc( app_t* app, void* user_data ) {
                 app_present( app, canvas_rgb, screen_width, screen_height, fade, bg );
             }
         }
+    }
+
+    app_sound( app, 0, NULL, NULL );
+    thread_mutex_term( &g_sound_mutex );
+
+    if( game.sound_state.prev_vorbis ) {
+        stb_vorbis_close( game.sound_state.prev_vorbis );
+        game.sound_state.prev_vorbis = NULL;
+    }
+
+    if( game.sound_state.current_vorbis ) {
+        stb_vorbis_close( game.sound_state.current_vorbis );
+        game.sound_state.current_vorbis = NULL;
+    }
+
+    if( game.sound_state.next_vorbis ) {
+        stb_vorbis_close( game.sound_state.next_vorbis );
+        game.sound_state.next_vorbis = NULL;
     }
 
     frametimer_destroy( frametimer );
@@ -744,6 +803,9 @@ uint32_t pixelfont_blend( uint32_t color1, uint32_t color2, uint8_t alpha )	{
 #define STB_TRUETYPE_IMPLEMENTATION
 #define STBTT_RASTERIZER_VERSION 1
 #include "libs/stb_truetype.h"
+
+#define STB_VORBIS_IMPLEMENTATION
+#include "libs/stb_vorbis.h"
 
 #pragma warning( push )
 #pragma warning( disable: 4456 )

@@ -1,6 +1,10 @@
 
 typedef string string_id; // strings of type string_id should be compared with case insensitive comparison
 
+typedef struct music_data_t {
+    uint32_t size;
+    uint8_t data[ 1 ];
+} music_data_t;
 
 int buffer_write_string( buffer_t* buffer, char const* const* value, int count ) {
     for( int i = 0; i < count; ++i ) {
@@ -34,6 +38,13 @@ int read_int( buffer_t* in ) {
 bool read_bool( buffer_t* in ) {
     bool value = 0;
     buffer_read_bool( in, &value, 1 );
+    return value;
+}
+
+
+float read_float( buffer_t* in ) {
+    float value = 0;
+    buffer_read_float( in, &value, 1 );
     return value;
 }
 
@@ -285,6 +296,44 @@ yarn_img_t* empty_img( void ) {
 }
 
 
+typedef struct yarn_mus_t {
+    yarn_cond_t cond;
+    int music_index;
+    bool start;
+    bool stop;
+    float volume;
+} yarn_mus_t;
+
+
+yarn_mus_t* empty_mus( void ) {
+    static yarn_mus_t mus;
+    mus.cond = *empty_cond();
+    mus.music_index = -1;
+    mus.start = false;
+    mus.stop = false;
+    mus.volume = 1.0f;
+    return &mus;
+}
+
+
+void save_mus( buffer_t* out, yarn_mus_t* mus ) {
+    save_cond( out, &mus->cond );
+    buffer_write_i32( out, &mus->music_index, 1 );
+    buffer_write_bool( out, &mus->start, 1 );
+    buffer_write_bool( out, &mus->stop, 1 );
+    buffer_write_float( out, &mus->volume, 1 );
+}
+
+
+void load_mus( buffer_t* in, yarn_mus_t* mus ) {
+    load_cond( in, &mus->cond );
+    mus->music_index = read_int( in );
+    mus->start = read_bool( in );
+    mus->stop = read_bool( in );
+    mus->volume = read_float( in );    
+}
+
+
 typedef struct yarn_txt_t {
     yarn_cond_t cond;
     string text;
@@ -302,6 +351,7 @@ yarn_txt_t* empty_txt( void ) {
 typedef struct yarn_location_t {
     string_id id;
     array(yarn_img_t)* img;
+    array(yarn_mus_t)* mus;
     array(yarn_txt_t)* txt;
     array(yarn_act_t)* act;
     array(yarn_opt_t)* opt;
@@ -314,6 +364,7 @@ yarn_location_t* empty_location( void ) {
     static yarn_location_t location;
     location.id = NULL;
     location.img = managed_array(yarn_img_t);
+    location.mus = managed_array(yarn_mus_t);
     location.txt = managed_array(yarn_txt_t);
     location.act = managed_array(yarn_act_t);
     location.opt = managed_array(yarn_opt_t);
@@ -330,6 +381,11 @@ void save_location( buffer_t* out, yarn_location_t* location ) {
     for( int i = 0; i < location->img->count; ++i ) {
         save_cond( out, &location->img->items[ i ].cond );
         buffer_write_i32( out, &location->img->items[ i ].image_index, 1 );
+    }
+
+    buffer_write_i32( out, &location->mus->count, 1 );
+    for( int i = 0; i < location->mus->count; ++i ) {
+        save_mus( out, &location->mus->items[ i ] );
     }
 
     buffer_write_i32( out, &location->txt->count, 1 );
@@ -370,6 +426,14 @@ void load_location( buffer_t* in, yarn_location_t* location ) {
         load_cond( in, &img.cond );
         img.image_index = read_int( in );
         array_add( location->img, &img );
+    }
+
+    location->mus = managed_array(yarn_mus_t);
+    int mus_count = read_int( in );
+    for( int i = 0; i < mus_count; ++i ) {
+        yarn_mus_t mus;
+        load_mus( in, &mus );
+        array_add( location->mus, &mus );
     }
 
     location->txt = managed_array(yarn_txt_t);
@@ -494,6 +558,7 @@ void save_say( buffer_t* out, yarn_say_t* say ) {
 
 typedef struct yarn_dialog_t {
     string_id id;
+    array(yarn_mus_t)* mus;
     array(yarn_act_t)* act;
     array(yarn_phrase_t)* phrase;
     array(yarn_say_t)* say;
@@ -504,6 +569,7 @@ typedef struct yarn_dialog_t {
 yarn_dialog_t* empty_dialog( void ) {
     static yarn_dialog_t dialog;
     dialog.id = NULL;
+    dialog.mus = managed_array(yarn_mus_t);
     dialog.act = managed_array(yarn_act_t);
     dialog.phrase = managed_array(yarn_phrase_t);
     dialog.say = managed_array(yarn_say_t);
@@ -514,6 +580,11 @@ yarn_dialog_t* empty_dialog( void ) {
 
 void save_dialog( buffer_t* out, yarn_dialog_t* dialog ) {
     buffer_write_string( out, &dialog->id, 1 );
+
+    buffer_write_i32( out, &dialog->mus->count, 1 );
+    for( int i = 0; i < dialog->mus->count; ++i ) {
+        save_mus( out, &dialog->mus->items[ i ] );
+    }
 
     buffer_write_i32( out, &dialog->act->count, 1 );
     for( int i = 0; i < dialog->act->count; ++i ) {
@@ -541,6 +612,14 @@ void save_dialog( buffer_t* out, yarn_dialog_t* dialog ) {
 
 void load_dialog( buffer_t* in, yarn_dialog_t* dialog ) {
     dialog->id = read_string( in );
+
+    dialog->mus = managed_array(yarn_mus_t);
+    int mus_count = read_int( in );
+    for( int i = 0; i < mus_count; ++i ) {
+        yarn_mus_t mus;
+        load_mus( in, &mus );
+        array_add( dialog->mus, &mus );
+    }
 
     dialog->act = managed_array(yarn_act_t);
     int acts_count = read_int( in );
@@ -679,6 +758,7 @@ typedef struct yarn_globals_t {
     yarn_colormode_t colormode;
     array(yarn_display_filter_t)* display_filters;
     array(int)* logo_indices;
+    int logo_music;
     int background_location;
     int background_dialog;
     int color_background;
@@ -724,6 +804,7 @@ yarn_globals_t* empty_globals( void ) {
     globals.colormode = YARN_COLORMODE_RGB;
     globals.display_filters = managed_array(int);
     globals.logo_indices = managed_array(int);
+    globals.logo_music = -1;
     globals.background_location = -1;
     globals.background_dialog = -1;
     globals.color_background = -1;
@@ -775,6 +856,8 @@ void save_globals( buffer_t* out, yarn_globals_t* globals ) {
 
     buffer_write_i32( out, &globals->logo_indices->count, 1 );
     buffer_write_i32( out, globals->logo_indices->items, globals->logo_indices->count );
+
+    buffer_write_i32( out, &globals->logo_music, 1 );
 
     buffer_write_i32( out, &globals->background_location, 1 );
     buffer_write_i32( out, &globals->background_dialog, 1 );
@@ -840,6 +923,8 @@ void load_globals( buffer_t* in, yarn_globals_t* globals ) {
         array_add( globals->logo_indices, &value );
     }
 
+    globals->logo_music = read_int( in );
+
     globals->background_location = read_int( in );
     globals->background_dialog = read_int( in );
     globals->color_background = read_int( in );
@@ -880,6 +965,7 @@ typedef struct yarn_assets_t {
     pixelfont_t* font_name;
 
     array(palrle_data_t*)* bitmaps;
+    array(music_data_t*)* music;
 
     uint32_t frame_pc_size;
     void* frame_pc;
@@ -902,6 +988,7 @@ yarn_assets_t* empty_assets( void ) {
     assets.font_name = NULL;
 
     assets.bitmaps = managed_array(palrle_data_t*);
+    assets.music = managed_array(music_data_t*);
 
     assets.frame_pc_size = 0;
     assets.frame_pc = NULL;
@@ -942,6 +1029,12 @@ void save_assets( buffer_t* out, yarn_assets_t* assets, yarn_colormode_t colormo
             buffer_write_u32( out, &qoi->size, 1 );
             buffer_write_u8( out, qoi->data, qoi->size );
         }
+    }
+
+    buffer_write_i32( out, &assets->music->count, 1 );
+    for( int i = 0; i < assets->music->count; ++i ) {
+        buffer_write_u32( out, &assets->music->items[ i ]->size, 1 );
+        buffer_write_u8( out, assets->music->items[ i ]->data, assets->music->items[ i ]->size );
     }
 
     buffer_write_u32( out, &assets->frame_pc_size, 1 );
@@ -1005,6 +1098,16 @@ void load_assets( buffer_t* in, yarn_assets_t* assets, yarn_colormode_t colormod
         }
     }
 
+    assets->music = managed_array(music_data_t*);
+    int music_count = read_int( in );
+    for( int i = 0; i < music_count; ++i ) {
+        uint32_t size;
+        buffer_read_u32( in, &size, 1 );
+        music_data_t* music = (music_data_t*)manage_alloc( malloc( sizeof( music_data_t ) + ( size - 1 ) ) );
+        music->size = size;
+        buffer_read_u8( in, music->data, size );
+        array_add( assets->music, &music );
+    }
 
     buffer_read_u32( in, &assets->frame_pc_size, 1 );
     if( assets->frame_pc_size ) {
@@ -1031,6 +1134,7 @@ typedef struct yarn_t {
     array(string_id)* flag_ids;
     array(string_id)* item_ids;
     array(string_id)* image_names;
+    array(string_id)* music_names;
     array(string_id)* screen_names;
     array(string_id)* face_names;
 
@@ -1054,6 +1158,7 @@ yarn_t* empty_yarn( void ) {
     yarn.flag_ids = managed_array(string_id);
     yarn.item_ids = managed_array(string_id);
     yarn.image_names = managed_array(string_id);
+    yarn.music_names = managed_array(string_id);
     yarn.screen_names = managed_array(string_id);
     yarn.face_names = managed_array(string_id);
 
@@ -1276,6 +1381,7 @@ buffer_t* yarn_compile( char const* path ) {
 
     float scale_factors[] = { 1.0f, 1.25f, 1.5f, 2.0f, 4.5f };
     float resolution_scale = scale_factors[ yarn.globals.resolution ];
+    bool jpeg = yarn.globals.colormode == YARN_COLORMODE_RGB && yarn.globals.resolution == YARN_RESOLUTION_FULL;
 
     printf( "Processing images\n" );
     for( int i = 0; i < yarn.screen_names->count; ++i ) {
@@ -1291,7 +1397,7 @@ buffer_t* yarn_compile( char const* path ) {
             }
         } else {
             int bpp = yarn.globals.colormode == YARN_COLORMODE_RGB9 ? 9 : 24;
-            qoi_data_t* qoi = (qoi_data_t*)manage_alloc( convert_rgb( screen_name, width, height, bpp, resolution_scale ) );
+            qoi_data_t* qoi = (qoi_data_t*)manage_alloc( convert_rgb( screen_name, width, height, bpp, resolution_scale, jpeg ) );
             array_add( yarn.assets.bitmaps, (palrle_data_t*)&qoi );
             if( !qoi ) {
                 printf( "Failed to load image: %s\n", screen_name );
@@ -1312,7 +1418,7 @@ buffer_t* yarn_compile( char const* path ) {
             }
         } else {
             int bpp = yarn.globals.colormode == YARN_COLORMODE_RGB9 ? 9 : 24;
-            qoi_data_t* qoi = (qoi_data_t*)manage_alloc( convert_rgb( image_name, width, height, bpp, resolution_scale ) );
+            qoi_data_t* qoi = (qoi_data_t*)manage_alloc( convert_rgb( image_name, width, height, bpp, resolution_scale, jpeg ) );
             array_add( yarn.assets.bitmaps, (palrle_data_t*)&qoi );
             if( !qoi ) {
                 printf( "Failed to load image: %s\n", image_name );
@@ -1335,13 +1441,24 @@ buffer_t* yarn_compile( char const* path ) {
             }
         } else {
             int bpp = yarn.globals.colormode == YARN_COLORMODE_RGB9 ? 9 : 24;
-            qoi_data_t* qoi = (qoi_data_t*)manage_alloc( convert_rgb( face_name, width, height, bpp, resolution_scale ) );
+            qoi_data_t* qoi = (qoi_data_t*)manage_alloc( convert_rgb( face_name, width, height, bpp, resolution_scale, jpeg ) );
             array_add( yarn.assets.bitmaps, (palrle_data_t*)&qoi );
             if( !qoi ) {
                 printf( "Failed to load image: %s\n", face_name );
                 no_error = false;
             }
         }
+    }
+
+    printf( "Processing music\n" );
+    for( int i = 0; i < yarn.music_names->count; ++i ) {
+        string_id music_name = yarn.music_names->items[ i ];
+        file_t* file = file_load( music_name, FILE_MODE_BINARY, NULL );
+        music_data_t* music = (music_data_t*)manage_alloc( malloc( sizeof( music_data_t ) + ( file ? file->size : 0 ) - 1 ) );
+        music->size = file ? (uint32_t) file->size : 0;
+        memcpy( music->data, file->data, music->size ); 
+        array_add( yarn.assets.music, &music );
+        file_destroy( file );
     }
 
     printf( "Processing frames\n" );

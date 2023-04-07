@@ -51,11 +51,11 @@ html, body, #a {
 </style></head>
 <body>
 <div id="a">
-<canvas id="wa_canvas"  oncontextmenu="event.preventDefault()"></canvas>
+<canvas id="wa_canvas" onclick="window.focus();" oncontextmenu="event.preventDefault()"></canvas>
 <div id="wa_log">Loading...</div>
 </div>
 <script>
-var WA = {  canvas: document.getElementById('wa_canvas'),  started: function() { document.getElementById('wa_log').style.display = 'none'; }, };
+var WA = {  canvas: document.getElementById('wa_canvas'),  started: function() { document.getElementById('wa_log').style.display = 'none'; window.focus();}, };
 {{{js}}}
 </script>
 </body>

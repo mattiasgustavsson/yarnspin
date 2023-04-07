@@ -152,6 +152,13 @@ int find_image_index( string_id name, yarn_t* yarn ) {
 }
 
 
+int find_music_index( string_id name, yarn_t* yarn ) {
+    for( int i = 0; i < yarn->music_names->count; ++i )
+        if( yarn->music_names->items[ i ] == name ) return i;
+    return -1;
+}
+
+
 int find_screen_index( string_id name, yarn_t* yarn ) {
     for( int i = 0; i < yarn->screen_names->count; ++i )
         if( yarn->screen_names->items[ i ] == name ) return i;
@@ -231,6 +238,30 @@ bool extract_declaration_fields( parser_section_t* section, yarn_t* yarn, compil
                     no_error = false;
                 }
                 add_unique_id( yarn->image_names, image_name );
+            }
+        } else if( CMP( decl->keyword,  "mus" ) ) {
+            bool stop = false;
+            string_id music_name = NULL;
+            if( decl->data->count > 0 ) { 
+                if( CMP( decl->data->items[ 0 ], "start" ) ) {
+                    if( decl->data->count >= 2 ) {
+                        music_name = cstr_trim( decl->data->items[ 1 ] );
+                    }
+                } else if( CMP( decl->data->items[ 0 ], "stop" ) ) {
+                    stop = true;
+                } else {
+                    music_name = cstr_trim( decl->data->items[ 0 ] );
+                }
+            }
+            if( music_name ) {
+                music_name = cstr_cat( "music/", music_name );
+                if( !file_exists( music_name ) ) {
+                    printf( "%s(%d): music file not found '%s'\n", decl->filename, decl->line_number, music_name ? music_name : "" );
+                    no_error = false;
+                } 
+                add_unique_id( yarn->music_names, music_name );
+            } else if( !stop ) {
+                printf( "%s(%d): invalid music name '%s'\n", decl->filename, decl->line_number, concat_data( decl->data ) );
             }
         } else if( CMP( decl->keyword, "face" ) ) {
             if( decl->data->count != 1 || ( decl->data->count == 1 && cstr_len( cstr_trim( decl->data->items[ 0 ] ) ) <= 0 ) ) {
@@ -513,6 +544,50 @@ bool compile_location( parser_section_t* section, yarn_t* yarn, compiler_context
                 printf( "%s(%d): 'img:' declaration not valid inside an 'opt:', 'chr' or 'use:' block\n", decl->filename, decl->line_number );
                 no_error = false;
             }
+        } else if( CMP( decl->keyword, "mus" ) ) {
+            if( !opt && !use && !chr && decl->data->count > 0 ) {
+                yarn_mus_t* mus = array_add( location->mus, empty_mus() );
+                if( cond ) {
+                    mus->cond = *cond;
+                    cond = 0;
+                }                
+                string music_name = NULL;
+                if( CMP( decl->data->items[ 0 ], "start" ) ) {
+                    mus->start = true;
+                    if( decl->data->count > 1 ) {
+                        music_name = cstr_cat( "music/", decl->data->items[ 1 ] );
+                        if( decl->data->count > 2 ) {
+                            int volume = atoi( decl->data->items[ 2 ] );
+                            if( volume > 0 ) {
+                                mus->volume = ( (float)volume ) / 100.0f; 
+                            }
+                        }
+                    }
+                } else if( CMP( decl->data->items[ 0 ], "stop" ) ) {
+                    mus->stop = true;
+                    if( decl->data->count > 1 ) {
+                        printf( "%s(%d): unexpected parameters to music stop command: '%s'\n", decl->filename, decl->line_number, decl->data->items[ 1 ] );
+                        no_error = false;
+                    }
+                } else {
+                    music_name = cstr_cat( "music/", decl->data->items[ 0 ] );
+                }
+                if( !music_name || !file_exists( music_name ) ) {
+                    if( !mus->stop ) {
+                        printf( "%s(%d): music file not found '%s'\n", decl->filename, decl->line_number, music_name ? music_name : "" );
+                        no_error = false;
+                    }
+                } else {
+                    mus->music_index = find_music_index( music_name, yarn );
+                    if( mus->music_index < 0 ) {
+                        printf( "%s(%d): music not found '%s'\n", decl->filename, decl->line_number, music_name );
+                        no_error = false;
+                    }
+                }
+            } else {
+                printf( "%s(%d): 'mus:' declaration not valid inside an 'opt:', 'chr' or 'use:' block, or missing music name\n", decl->filename, decl->line_number );
+                no_error = false;
+            }
         } else if( CMP( decl->keyword, "act"  ) ) {
             yarn_act_t* action = 0;
             if( opt ) action = array_add( opt->act, empty_act() );
@@ -658,6 +733,48 @@ bool compile_dialog( parser_section_t* section, yarn_t* yarn, compiler_context_t
                 printf( "%s(%d): phrase declaration not valid inside a 'say:' or 'use:' block\n", decl->filename, decl->line_number );
                 no_error = false;
             }
+        } else if( CMP( decl->keyword, "mus" ) ) {
+            if( !say && !use && decl->data->count > 0 ) {
+                yarn_mus_t* mus = array_add( dialog->mus, empty_mus() );
+                if( cond ) {
+                    mus->cond = *cond;
+                    cond = 0;
+                }                
+                string music_name = NULL;
+                if( CMP( decl->data->items[ 0 ], "start" ) ) {
+                    mus->start = true;
+                    if( decl->data->count > 1 ) {
+                        music_name = cstr_cat( "music/", decl->data->items[ 1 ] );
+                        if( decl->data->count > 2 ) {
+                            int volume = atoi( decl->data->items[ 2 ] );
+                            if( volume > 0 ) {
+                                mus->volume = ( (float)volume ) / 100.0f; 
+                            }
+                        }
+                    }
+                } else if( CMP( decl->data->items[ 0 ], "stop" ) ) {
+                    mus->stop = true;
+                    if( decl->data->count > 1 ) {
+                        printf( "%s(%d): unexpected parameters to music stop command: '%s'\n", decl->filename, decl->line_number, decl->data->items[ 1 ] );
+                        no_error = false;
+                    }
+                } else {
+                    music_name = cstr_cat( "music/", decl->data->items[ 0 ] );
+                }
+                if( !music_name || !file_exists( music_name ) ) {
+                    printf( "%s(%d): music file not found '%s'\n", decl->filename, decl->line_number, music_name ? music_name : "" );
+                    no_error = false;
+                } else {
+                    mus->music_index = find_music_index( music_name, yarn );
+                    if( mus->music_index < 0 ) {
+                        printf( "%s(%d): music not found '%s'\n", decl->filename, decl->line_number, music_name );
+                        no_error = false;
+                    }
+                }
+            } else {
+                printf( "%s(%d): 'mus:' declaration not valid inside an 'opt:', 'chr' or 'use:' block, or missing music name\n", decl->filename, decl->line_number );
+                no_error = false;
+            }
         } else if( CMP( decl->keyword, "act" ) ) {
             yarn_act_t* action = 0;
             if( say ) action = array_add( say->act, empty_act() );
@@ -768,6 +885,7 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
     bool no_error = true;
 
     bool found_logo = false;
+    bool found_logo_music = false;
     yarn->globals.explicit_flags = false;
     yarn->globals.explicit_items = false;
     yarn->globals.background_location = -1;
@@ -974,6 +1092,23 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
                     }
                     array_add( yarn->globals.logo_indices, &image_index );
                 }
+            }
+        } else if( CMP( global->keyword, "logo_music" ) ) {
+            if( global->data->count == 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) {
+                string music_name = cstr_cat( "music/", cstr_trim( global->data->items[ 0 ] ) );
+                if( !file_exists( music_name ) ) {
+                    printf( "%s(%d): music file not found '%s'\n", global->filename, global->line_number, music_name );
+                    no_error = false;
+                }
+                int music_index = find_music_index( music_name, yarn );
+                if( music_index < 0 ) {
+                    printf( "%s(%d): music not found '%s'\n", global->filename, global->line_number, music_name );
+                    no_error = false;
+                }
+                yarn->globals.logo_music = music_index;
+            } else {
+                printf( "%s(%d): invalid logo_music declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
+                no_error = false;
             }
         } else if( CMP( global->keyword, "resolution" ) ) {
             if( global->data->count == 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) {
@@ -1207,6 +1342,11 @@ bool yarn_compiler( array_param(parser_global_t)* parser_globals_param, array_pa
             for( int j = 0; j < global->data->count; ++j ) {
                 string_id logo_name = cstr_cat( "images/", cstr_trim( global->data->items[ j ] ) );
                 if( cstr_len( logo_name ) > 0 ) add_unique_id( yarn->screen_names, logo_name );
+            }
+        } else if( CMP( global->keyword, "logo_music" ) ) {
+            if( global->data->count == 1 ) {
+                string_id music_name = cstr_cat( "music/", cstr_trim( global->data->items[ 0 ] ) );
+                if( cstr_len( music_name ) > 0 ) add_unique_id( yarn->music_names, music_name );
             }
         } else if( CMP( global->keyword, "background_location" ) || CMP( global->keyword, "background_dialog" ) ) {
             for( int j = 0; j < global->data->count; ++j ) {
