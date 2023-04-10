@@ -1086,7 +1086,7 @@ void load_assets( buffer_t* in, yarn_assets_t* assets, yarn_colormode_t colormod
             buffer_read_u32( in, &size, 1 );
             palrle_data_t* rle = (palrle_data_t*)manage_alloc( malloc( size ) );
             rle->size = size;
-            buffer_read_u8( in, (uint8_t*) rle, size - sizeof( uint32_t ) );
+            buffer_read_u8( in, (uint8_t*) rle, size );
             array_add( assets->bitmaps, &rle );
         } else {
             uint32_t size;

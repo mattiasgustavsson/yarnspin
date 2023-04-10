@@ -307,33 +307,35 @@ void game_init( game_t* game, yarn_t* yarn, input_t* input, uint8_t* screen, uin
     if( game->color_name < 0 ) game->color_name = (uint8_t)brightest_index;
     if( game->color_facebg < 0 ) game->color_facebg = (uint8_t)facebg_index;
 
-    game->rgbimages = (rgbimage_t**)manage_alloc( malloc( sizeof( rgbimage_t* ) * game->yarn->assets.bitmaps->count ) );
-    for( int i = 0; i < game->yarn->assets.bitmaps->count; ++i ) {
-        bool jpeg = game->yarn->globals.colormode == YARN_COLORMODE_RGB && game->yarn->globals.resolution == YARN_RESOLUTION_FULL;
-        qoi_data_t* qoi = (qoi_data_t*)game->yarn->assets.bitmaps->items[ i ];
-        if( !jpeg ) {        
-            qoi_desc desc;
-            uint32_t* pixels = (uint32_t*)qoi_decode( qoi->data, qoi->size, &desc, 4 ); 
-            rgbimage_t* image = (rgbimage_t*)manage_alloc( malloc( sizeof( rgbimage_t) + ( desc.width * desc.height - 1 ) * sizeof( uint32_t ) ) );
-            image->width = desc.width;
-            image->height = desc.height;
-            uint32_t bgcolor = game->yarn->assets.palette[ game->color_background ];
-            for( int i = 0; i < image->width * image->height; ++i ) {
-                uint32_t c = pixels[ i ];
-                uint8_t a = (uint8_t)( c >> 24 );
-                image->pixels[ i ] = blend_rgb( bgcolor, c, a );
+    if( game->yarn->globals.colormode != YARN_COLORMODE_PALETTE ) {
+        game->rgbimages = (rgbimage_t**)manage_alloc( malloc( sizeof( rgbimage_t* ) * game->yarn->assets.bitmaps->count ) );
+        for( int i = 0; i < game->yarn->assets.bitmaps->count; ++i ) {
+            bool jpeg = game->yarn->globals.colormode == YARN_COLORMODE_RGB && game->yarn->globals.resolution == YARN_RESOLUTION_FULL;
+            qoi_data_t* qoi = (qoi_data_t*)game->yarn->assets.bitmaps->items[ i ];
+            if( !jpeg ) {        
+                qoi_desc desc;
+                uint32_t* pixels = (uint32_t*)qoi_decode( qoi->data, qoi->size, &desc, 4 ); 
+                rgbimage_t* image = (rgbimage_t*)manage_alloc( malloc( sizeof( rgbimage_t) + ( desc.width * desc.height - 1 ) * sizeof( uint32_t ) ) );
+                image->width = desc.width;
+                image->height = desc.height;
+                uint32_t bgcolor = game->yarn->assets.palette[ game->color_background ];
+                for( int i = 0; i < image->width * image->height; ++i ) {
+                    uint32_t c = pixels[ i ];
+                    uint8_t a = (uint8_t)( c >> 24 );
+                    image->pixels[ i ] = blend_rgb( bgcolor, c, a );
+                }
+                game->rgbimages[ i ] = image;
+                free( pixels );
+            } else {
+                int width, height, c;
+                stbi_uc* pixels = stbi_load_from_memory( qoi->data, qoi->size, &width, &height, &c, 4 );
+                rgbimage_t* image = (rgbimage_t*)manage_alloc( malloc( sizeof( rgbimage_t) + ( width * height - 1 ) * sizeof( uint32_t ) ) );
+                image->width = width;
+                image->height = height;
+                memcpy( image->pixels, pixels, width * height * sizeof( uint32_t ) );
+                game->rgbimages[ i ] = image;
+                free( pixels );
             }
-            game->rgbimages[ i ] = image;
-            free( pixels );
-        } else {
-            int width, height, c;
-            stbi_uc* pixels = stbi_load_from_memory( qoi->data, qoi->size, &width, &height, &c, 4 );
-            rgbimage_t* image = (rgbimage_t*)manage_alloc( malloc( sizeof( rgbimage_t) + ( width * height - 1 ) * sizeof( uint32_t ) ) );
-            image->width = width;
-            image->height = height;
-            memcpy( image->pixels, pixels, width * height * sizeof( uint32_t ) );
-            game->rgbimages[ i ] = image;
-            free( pixels );
         }
     }
 }

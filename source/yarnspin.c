@@ -186,6 +186,7 @@ int app_proc( app_t* app, void* user_data ) {
     #else
         bool fullscreen = false;
     #endif
+
     app_interpolation( app, yarn->globals.resolution >= YARN_RESOLUTION_FULL || ( yarn->globals.resolution == YARN_RESOLUTION_HIGH && yarn->globals.colormode == YARN_COLORMODE_RGB ) ? APP_INTERPOLATION_LINEAR : APP_INTERPOLATION_NONE );
     app_screenmode( app, fullscreen ? APP_SCREENMODE_FULLSCREEN : APP_SCREENMODE_WINDOW );
     app_title( app, yarn->globals.title );
@@ -243,7 +244,7 @@ int app_proc( app_t* app, void* user_data ) {
     }
 
     thread_mutex_init( &g_sound_mutex );
-    app_sound( app, 735 * 16, sound_callback, &game );
+    app_sound( app, 735 * 32, sound_callback, &game );
 
     // main loop
     APP_U64 time = 0;
