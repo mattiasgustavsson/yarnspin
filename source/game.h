@@ -803,8 +803,41 @@ void do_actions( game_t* game, array_param(yarn_act_t)* act_param ) {
 
 // boot
 gamestate_t boot_init( game_t* game ) {
-    cls( game );
     game->state.logo_index = -1;
+    cls( game );
+    return GAMESTATE_NO_CHANGE;
+}
+
+
+gamestate_t boot_update( game_t* game ) {
+    (void) game;
+    #ifdef __wasm__
+        static int blink_count = 0;
+        static int blink_wait = 100;
+        static bool visible = true;
+	    if( blink_count > 0 ) {
+		    --blink_count;
+		    if( blink_count > 0 ) {
+			    visible = blink_count % 30 < 15;
+		    } else {
+			    visible = true;
+		    }
+	    } else {
+		    --blink_wait;
+		    if( blink_wait <= 0 ) {
+			    blink_wait = 200;
+			    blink_count = 100;
+		    }
+	    }
+        cls( game );
+        if( visible ) {
+            center( game, game->yarn->assets.font_name, "CLICK TO START", 160, 120 - game->yarn->assets.font_name->height / 2, game->color_name );
+        }
+        if( !was_key_pressed( game, APP_KEY_LBUTTON ) ) {
+            return GAMESTATE_NO_CHANGE;
+        }
+    #endif
+
     if( game->yarn->screen_names->count > 0 && !( game->yarn->is_debug && ( game->yarn->debug_start_dialog >= 0 || game->yarn->debug_start_location >= 0  ) ) ) {
         game->state.current_music = game->yarn->globals.logo_music;
         return GAMESTATE_TITLE;
@@ -815,11 +848,6 @@ gamestate_t boot_init( game_t* game ) {
     } else {
         return GAMESTATE_EXIT;
     }
-}
-
-
-gamestate_t boot_update( game_t* game ) {
-    (void) game;
     return GAMESTATE_NO_CHANGE;
 }
 
