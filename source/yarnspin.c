@@ -348,10 +348,7 @@ int app_proc( app_t* app, void* user_data ) {
                 crtemu_tv = NULL;
                 memset( screen, 0, ( 1440 + (int)( 22 * 4.5f ) ) * ( 1080 + (int)( 33 * 4.5 ) ) * sizeof( uint32_t ) );
         }
-        int mx = input.mouse_x;
-        int my = input.mouse_y;
-        if( canvas_rgb ) canvas_rgb[ mx + screen_width * my ] = 0xffffff;
-        if( canvas ) canvas[ mx + screen_width * my ] = game.color_opt;
+
         if( crtemu_lite ) {
             if( canvas ) {
                 for( int i = 0; i < screen_width * screen_height; ++i ) {
