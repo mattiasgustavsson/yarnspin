@@ -16,7 +16,7 @@ void input_init( struct input_t* input, app_t* app ) {
 }
 
 
-void input_update(  struct input_t* input, int screen_width, int screen_height, crtemu_lite_t* crtemu_lite, crtemu_pc_t* crtemu_pc, crtemu_t* crtemu ) {
+void input_update(  struct input_t* input, int screen_width, int screen_height, crtemu_t* crtemu_lite, crtemu_t* crtemu_pc, crtemu_t* crtemu ) {
     for( int i = 0; i < 256; ++i ) {
         input->prev_[ i ] = input->curr_[ i ];
         input->curr_[ i ] = false;
@@ -29,9 +29,9 @@ void input_update(  struct input_t* input, int screen_width, int screen_height, 
             input->mouse_x = in.events[ i ].data.mouse_pos.x;
             input->mouse_y = in.events[ i ].data.mouse_pos.y;
             if( crtemu_lite ) {
-                crtemu_lite_coordinates_window_to_bitmap( crtemu_lite, screen_width, screen_height, &input->mouse_x, &input->mouse_y );
+                crtemu_coordinates_window_to_bitmap( crtemu_lite, screen_width, screen_height, &input->mouse_x, &input->mouse_y );
             } else if( crtemu_pc ) {
-                crtemu_pc_coordinates_window_to_bitmap( crtemu_pc, screen_width, screen_height, &input->mouse_x, &input->mouse_y );
+                crtemu_coordinates_window_to_bitmap( crtemu_pc, screen_width, screen_height, &input->mouse_x, &input->mouse_y );
             } else if( crtemu ) {
                 int border_x = 22;
                 int border_y = 33;
