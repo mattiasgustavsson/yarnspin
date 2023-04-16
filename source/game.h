@@ -42,6 +42,7 @@ typedef struct game_t {
     gamestate_t current_state;
     gamestate_t new_state;
     bool disable_transition;
+    bool ingame_menu;
     int transition_counter;
     uint8_t* screen;
     uint32_t* screen_rgb;
@@ -340,6 +341,10 @@ void game_init( game_t* game, yarn_t* yarn, input_t* input, uint8_t* screen, uin
     }
 }
 
+bool was_key_pressed( game_t* game, int key ) {
+    return input_was_key_pressed( game->input, key );
+}
+
 
 gamestate_t boot_init( game_t* game );
 gamestate_t boot_update( game_t* game );
@@ -353,6 +358,8 @@ gamestate_t exit_init( game_t* game );
 gamestate_t exit_update( game_t* game );
 gamestate_t terminate_init( game_t* game );
 gamestate_t terminate_update( game_t* game );
+
+void ingame_menu_update( game_t* game );
 
 
 void game_update( game_t* game, float delta_time ) {
@@ -387,7 +394,33 @@ void game_update( game_t* game, float delta_time ) {
         }
     }
 
+    if( game->ingame_menu ) {
+        ingame_menu_update( game );
+        return;
+    } else {
+        if( was_key_pressed( game, APP_KEY_ESCAPE ) ) {
+            game->ingame_menu = true;
+            if( game->screen ) {
+                for( int y = 0; y < game->screen_height; ++y ) {
+                    for( int x = 0; x < game->screen_width; ++x ) {
+                        if( ( x + y ) & 1 ) {
+                            game->screen[ x + y * game->screen_width ] = game->color_background;
+                        }
+                    }
+                }
+            } else {
+                for( int y = 0; y < game->screen_height; ++y ) {
+                    for( int x = 0; x < game->screen_width; ++x ) {
+                        game->screen_rgb[ x + y * game->screen_width ] = blend_rgb( game->screen_rgb[ x + y * game->screen_width ], 0x000000, 127 );
+                    }
+                }
+            }
+            return;
+        }
+    }
+
     game->delta_time = delta_time;
+
     if( game->new_state != GAMESTATE_NO_CHANGE ) {
         if( !game->disable_transition ) {
             game->transition_counter = -10;
@@ -635,10 +668,6 @@ int font_height( game_t* game, int height ) {
 }
 
 
-bool was_key_pressed( game_t* game, int key ) {
-    return input_was_key_pressed( game->input, key );
-}
-
 
 yarn_location_t* find_location( yarn_t* yarn, string location_id ) {
     for( int i = 0; i < yarn->locations->count; ++i ) {
@@ -801,6 +830,32 @@ void do_actions( game_t* game, array_param(yarn_act_t)* act_param ) {
 }
 
 
+
+void ingame_menu_update( game_t* game ) {
+    box( game, 104, 46, 123, 163, game->color_background );
+    box( game, 99, 39, 124, 164, game->color_background );
+    box( game, 100, 40, 121, 161, game->color_opt );
+    box( game, 102, 42, 118, 158, game->color_background );
+    int spacing = 25;
+    int ypos = 50 + ( 160 - ( 5 * spacing ) ) / 2 - spacing;
+    center( game, game->font_name, "RESUME", 160, ypos+=spacing, game->color_opt );
+    center( game, game->font_name, "SAVE GAME", 160, ypos+=spacing, game->color_opt );
+    center( game, game->font_name, "LOAD GAME", 160, ypos+=spacing, game->color_opt );
+    center( game, game->font_name, "RESTART", 160, ypos+=spacing, game->color_opt );
+    center( game, game->font_name, "QUIT", 160, ypos+=spacing, game->color_opt );
+    if( was_key_pressed( game, APP_KEY_ESCAPE ) || was_key_pressed( game, APP_KEY_1 ) ) {
+        game->ingame_menu = false;
+    } else if( was_key_pressed( game, APP_KEY_2 ) ) {
+    } else if( was_key_pressed( game, APP_KEY_3 ) ) {
+    } else if( was_key_pressed( game, APP_KEY_4 ) ) {
+    } else if( was_key_pressed( game, APP_KEY_5 ) ) {
+        game->new_state = GAMESTATE_TERMINATE;
+        game->ingame_menu = false;
+    }
+}
+
+
+
 // boot
 gamestate_t boot_init( game_t* game ) {
     game->state.logo_index = -1;
@@ -864,7 +919,7 @@ gamestate_t title_update( game_t* game ) {
         draw( game, game->yarn->globals.logo_indices->items[ game->state.logo_index ], 0, 0 );
     }
 
-    if( was_key_pressed( game, APP_KEY_LBUTTON ) || was_key_pressed( game, APP_KEY_SPACE ) || was_key_pressed( game, APP_KEY_ESCAPE ) ) {
+    if( was_key_pressed( game, APP_KEY_LBUTTON ) || was_key_pressed( game, APP_KEY_SPACE ) ) {
         if( game->state.logo_index < game->yarn->globals.logo_indices->count - 1 ) {
             return GAMESTATE_TITLE;
         } else {
@@ -1071,10 +1126,6 @@ gamestate_t location_update( game_t* game ) {
             pixelfont_bounds_t b = center( game,  game->font_chr, game->yarn->characters->items[ game->state.chars->items[ i ] ].short_name, 32, ypos, color );
             ++c;
         }
-    }
-
-    if( was_key_pressed( game, APP_KEY_ESCAPE ) ) {
-        return GAMESTATE_TERMINATE;
     }
 
     if( game->queued_dialog < 0 && game->queued_location < 0 ) {
@@ -1309,11 +1360,6 @@ gamestate_t dialog_update( game_t* game ) {
             }
         }
         ++c;
-    }
-
-
-    if( was_key_pressed( game, APP_KEY_ESCAPE ) ) {
-        return GAMESTATE_TERMINATE;
     }
 
     if( game->queued_dialog >= 0 && game->dialog.enable_options == 2  ) {
