@@ -22,6 +22,7 @@
 // Library includes
 #include "libs/app.h"
 #include "libs/array.h"
+#include "libs/audiosys.h"
 #include "libs/buffer.h"
 #include "libs/crtemu.h"
 #include "libs/cstr.h"
@@ -114,31 +115,10 @@ thread_mutex_t g_sound_mutex;
 
 void sound_callback( APP_S16* sample_pairs, int sample_pairs_count, void* user_data ) {
     thread_mutex_lock( &g_sound_mutex );
-
-    game_t* game = (game_t*) user_data;
-
-    if( game->sound_state.next_vorbis ) {
-        if( game->sound_state.prev_vorbis ) {
-            stb_vorbis_close( game->sound_state.prev_vorbis );
-            game->sound_state.prev_vorbis = NULL;
-        }
-        game->sound_state.prev_vorbis = game->sound_state.current_vorbis;
-        game->sound_state.current_vorbis = game->sound_state.next_vorbis;
-        game->sound_state.next_vorbis = NULL;
-    }
-    if( game->sound_state.current_vorbis ) {
-        while( sample_pairs_count > 0 ) {
-            int samples_decoded = stb_vorbis_get_samples_short_interleaved( game->sound_state.current_vorbis, 2, sample_pairs, sample_pairs_count * 2 );
-            if( samples_decoded < sample_pairs_count ) {
-                stb_vorbis_seek_start( game->sound_state.current_vorbis );
-            }
-            sample_pairs_count -= samples_decoded;
-            sample_pairs += samples_decoded * 2;
-        }
-    } else {
-        memset( sample_pairs, 0, sizeof( short ) * 2 * sample_pairs_count );
-    }
-
+    
+    audiosys_t* audiosys = (audiosys_t*) user_data;
+    audiosys_render( audiosys, sample_pairs, sample_pairs_count );
+    
     thread_mutex_unlock( &g_sound_mutex );
 }
 
@@ -228,6 +208,8 @@ int app_proc( app_t* app, void* user_data ) {
     uint32_t* screen = (uint32_t*)malloc( ( 1440 + (int)( 44 * 4.5f ) ) * ( 1080 + (int)(66 * 4.5 ) ) * sizeof( uint32_t ) );
     memset( screen, 0, ( 1440 + (int)( 44 * 4.5f ) ) * ( 1080 + (int)( 66 * 4.5 ) ) * sizeof( uint32_t ) );
 
+    audiosys_t* audiosys = audiosys_create( AUDIOSYS_DEFAULT_VOICE_COUNT, NULL );
+
     // run game
     input_t input;
     input_init( &input, app );
@@ -235,15 +217,15 @@ int app_proc( app_t* app, void* user_data ) {
     if( yarn->globals.colormode == YARN_COLORMODE_PALETTE ) {
         canvas = (uint8_t*)malloc( screen_width * screen_height * sizeof( uint8_t ) );
         memset( canvas, 0, screen_width * screen_height * sizeof( uint8_t ) );
-        game_init( &game, yarn, &input, canvas, NULL, screen_width, screen_height );
+        game_init( &game, yarn, &input, audiosys, canvas, NULL, screen_width, screen_height );
     } else {
         canvas_rgb = (uint32_t*)malloc( screen_width * screen_height * sizeof( uint32_t ) );
         memset( canvas_rgb, 0, screen_width * screen_height * sizeof( uint32_t ) );
-        game_init( &game, yarn, &input, NULL, canvas_rgb, screen_width, screen_height );
+        game_init( &game, yarn, &input, audiosys, NULL, canvas_rgb, screen_width, screen_height );
     }
 
     thread_mutex_init( &g_sound_mutex );
-    app_sound( app, 735 * 32, sound_callback, &game );
+    app_sound( app, 735 * 8, sound_callback, audiosys );
 
     // main loop
     APP_U64 time = 0;
@@ -405,20 +387,7 @@ int app_proc( app_t* app, void* user_data ) {
     app_sound( app, 0, NULL, NULL );
     thread_mutex_term( &g_sound_mutex );
 
-    if( game.sound_state.prev_vorbis ) {
-        stb_vorbis_close( game.sound_state.prev_vorbis );
-        game.sound_state.prev_vorbis = NULL;
-    }
-
-    if( game.sound_state.current_vorbis ) {
-        stb_vorbis_close( game.sound_state.current_vorbis );
-        game.sound_state.current_vorbis = NULL;
-    }
-
-    if( game.sound_state.next_vorbis ) {
-        stb_vorbis_close( game.sound_state.next_vorbis );
-        game.sound_state.next_vorbis = NULL;
-    }
+    audiosys_destroy( audiosys );
 
     frametimer_destroy( frametimer );
     if( crtemu_lite ) {
@@ -701,9 +670,11 @@ int main( int argc, char** argv ) {
 #define APP_LOG( ctx, level, message )
 #include "libs/app.h"
 
-
 #define ARRAY_IMPLEMENTATION
 #include "libs/array.h"
+
+#define AUDIOSYS_IMPLEMENTATION
+#include "libs/audiosys.h"
 
 #define BUFFER_IMPLEMENTATION
 #include "libs/buffer.h"

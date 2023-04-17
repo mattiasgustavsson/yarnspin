@@ -85,7 +85,7 @@ void imgedit_list_images( array_param(imgedit_image_t)* images, cstr_t folder, f
             if( cstr_is_equal( name, "settings.ini" ) ) {
                 continue;
             }
-            #if _WIN32
+            #ifdef _WIN32
             if( strrchr( name, '.' ) == NULL || stricmp( strrchr( name, '.' ), ".ini" ) == 0 ) {
             #else
             if( strrchr( name, '.' ) == NULL || strcasecmp( strrchr( name, '.' ), ".ini" ) == 0 ) {

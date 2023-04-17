@@ -761,14 +761,16 @@ bool compile_dialog( parser_section_t* section, yarn_t* yarn, compiler_context_t
                 } else {
                     music_name = cstr_cat( "music/", decl->data->items[ 0 ] );
                 }
-                if( !music_name || !file_exists( music_name ) ) {
-                    printf( "%s(%d): music file not found '%s'\n", decl->filename, decl->line_number, music_name ? music_name : "" );
-                    no_error = false;
-                } else {
-                    mus->music_index = find_music_index( music_name, yarn );
-                    if( mus->music_index < 0 ) {
-                        printf( "%s(%d): music not found '%s'\n", decl->filename, decl->line_number, music_name );
+                if( !mus->stop ) {
+                    if( !music_name || !file_exists( music_name ) ) {
+                        printf( "%s(%d): music file not found '%s'\n", decl->filename, decl->line_number, music_name ? music_name : "" );
                         no_error = false;
+                    } else {
+                        mus->music_index = find_music_index( music_name, yarn );
+                        if( mus->music_index < 0 ) {
+                            printf( "%s(%d): music not found '%s'\n", decl->filename, decl->line_number, music_name );
+                            no_error = false;
+                        }
                     }
                 }
             } else {
