@@ -243,8 +243,8 @@ void game_init( game_t* game, yarn_t* yarn, input_t* input, audiosys_t* audiosys
 
     game_restart( game );
 
-    game->sound_state.ogg_instances = (stb_vorbis**)manage_alloc( malloc( sizeof( stb_vorbis* ) * game->yarn->assets.music->count ) );
-    memset( game->sound_state.ogg_instances, 0, sizeof( stb_vorbis* ) * game->yarn->assets.music->count );
+    game->sound_state.ogg_instances = (stb_vorbis**)manage_alloc( malloc( sizeof( stb_vorbis* ) * game->yarn->assets.audio->count ) );
+    memset( game->sound_state.ogg_instances, 0, sizeof( stb_vorbis* ) * game->yarn->assets.audio->count );
 
     int darkest_index = 0;
     int darkest_luma = 65536;
@@ -405,12 +405,12 @@ int audio_ogg_get_position( void* instance ) {
 }
 
 
-bool audio_ogg_source( game_t* game, int music_index, audiosys_audio_source_t* src ) {
-    stb_vorbis** vorbis = &game->sound_state.ogg_instances[ music_index ];
+bool audio_ogg_source( game_t* game, int audio_index, audiosys_audio_source_t* src ) {
+    stb_vorbis** vorbis = &game->sound_state.ogg_instances[ audio_index ];
     if( *vorbis == NULL ) {
-        music_data_t* music_data = game->yarn->assets.music->items[ music_index ];
+        audio_data_t* audio_data = game->yarn->assets.audio->items[ audio_index ];
         int error = 0;
-        *vorbis = stb_vorbis_open_memory( music_data->data, music_data->size, &error, NULL );
+        *vorbis = stb_vorbis_open_memory( audio_data->data, audio_data->size, &error, NULL );
     }
     if( *vorbis ) {
         src->instance = vorbis;
@@ -745,17 +745,17 @@ bool test_cond( game_t* game, yarn_cond_t* cond ) {
 }
 
 
-void do_music( game_t* game, array_param(yarn_mus_t)* mus_param ) {
-    array(yarn_mus_t)* mus = ARRAY_CAST( mus_param );
-    for( int i = 0; i < mus->count; ++i ) {
-        if( test_cond( game, &mus->items[ i ].cond ) )  {
-            if( mus->items[ i ].stop ) {
+void do_audio( game_t* game, array_param(yarn_audio_t)* audio_param ) {
+    array(yarn_audio_t)* audio = ARRAY_CAST( audio_param );
+    for( int i = 0; i < audio->count; ++i ) {
+        if( test_cond( game, &audio->items[ i ].cond ) )  {
+            if( audio->items[ i ].stop ) {
                 game->state.current_music = -1;
                 audiosys_music_stop( game->audiosys, 0.5f );
             } else {
-                int music_index = mus->items[ i ].music_index;
+                int music_index = audio->items[ i ].audio_index;
                 if( music_index == game->state.current_music ) {
-                    if( mus->items[ i ].start ) {
+                    if( audio->items[ i ].restart ) {
                         audiosys_music_position_set( game->audiosys, 0.0f );
                     }
                 } else {
@@ -995,8 +995,8 @@ gamestate_t location_init( game_t* game ) {
     yarn_t* yarn = game->yarn;
     yarn_location_t* location = &yarn->locations->items[ game->state.current_location ];
 
-    //  mus:
-    do_music( game, location->mus );
+    // mus: amb: snd:
+    do_audio( game, location->audio );
 
     // act:
     do_actions( game, location->act );
@@ -1254,8 +1254,8 @@ gamestate_t dialog_init( game_t* game ) {
     yarn_t* yarn = game->yarn;
     yarn_dialog_t* dialog = &yarn->dialogs->items[ game->state.current_dialog ];
 
-    //  mus:
-    do_music( game, dialog->mus );
+    //  mus: amb: snd:
+    do_audio( game, dialog->audio );
 
     // act:
     do_actions( game, dialog->act );

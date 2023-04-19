@@ -1,10 +1,10 @@
 
 typedef string string_id; // strings of type string_id should be compared with case insensitive comparison
 
-typedef struct music_data_t {
+typedef struct audio_data_t {
     uint32_t size;
     uint8_t data[ 1 ];
-} music_data_t;
+} audio_data_t;
 
 int buffer_write_string( buffer_t* buffer, char const* const* value, int count ) {
     for( int i = 0; i < count; ++i ) {
@@ -295,42 +295,86 @@ yarn_img_t* empty_img( void ) {
     return &img;
 }
 
+typedef enum yarn_audio_type_t {
+    YARN_AUDIO_TYPE_MUSIC,
+    YARN_AUDIO_TYPE_AMBIENCE,
+    YARN_AUDIO_TYPE_SOUND,
+} yarn_audio_type_t;
 
-typedef struct yarn_mus_t {
+
+typedef struct yarn_audio_t {
     yarn_cond_t cond;
-    int music_index;
-    bool start;
+    yarn_audio_type_t type;
+    int audio_index;
+    bool loop;
+    bool restart;
     bool stop;
-    float volume;
-} yarn_mus_t;
+    bool resume;
+    bool random;
+    float crossfade_min;
+    float crossfade_max;
+    float delay_min;
+    float delay_max;
+    float volume_min;
+    float volume_max;
+} yarn_audio_t;
 
 
-yarn_mus_t* empty_mus( void ) {
-    static yarn_mus_t mus;
-    mus.cond = *empty_cond();
-    mus.music_index = -1;
-    mus.start = false;
-    mus.stop = false;
-    mus.volume = 1.0f;
-    return &mus;
+yarn_audio_t* empty_audio( void ) {
+    static yarn_audio_t audio;
+    audio.cond = *empty_cond();
+    audio.type = (yarn_audio_type_t)-1;
+    audio.audio_index = -1;
+    audio.loop = false;
+    audio.restart = false;
+    audio.stop = false;
+    audio.resume = false;
+    audio.random = false;
+    audio.crossfade_min = 0.0f;
+    audio.crossfade_max = 0.0f;
+    audio.delay_min = 0.0f;
+    audio.delay_max = 0.0f;
+    audio.volume_min = 1.0f;
+    audio.volume_max = 1.0f;
+    return &audio;
 }
 
 
-void save_mus( buffer_t* out, yarn_mus_t* mus ) {
-    save_cond( out, &mus->cond );
-    buffer_write_i32( out, &mus->music_index, 1 );
-    buffer_write_bool( out, &mus->start, 1 );
-    buffer_write_bool( out, &mus->stop, 1 );
-    buffer_write_float( out, &mus->volume, 1 );
+void save_audio( buffer_t* out, yarn_audio_t* audio ) {
+    save_cond( out, &audio->cond );
+    int type = (int) audio->type;
+    buffer_write_i32( out, &type, 1 );
+    buffer_write_i32( out, &audio->audio_index, 1 );
+    buffer_write_bool( out, &audio->loop, 1 );
+    buffer_write_bool( out, &audio->restart, 1 );
+    buffer_write_bool( out, &audio->stop, 1 );
+    buffer_write_bool( out, &audio->resume, 1 );
+    buffer_write_bool( out, &audio->random, 1 );
+    buffer_write_float( out, &audio->crossfade_min, 1 );
+    buffer_write_float( out, &audio->crossfade_max, 1 );
+    buffer_write_float( out, &audio->delay_min, 1 );
+    buffer_write_float( out, &audio->delay_max, 1 );
+    buffer_write_float( out, &audio->volume_min, 1 );
+    buffer_write_float( out, &audio->volume_max, 1 );
 }
 
 
-void load_mus( buffer_t* in, yarn_mus_t* mus ) {
-    load_cond( in, &mus->cond );
-    mus->music_index = read_int( in );
-    mus->start = read_bool( in );
-    mus->stop = read_bool( in );
-    mus->volume = read_float( in );    
+void load_audio( buffer_t* in, yarn_audio_t* audio ) {
+    load_cond( in, &audio->cond );
+    int type = read_int( in );
+    audio->type = (yarn_audio_type_t) type; 
+    audio->audio_index = read_int( in );
+    audio->loop = read_bool( in );
+    audio->restart = read_bool( in );
+    audio->stop = read_bool( in );
+    audio->resume = read_bool( in );
+    audio->random = read_bool( in );
+    audio->crossfade_min = read_float( in );    
+    audio->crossfade_max = read_float( in );    
+    audio->delay_min = read_float( in );    
+    audio->delay_max = read_float( in );    
+    audio->volume_min = read_float( in );    
+    audio->volume_max = read_float( in );    
 }
 
 
@@ -351,7 +395,7 @@ yarn_txt_t* empty_txt( void ) {
 typedef struct yarn_location_t {
     string_id id;
     array(yarn_img_t)* img;
-    array(yarn_mus_t)* mus;
+    array(yarn_audio_t)* audio;
     array(yarn_txt_t)* txt;
     array(yarn_act_t)* act;
     array(yarn_opt_t)* opt;
@@ -364,7 +408,7 @@ yarn_location_t* empty_location( void ) {
     static yarn_location_t location;
     location.id = NULL;
     location.img = managed_array(yarn_img_t);
-    location.mus = managed_array(yarn_mus_t);
+    location.audio = managed_array(yarn_audio_t);
     location.txt = managed_array(yarn_txt_t);
     location.act = managed_array(yarn_act_t);
     location.opt = managed_array(yarn_opt_t);
@@ -383,9 +427,9 @@ void save_location( buffer_t* out, yarn_location_t* location ) {
         buffer_write_i32( out, &location->img->items[ i ].image_index, 1 );
     }
 
-    buffer_write_i32( out, &location->mus->count, 1 );
-    for( int i = 0; i < location->mus->count; ++i ) {
-        save_mus( out, &location->mus->items[ i ] );
+    buffer_write_i32( out, &location->audio->count, 1 );
+    for( int i = 0; i < location->audio->count; ++i ) {
+        save_audio( out, &location->audio->items[ i ] );
     }
 
     buffer_write_i32( out, &location->txt->count, 1 );
@@ -428,12 +472,12 @@ void load_location( buffer_t* in, yarn_location_t* location ) {
         array_add( location->img, &img );
     }
 
-    location->mus = managed_array(yarn_mus_t);
-    int mus_count = read_int( in );
-    for( int i = 0; i < mus_count; ++i ) {
-        yarn_mus_t mus;
-        load_mus( in, &mus );
-        array_add( location->mus, &mus );
+    location->audio = managed_array(yarn_audio_t);
+    int audio_count = read_int( in );
+    for( int i = 0; i < audio_count; ++i ) {
+        yarn_audio_t audio;
+        load_audio( in, &audio );
+        array_add( location->audio, &audio );
     }
 
     location->txt = managed_array(yarn_txt_t);
@@ -558,7 +602,7 @@ void save_say( buffer_t* out, yarn_say_t* say ) {
 
 typedef struct yarn_dialog_t {
     string_id id;
-    array(yarn_mus_t)* mus;
+    array(yarn_audio_t)* audio;
     array(yarn_act_t)* act;
     array(yarn_phrase_t)* phrase;
     array(yarn_say_t)* say;
@@ -569,7 +613,7 @@ typedef struct yarn_dialog_t {
 yarn_dialog_t* empty_dialog( void ) {
     static yarn_dialog_t dialog;
     dialog.id = NULL;
-    dialog.mus = managed_array(yarn_mus_t);
+    dialog.audio = managed_array(yarn_audio_t);
     dialog.act = managed_array(yarn_act_t);
     dialog.phrase = managed_array(yarn_phrase_t);
     dialog.say = managed_array(yarn_say_t);
@@ -581,9 +625,9 @@ yarn_dialog_t* empty_dialog( void ) {
 void save_dialog( buffer_t* out, yarn_dialog_t* dialog ) {
     buffer_write_string( out, &dialog->id, 1 );
 
-    buffer_write_i32( out, &dialog->mus->count, 1 );
-    for( int i = 0; i < dialog->mus->count; ++i ) {
-        save_mus( out, &dialog->mus->items[ i ] );
+    buffer_write_i32( out, &dialog->audio->count, 1 );
+    for( int i = 0; i < dialog->audio->count; ++i ) {
+        save_audio( out, &dialog->audio->items[ i ] );
     }
 
     buffer_write_i32( out, &dialog->act->count, 1 );
@@ -613,12 +657,12 @@ void save_dialog( buffer_t* out, yarn_dialog_t* dialog ) {
 void load_dialog( buffer_t* in, yarn_dialog_t* dialog ) {
     dialog->id = read_string( in );
 
-    dialog->mus = managed_array(yarn_mus_t);
-    int mus_count = read_int( in );
-    for( int i = 0; i < mus_count; ++i ) {
-        yarn_mus_t mus;
-        load_mus( in, &mus );
-        array_add( dialog->mus, &mus );
+    dialog->audio = managed_array(yarn_audio_t);
+    int audio_count = read_int( in );
+    for( int i = 0; i < audio_count; ++i ) {
+        yarn_audio_t audio;
+        load_audio( in, &audio );
+        array_add( dialog->audio, &audio );
     }
 
     dialog->act = managed_array(yarn_act_t);
@@ -965,7 +1009,7 @@ typedef struct yarn_assets_t {
     pixelfont_t* font_name;
 
     array(palrle_data_t*)* bitmaps;
-    array(music_data_t*)* music;
+    array(audio_data_t*)* audio;
 
     uint32_t frame_pc_size;
     void* frame_pc;
@@ -988,7 +1032,7 @@ yarn_assets_t* empty_assets( void ) {
     assets.font_name = NULL;
 
     assets.bitmaps = managed_array(palrle_data_t*);
-    assets.music = managed_array(music_data_t*);
+    assets.audio = managed_array(audio_data_t*);
 
     assets.frame_pc_size = 0;
     assets.frame_pc = NULL;
@@ -1031,10 +1075,10 @@ void save_assets( buffer_t* out, yarn_assets_t* assets, yarn_colormode_t colormo
         }
     }
 
-    buffer_write_i32( out, &assets->music->count, 1 );
-    for( int i = 0; i < assets->music->count; ++i ) {
-        buffer_write_u32( out, &assets->music->items[ i ]->size, 1 );
-        buffer_write_u8( out, assets->music->items[ i ]->data, assets->music->items[ i ]->size );
+    buffer_write_i32( out, &assets->audio->count, 1 );
+    for( int i = 0; i < assets->audio->count; ++i ) {
+        buffer_write_u32( out, &assets->audio->items[ i ]->size, 1 );
+        buffer_write_u8( out, assets->audio->items[ i ]->data, assets->audio->items[ i ]->size );
     }
 
     buffer_write_u32( out, &assets->frame_pc_size, 1 );
@@ -1098,15 +1142,15 @@ void load_assets( buffer_t* in, yarn_assets_t* assets, yarn_colormode_t colormod
         }
     }
 
-    assets->music = managed_array(music_data_t*);
-    int music_count = read_int( in );
-    for( int i = 0; i < music_count; ++i ) {
+    assets->audio = managed_array(audio_data_t*);
+    int audio_count = read_int( in );
+    for( int i = 0; i < audio_count; ++i ) {
         uint32_t size;
         buffer_read_u32( in, &size, 1 );
-        music_data_t* music = (music_data_t*)manage_alloc( malloc( sizeof( music_data_t ) + ( size - 1 ) ) );
-        music->size = size;
-        buffer_read_u8( in, music->data, size );
-        array_add( assets->music, &music );
+        audio_data_t* audio = (audio_data_t*)manage_alloc( malloc( sizeof( audio_data_t ) + ( size - 1 ) ) );
+        audio->size = size;
+        buffer_read_u8( in, audio->data, size );
+        array_add( assets->audio, &audio );
     }
 
     buffer_read_u32( in, &assets->frame_pc_size, 1 );
@@ -1134,7 +1178,7 @@ typedef struct yarn_t {
     array(string_id)* flag_ids;
     array(string_id)* item_ids;
     array(string_id)* image_names;
-    array(string_id)* music_names;
+    array(string_id)* audio_names;
     array(string_id)* screen_names;
     array(string_id)* face_names;
 
@@ -1158,7 +1202,7 @@ yarn_t* empty_yarn( void ) {
     yarn.flag_ids = managed_array(string_id);
     yarn.item_ids = managed_array(string_id);
     yarn.image_names = managed_array(string_id);
-    yarn.music_names = managed_array(string_id);
+    yarn.audio_names = managed_array(string_id);
     yarn.screen_names = managed_array(string_id);
     yarn.face_names = managed_array(string_id);
 
@@ -1450,14 +1494,14 @@ buffer_t* yarn_compile( char const* path ) {
         }
     }
 
-    printf( "Processing music\n" );
-    for( int i = 0; i < yarn.music_names->count; ++i ) {
-        string_id music_name = yarn.music_names->items[ i ];
-        file_t* file = file_load( music_name, FILE_MODE_BINARY, NULL );
-        music_data_t* music = (music_data_t*)manage_alloc( malloc( sizeof( music_data_t ) + ( file ? file->size : 0 ) - 1 ) );
-        music->size = file ? (uint32_t) file->size : 0;
-        memcpy( music->data, file->data, music->size ); 
-        array_add( yarn.assets.music, &music );
+    printf( "Processing audio\n" );
+    for( int i = 0; i < yarn.audio_names->count; ++i ) {
+        string_id audio_name = yarn.audio_names->items[ i ];
+        file_t* file = file_load( audio_name, FILE_MODE_BINARY, NULL );
+        audio_data_t* audio = (audio_data_t*)manage_alloc( malloc( sizeof( audio_data_t ) + ( file ? file->size : 0 ) - 1 ) );
+        audio->size = file ? (uint32_t) file->size : 0;
+        memcpy( audio->data, file->data, audio->size ); 
+        array_add( yarn.assets.audio, &audio );
         file_destroy( file );
     }
 

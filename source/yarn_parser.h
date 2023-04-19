@@ -37,7 +37,7 @@ bool is_multi_item_keyword( string keyword ) {
     char const* multi_item_keywords[] = { 
         "display_filters", "logo", "flags", "items",
         "font_description", "font_options", "font_characters", "font_items", "font_name",
-        "debug_set_flags", "debug_get_items", "debug_attach_chars", "mus", 
+        "debug_set_flags", "debug_get_items", "debug_attach_chars", "mus", "amb", "snd", 
     };
     for( int i = 0; i < ARRAY_COUNT( multi_item_keywords ); ++i ) {
         if( cstr_compare_nocase( keyword, multi_item_keywords[ i ] ) == 0 ) {
@@ -69,7 +69,7 @@ bool is_global_keyword( string keyword ) {
 
 bool is_section_keyword( string keyword ) {
     char const* section_keywords[] = {
-        "mus", "img", "txt", "opt", "act", "use", "chr",
+        "mus", "amb", "snd",  "img", "txt", "opt", "act", "use", "chr",
         "say", "name", "short", "face",
     };
     for( int i = 0; i < ARRAY_COUNT( section_keywords ); ++i ) {

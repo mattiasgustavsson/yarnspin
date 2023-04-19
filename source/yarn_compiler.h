@@ -152,9 +152,9 @@ int find_image_index( string_id name, yarn_t* yarn ) {
 }
 
 
-int find_music_index( string_id name, yarn_t* yarn ) {
-    for( int i = 0; i < yarn->music_names->count; ++i )
-        if( yarn->music_names->items[ i ] == name ) return i;
+int find_audio_index( string_id name, yarn_t* yarn ) {
+    for( int i = 0; i < yarn->audio_names->count; ++i )
+        if( yarn->audio_names->items[ i ] == name ) return i;
     return -1;
 }
 
@@ -206,6 +206,154 @@ bool skip_word_if_match( string_id* str_param, string word ) {
 }
 
 
+bool extract_time_range( cstr_t str, float* time_min, float* time_max ) {
+    if( !cstr_ends( str, "s" ) || !isdigit( *str ) ) {
+        return false;
+    }
+    
+    // extract first number
+    char const* s = str; 
+    bool point = false;
+    while( *s != 's' ) {
+        if( *s == '.' ) {
+            if( point ) {
+                return false;
+            }
+            point = true;
+            ++s;
+        }        
+        if( !isdigit( *s ) ) {
+            return false;
+        }
+        ++s;
+    }    
+
+    float value = atof( cstr_left( str, s - str ) );
+    if( value <= 0.0f ) {
+        return false;
+    }
+    ++s;
+    
+    if( time_min ) {
+        *time_min = value;
+    }
+
+    if( time_max ) {
+        *time_max = value;
+    }
+
+    if( s - str == cstr_len( str ) ) {
+        return true;
+    }
+ 
+    // test if this is a range
+    if( *s != '-' ) {
+        return false;
+    }
+    ++s;
+    str = s;
+
+    // extract second number
+    s = str; 
+    point = false;
+    while( *s != 's' ) {
+        if( *s == '.' ) {
+            if( point ) {
+                return false;
+            }
+            point = true;
+            ++s;
+        }        
+        if( !isdigit( *s ) ) {
+            return false;
+        }
+        ++s;
+    }    
+
+    value = atof( cstr_left( str, s - str ) );
+    if( value <= 0.0f ) {
+        return false;
+    }
+    ++s;
+    
+    if( time_max ) {
+        *time_max = value;
+    }
+
+    if( s - str == cstr_len( str ) ) {
+        return true;
+    }
+
+    return false;
+}
+
+
+bool extract_volume_range( cstr_t str, float* volume_min, float* volume_max ) {
+    if( !cstr_ends( str, "%" ) || !isdigit( *str ) ) {
+        return false;
+    }
+    
+    // extract first number
+    char const* s = str; 
+    while( *s != '%' ) {
+        if( !isdigit( *s ) ) {
+            return false;
+        }
+        ++s;
+    }    
+
+    int value = atoi( cstr_left( str, s - str ) );
+    if( value <= 0 ) {
+        return false;
+    }
+    ++s;
+    
+    if( volume_min ) {
+        *volume_min = ( (float) value ) / 100.0f;
+    }
+
+    if( volume_max ) {
+        *volume_max = ( (float) value ) / 100.0f;
+    }
+
+    if( s - str == cstr_len( str ) ) {
+        return true;
+    }
+ 
+    // test if this is a range
+    if( *s != '-' ) {
+        return false;
+    }
+    ++s;
+    str = s;
+
+    // extract second number
+    s = str;
+    while( *s != '%' ) {
+        if( !isdigit( *s ) ) {
+            return false;
+        }
+        ++s;
+    }   
+
+    value = atoi( cstr_left( str, s - str ) );
+    if( value <= 0 ) {
+        return false;
+    }
+    ++s;
+    
+    if( volume_max ) {
+        *volume_max = ( (float) value ) / 100.0f;
+    }
+
+    if( s - str == cstr_len( str ) ) {
+        return true;
+    }
+
+    return false;
+}
+
+
 bool extract_declaration_fields( parser_section_t* section, yarn_t* yarn, compiler_context_t* context ) {
     bool no_error = true;
     for( int j = 0; j < section->declarations->count; ++j ) {
@@ -239,29 +387,37 @@ bool extract_declaration_fields( parser_section_t* section, yarn_t* yarn, compil
                 }
                 add_unique_id( yarn->image_names, image_name );
             }
-        } else if( CMP( decl->keyword,  "mus" ) ) {
+        } else if( CMP( decl->keyword, "mus" ) || CMP( decl->keyword, "amb" ) || CMP( decl->keyword, "snd" ) ) {
+            string_id audio_name = NULL;
             bool stop = false;
-            string_id music_name = NULL;
-            if( decl->data->count > 0 ) { 
-                if( CMP( decl->data->items[ 0 ], "start" ) ) {
-                    if( decl->data->count >= 2 ) {
-                        music_name = cstr_trim( decl->data->items[ 1 ] );
-                    }
-                } else if( CMP( decl->data->items[ 0 ], "stop" ) ) {
+            for( int i = 0; i < decl->data->count; ++i ) {
+                string_id str = cstr_trim( decl->data->items[ i ] );               
+
+                if( CMP( str, "stop" ) ) {
                     stop = true;
-                } else {
-                    music_name = cstr_trim( decl->data->items[ 0 ] );
+                    continue;
                 }
+
+                if( CMP( str, "restart" ) || CMP( str, "random" ) || CMP( str, "resume" ) || CMP( str, "loop" ) || CMP( str, "stop" ) || extract_time_range( str, NULL, NULL ) || extract_volume_range( str, NULL, NULL ) ) {
+                    continue;
+                }
+                
+                if( audio_name ) {
+                    printf( "%s(%d): multiple audio names specified '%s', '%s'\n", decl->filename, decl->line_number, audio_name, str );
+                    no_error = false;
+                }
+                audio_name = str;
             }
-            if( music_name ) {
-                music_name = cstr_cat( "music/", music_name );
-                if( !file_exists( music_name ) ) {
-                    printf( "%s(%d): music file not found '%s'\n", decl->filename, decl->line_number, music_name ? music_name : "" );
+            if( audio_name ) {
+                audio_name = cstr_cat( "sound/", audio_name );
+                if( !file_exists( audio_name ) ) {
+                    printf( "%s(%d): audio file not found '%s'\n", decl->filename, decl->line_number, audio_name ? audio_name : "" );
                     no_error = false;
                 } 
-                add_unique_id( yarn->music_names, music_name );
+                add_unique_id( yarn->audio_names, audio_name );
             } else if( !stop ) {
-                printf( "%s(%d): invalid music name '%s'\n", decl->filename, decl->line_number, concat_data( decl->data ) );
+                printf( "%s(%d): no audio name specified '%s'\n", decl->filename, decl->line_number, concat_data( decl->data ) );
+                no_error = false;
             }
         } else if( CMP( decl->keyword, "face" ) ) {
             if( decl->data->count != 1 || ( decl->data->count == 1 && cstr_len( cstr_trim( decl->data->items[ 0 ] ) ) <= 0 ) ) {
@@ -492,6 +648,105 @@ bool compile_cond( array_param(string)* data_param, yarn_cond_or_t* compiled_con
 }
 
 
+bool compile_audio( yarn_audio_t* audio, parser_declaration_t* decl, yarn_t* yarn ) {
+    bool no_error = true;
+    audio->type = CMP( decl->keyword, "mus" ) ? YARN_AUDIO_TYPE_MUSIC : CMP( decl->keyword, "amb" ) ? YARN_AUDIO_TYPE_AMBIENCE : YARN_AUDIO_TYPE_SOUND;               
+    string audio_name = NULL;
+    for( int i = 0; i < decl->data->count; ++i ) {
+        string_id str = cstr_trim( decl->data->items[ i ] );               
+        if( CMP( str, "restart" ) ) {
+            if( audio->type == YARN_AUDIO_TYPE_SOUND ) {
+                printf( "%s(%d): 'start' can not be specified for 'snd:'\n", decl->filename, decl->line_number );
+                no_error = false;
+            }
+            audio->restart = true;
+        } else if( CMP( str, "random" ) ) {
+            if( audio->type == YARN_AUDIO_TYPE_SOUND ) {
+                printf( "%s(%d): 'random' can not be specified for 'snd:'\n", decl->filename, decl->line_number );
+                no_error = false;
+            }
+            audio->random = true;
+        } else if( CMP( str, "resume" ) ) {
+            if( audio->type == YARN_AUDIO_TYPE_SOUND ) {
+                printf( "%s(%d): 'resume' can not be specified for 'snd:'\n", decl->filename, decl->line_number );
+                no_error = false;
+            }
+            audio->resume = true;
+        } else if( CMP( str, "loop" ) ) {
+            if( audio->type == YARN_AUDIO_TYPE_MUSIC || audio->type == YARN_AUDIO_TYPE_AMBIENCE ) {
+                printf( "%s(%d): 'loop' can not be specified for 'mus:' or 'amb:' (they always loop by default)\n", decl->filename, decl->line_number );
+                no_error = false;
+            }
+            audio->loop = true;
+        } else if( CMP( str, "stop" ) ) {
+            audio->stop = true;
+        } else if( extract_time_range( str, audio->type == YARN_AUDIO_TYPE_SOUND ? &audio->delay_min : &audio->crossfade_min, audio->type == YARN_AUDIO_TYPE_SOUND ? &audio->delay_max : &audio->crossfade_max ) ) {
+            // time extracted in the if check
+            if( ( audio->type == YARN_AUDIO_TYPE_SOUND ? audio->delay_min : audio->crossfade_min ) <= 0.0f  ) {
+                printf( "%s(%d): time interval can not be 0 seconds or less: '%s'\n", decl->filename, decl->line_number, str );
+                no_error = false;
+            }
+            if( ( audio->type == YARN_AUDIO_TYPE_SOUND ? audio->delay_max - audio->delay_min : audio->crossfade_max - audio->crossfade_min ) < 0.0f  ) {
+                printf( "%s(%d): the max value in a range can not be lower than the min value: '%s'\n", decl->filename, decl->line_number, str );
+                no_error = false;
+            }
+        } else if( extract_volume_range( str, &audio->volume_min, &audio->volume_max ) ) {
+            // volume extracted in the if check
+            if( audio->volume_min <= 0.0f ) {
+                printf( "%s(%d): audio volume can not be 0%% or less: '%s'\n", decl->filename, decl->line_number, str );
+                no_error = false;
+            }
+            if( audio->volume_max - audio->volume_min < 0.0f ) {
+                printf( "%s(%d): the max value in a range can not be lower than the min value: '%s'\n", decl->filename, decl->line_number, str );
+                no_error = false;
+            }
+        } else {
+            if( audio_name ) {
+                printf( "%s(%d): multiple audio names specified '%s', '%s'\n", decl->filename, decl->line_number, audio_name, str );
+                no_error = false;
+            }
+            audio_name = str;
+        }
+    }
+    if( audio->restart && ( audio->stop || audio->resume || audio->random ) ) {
+        printf( "%s(%d): 'restart' may not be combined with 'stop', 'resume' or 'random'\n", decl->filename, decl->line_number );
+        no_error = false;
+    }
+    if( audio->stop && ( audio->restart || audio->resume || audio->random ) ) {
+        printf( "%s(%d): 'stop' may not be combined with 'restart', 'resume' or 'random'\n", decl->filename, decl->line_number );
+        no_error = false;
+    }
+    if( audio->resume && ( audio->stop || audio->restart || audio->random ) ) {
+        printf( "%s(%d): 'resume' may not be combined with 'restart', 'stop' or 'random'\n", decl->filename, decl->line_number );
+        no_error = false;
+    }
+    if( audio->random && ( audio->stop || audio->resume || audio->restart) ) {
+        printf( "%s(%d): 'random' may not be combined with 'restart', 'stop' or 'resume'\n", decl->filename, decl->line_number );
+        no_error = false;
+    }
+    if( audio->stop && audio->audio_index >= 0 && audio->type != YARN_AUDIO_TYPE_SOUND ) {
+        printf( "%s(%d): stopping a named sound is only supported for 'snd:', not for '%s:'\n", decl->filename, decl->line_number, decl->keyword );
+        no_error = false;
+    }
+    if( audio_name ) {
+        audio_name = cstr_cat( "sound/", audio_name );
+    }
+    if( !audio_name || !file_exists( audio_name ) ) {
+        if( !audio->stop ) {
+            printf( "%s(%d): audio file not found '%s'\n", decl->filename, decl->line_number, audio_name ? audio_name : "" );
+            no_error = false;
+        }
+    } else {
+        audio->audio_index = find_audio_index( audio_name, yarn );
+        if( audio->audio_index < 0 ) {
+            printf( "%s(%d): audio not found '%s'\n", decl->filename, decl->line_number, audio_name );
+            no_error = false;
+        }
+    }
+    return no_error;
+}
+
+
 bool compile_location( parser_section_t* section, yarn_t* yarn, compiler_context_t* context ) {
     bool no_error = true;
     yarn_location_t* location = array_add( yarn->locations, empty_location() );
@@ -544,48 +799,18 @@ bool compile_location( parser_section_t* section, yarn_t* yarn, compiler_context
                 printf( "%s(%d): 'img:' declaration not valid inside an 'opt:', 'chr' or 'use:' block\n", decl->filename, decl->line_number );
                 no_error = false;
             }
-        } else if( CMP( decl->keyword, "mus" ) ) {
+        } else if( CMP( decl->keyword, "mus" ) || CMP( decl->keyword, "amb" ) || CMP( decl->keyword, "snd" ) ) {
             if( !opt && !use && !chr && decl->data->count > 0 ) {
-                yarn_mus_t* mus = array_add( location->mus, empty_mus() );
+                yarn_audio_t* audio = array_add( location->audio, empty_audio() );
                 if( cond ) {
-                    mus->cond = *cond;
+                    audio->cond = *cond;
                     cond = 0;
                 }                
-                string music_name = NULL;
-                if( CMP( decl->data->items[ 0 ], "start" ) ) {
-                    mus->start = true;
-                    if( decl->data->count > 1 ) {
-                        music_name = cstr_cat( "music/", decl->data->items[ 1 ] );
-                        if( decl->data->count > 2 ) {
-                            int volume = atoi( decl->data->items[ 2 ] );
-                            if( volume > 0 ) {
-                                mus->volume = ( (float)volume ) / 100.0f; 
-                            }
-                        }
-                    }
-                } else if( CMP( decl->data->items[ 0 ], "stop" ) ) {
-                    mus->stop = true;
-                    if( decl->data->count > 1 ) {
-                        printf( "%s(%d): unexpected parameters to music stop command: '%s'\n", decl->filename, decl->line_number, decl->data->items[ 1 ] );
-                        no_error = false;
-                    }
-                } else {
-                    music_name = cstr_cat( "music/", decl->data->items[ 0 ] );
-                }
-                if( !music_name || !file_exists( music_name ) ) {
-                    if( !mus->stop ) {
-                        printf( "%s(%d): music file not found '%s'\n", decl->filename, decl->line_number, music_name ? music_name : "" );
-                        no_error = false;
-                    }
-                } else {
-                    mus->music_index = find_music_index( music_name, yarn );
-                    if( mus->music_index < 0 ) {
-                        printf( "%s(%d): music not found '%s'\n", decl->filename, decl->line_number, music_name );
-                        no_error = false;
-                    }
+                if( !compile_audio( audio, decl, yarn ) ) {
+                    no_error = false;
                 }
             } else {
-                printf( "%s(%d): 'mus:' declaration not valid inside an 'opt:', 'chr' or 'use:' block, or missing music name\n", decl->filename, decl->line_number );
+                printf( "%s(%d): '%s:' declaration not valid inside an 'opt:', 'chr' or 'use:' block, or missing audio name\n",  decl->filename, decl->line_number, decl->keyword );
                 no_error = false;
             }
         } else if( CMP( decl->keyword, "act"  ) ) {
@@ -735,46 +960,16 @@ bool compile_dialog( parser_section_t* section, yarn_t* yarn, compiler_context_t
             }
         } else if( CMP( decl->keyword, "mus" ) ) {
             if( !say && !use && decl->data->count > 0 ) {
-                yarn_mus_t* mus = array_add( dialog->mus, empty_mus() );
+                yarn_audio_t* audio = array_add( dialog->audio, empty_audio() );
                 if( cond ) {
-                    mus->cond = *cond;
+                    audio->cond = *cond;
                     cond = 0;
                 }                
-                string music_name = NULL;
-                if( CMP( decl->data->items[ 0 ], "start" ) ) {
-                    mus->start = true;
-                    if( decl->data->count > 1 ) {
-                        music_name = cstr_cat( "music/", decl->data->items[ 1 ] );
-                        if( decl->data->count > 2 ) {
-                            int volume = atoi( decl->data->items[ 2 ] );
-                            if( volume > 0 ) {
-                                mus->volume = ( (float)volume ) / 100.0f; 
-                            }
-                        }
-                    }
-                } else if( CMP( decl->data->items[ 0 ], "stop" ) ) {
-                    mus->stop = true;
-                    if( decl->data->count > 1 ) {
-                        printf( "%s(%d): unexpected parameters to music stop command: '%s'\n", decl->filename, decl->line_number, decl->data->items[ 1 ] );
-                        no_error = false;
-                    }
-                } else {
-                    music_name = cstr_cat( "music/", decl->data->items[ 0 ] );
-                }
-                if( !mus->stop ) {
-                    if( !music_name || !file_exists( music_name ) ) {
-                        printf( "%s(%d): music file not found '%s'\n", decl->filename, decl->line_number, music_name ? music_name : "" );
-                        no_error = false;
-                    } else {
-                        mus->music_index = find_music_index( music_name, yarn );
-                        if( mus->music_index < 0 ) {
-                            printf( "%s(%d): music not found '%s'\n", decl->filename, decl->line_number, music_name );
-                            no_error = false;
-                        }
-                    }
+                if( !compile_audio( audio, decl, yarn ) ) {
+                    no_error = false;
                 }
             } else {
-                printf( "%s(%d): 'mus:' declaration not valid inside an 'opt:', 'chr' or 'use:' block, or missing music name\n", decl->filename, decl->line_number );
+                printf( "%s(%d): '%s:' declaration not valid inside a 'say:', 'chr' or 'use:' block, or missing audio name\n", decl->filename, decl->line_number, decl->keyword );
                 no_error = false;
             }
         } else if( CMP( decl->keyword, "act" ) ) {
@@ -1097,17 +1292,17 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
             }
         } else if( CMP( global->keyword, "logo_music" ) ) {
             if( global->data->count == 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) {
-                string music_name = cstr_cat( "music/", cstr_trim( global->data->items[ 0 ] ) );
-                if( !file_exists( music_name ) ) {
-                    printf( "%s(%d): music file not found '%s'\n", global->filename, global->line_number, music_name );
+                string audio_name = cstr_cat( "sound/", cstr_trim( global->data->items[ 0 ] ) );
+                if( !file_exists( audio_name ) ) {
+                    printf( "%s(%d): audio file not found '%s'\n", global->filename, global->line_number, audio_name );
                     no_error = false;
                 }
-                int music_index = find_music_index( music_name, yarn );
-                if( music_index < 0 ) {
-                    printf( "%s(%d): music not found '%s'\n", global->filename, global->line_number, music_name );
+                int audio_index = find_audio_index( audio_name, yarn );
+                if( audio_index < 0 ) {
+                    printf( "%s(%d): audio not found '%s'\n", global->filename, global->line_number, audio_name );
                     no_error = false;
                 }
-                yarn->globals.logo_music = music_index;
+                yarn->globals.logo_music = audio_index;
             } else {
                 printf( "%s(%d): invalid logo_music declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
                 no_error = false;
@@ -1347,8 +1542,8 @@ bool yarn_compiler( array_param(parser_global_t)* parser_globals_param, array_pa
             }
         } else if( CMP( global->keyword, "logo_music" ) ) {
             if( global->data->count == 1 ) {
-                string_id music_name = cstr_cat( "music/", cstr_trim( global->data->items[ 0 ] ) );
-                if( cstr_len( music_name ) > 0 ) add_unique_id( yarn->music_names, music_name );
+                string_id audio_name = cstr_cat( "sound/", cstr_trim( global->data->items[ 0 ] ) );
+                if( cstr_len( audio_name ) > 0 ) add_unique_id( yarn->audio_names, audio_name );
             }
         } else if( CMP( global->keyword, "background_location" ) || CMP( global->keyword, "background_dialog" ) ) {
             for( int j = 0; j < global->data->count; ++j ) {
