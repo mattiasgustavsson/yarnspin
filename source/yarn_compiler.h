@@ -958,7 +958,7 @@ bool compile_dialog( parser_section_t* section, yarn_t* yarn, compiler_context_t
                 printf( "%s(%d): phrase declaration not valid inside a 'say:' or 'use:' block\n", decl->filename, decl->line_number );
                 no_error = false;
             }
-        } else if( CMP( decl->keyword, "mus" ) ) {
+        } else if( CMP( decl->keyword, "mus" ) || CMP( decl->keyword, "amb" ) || CMP( decl->keyword, "snd" ) ) {
             if( !say && !use && decl->data->count > 0 ) {
                 yarn_audio_t* audio = array_add( dialog->audio, empty_audio() );
                 if( cond ) {

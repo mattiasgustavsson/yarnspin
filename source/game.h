@@ -80,6 +80,7 @@ typedef struct game_t {
         int current_dialog;
         int current_image;
         int current_music;
+        int current_ambience;
         int logo_index;
         array(bool)* flags;
         array(int)* items;
@@ -87,7 +88,12 @@ typedef struct game_t {
         array(stack_entry_t)* section_stack;
     } state, quicksave;
     struct {
-        stb_vorbis** ogg_instances;
+        struct {
+            int audio_index;
+            AUDIOSYS_U64 handle;
+        }* sounds;
+        int sounds_count;
+        int sounds_capacity;
     } sound_state;
     rgbimage_t** rgbimages;
 } game_t;
@@ -99,6 +105,7 @@ void game_restart( game_t* game ) {
     game->state.current_dialog = -1;
     game->state.current_image = -1;
     game->state.current_music = -1;
+    game->state.current_ambience = -1;
 
     game->state.logo_index = 0;
     array_clear( game->state.flags );
@@ -243,8 +250,10 @@ void game_init( game_t* game, yarn_t* yarn, input_t* input, audiosys_t* audiosys
 
     game_restart( game );
 
-    game->sound_state.ogg_instances = (stb_vorbis**)manage_alloc( malloc( sizeof( stb_vorbis* ) * game->yarn->assets.audio->count ) );
-    memset( game->sound_state.ogg_instances, 0, sizeof( stb_vorbis* ) * game->yarn->assets.audio->count );
+    game->sound_state.sounds_count = 0;
+    game->sound_state.sounds_capacity = 256;
+    game->sound_state.sounds = ARRAY_CAST( manage_alloc( malloc( sizeof( *game->sound_state.sounds ) * game->sound_state.sounds_capacity ) ) );
+    memset( game->sound_state.sounds, 0, sizeof( *game->sound_state.sounds ) * game->sound_state.sounds_capacity );
 
     int darkest_index = 0;
     int darkest_luma = 65536;
@@ -361,18 +370,21 @@ void ingame_menu_update( game_t* game );
 
 
 void audio_ogg_release( void* instance ) {
-    stb_vorbis** vorbis = (stb_vorbis**) instance;
-    if( *vorbis ) {
-        stb_vorbis_close( *vorbis );
-        *vorbis = NULL;
+    stb_vorbis* vorbis = (stb_vorbis*) instance;
+    if( vorbis ) {
+        stb_vorbis_close( vorbis );
     }
 }
 
 
 int audio_ogg_read_samples( void* instance, float* sample_pairs, int sample_pairs_count ) {
-    stb_vorbis** vorbis = (stb_vorbis**) instance;
-    if( *vorbis ) {
-        return stb_vorbis_get_samples_float_interleaved( *vorbis, 2, sample_pairs, sample_pairs_count * 2 );
+    stb_vorbis* vorbis = (stb_vorbis*) instance;
+    if( vorbis ) {
+        int res = stb_vorbis_get_samples_float_interleaved( vorbis, 2, sample_pairs, sample_pairs_count * 2 );
+        for( int i = 0; i < res; ++i ) {
+            sample_pairs[ i * 2 + 1 ] = sample_pairs[ i * 2 + 0 ];
+        }
+        return res;
     } else {
         memset( sample_pairs, 0, sizeof( float ) * 2 * sample_pairs_count );
         return sample_pairs_count;
@@ -381,39 +393,36 @@ int audio_ogg_read_samples( void* instance, float* sample_pairs, int sample_pair
 
 
 void audio_ogg_restart( void* instance ) {
-    stb_vorbis** vorbis = (stb_vorbis**) instance;
-    if( *vorbis ) {
-        stb_vorbis_seek_start( *vorbis );
+    stb_vorbis* vorbis = (stb_vorbis*) instance;
+    if( vorbis ) {
+        stb_vorbis_seek_start( vorbis );
     }
 }
 
 
 void audio_ogg_set_position( void* instance, int position_in_sample_pairs ) { 
-    stb_vorbis** vorbis = (stb_vorbis**) instance;
-    if( *vorbis ) {
-        stb_vorbis_seek_frame( *vorbis, position_in_sample_pairs );
+    stb_vorbis* vorbis = (stb_vorbis*) instance;
+    if( vorbis ) {
+        stb_vorbis_seek_frame( vorbis, position_in_sample_pairs );
     }
 }
 
 
 int audio_ogg_get_position( void* instance ) {
-    stb_vorbis** vorbis = (stb_vorbis**) instance;
-    if( *vorbis ) {
-        return stb_vorbis_get_sample_offset( *vorbis );
+    stb_vorbis* vorbis = (stb_vorbis*) instance;
+    if( vorbis ) {
+        return stb_vorbis_get_sample_offset( vorbis );
     }
     return 0;
 }
 
 
 bool audio_ogg_source( game_t* game, int audio_index, audiosys_audio_source_t* src ) {
-    stb_vorbis** vorbis = &game->sound_state.ogg_instances[ audio_index ];
-    if( *vorbis == NULL ) {
-        audio_data_t* audio_data = game->yarn->assets.audio->items[ audio_index ];
-        int error = 0;
-        *vorbis = stb_vorbis_open_memory( audio_data->data, audio_data->size, &error, NULL );
-    }
-    if( *vorbis ) {
-        src->instance = vorbis;
+    audio_data_t* audio_data = game->yarn->assets.audio->items[ audio_index ];
+    int error = 0;
+    stb_vorbis* ogg = stb_vorbis_open_memory( audio_data->data, audio_data->size, &error, NULL );
+    if( ogg ) {
+        src->instance = ogg;
         src->release = audio_ogg_release;
         src->read_samples = audio_ogg_read_samples;
         src->restart = audio_ogg_restart;
@@ -749,25 +758,83 @@ void do_audio( game_t* game, array_param(yarn_audio_t)* audio_param ) {
     array(yarn_audio_t)* audio = ARRAY_CAST( audio_param );
     for( int i = 0; i < audio->count; ++i ) {
         if( test_cond( game, &audio->items[ i ].cond ) )  {
-            if( audio->items[ i ].stop ) {
-                game->state.current_music = -1;
-                audiosys_music_stop( game->audiosys, 0.5f );
-            } else {
-                int music_index = audio->items[ i ].audio_index;
-                if( music_index == game->state.current_music ) {
-                    if( audio->items[ i ].restart ) {
-                        audiosys_music_position_set( game->audiosys, 0.0f );
-                    }
-                } else {
-                    audiosys_audio_source_t src;
-                    if( audio_ogg_source( game, music_index, &src ) ) {
-                        audiosys_music_switch( game->audiosys, src, 0.5f, 0.0f );
+            switch( audio->items[ i ].type ) {
+                case YARN_AUDIO_TYPE_MUSIC: {
+                    yarn_audio_t const* mus = &audio->items[ i ];
+                    if( mus->stop ) {
+                        game->state.current_music = -1;
+                        audiosys_music_stop( game->audiosys, 1.0f );
                     } else {
-                        audiosys_music_stop( game->audiosys, 0.5f );
+                        int music_index = mus->audio_index;
+                        if( music_index == game->state.current_music ) {
+                            if( mus->restart ) {
+                                audiosys_music_position_set( game->audiosys, 0.0f );
+                            }
+                            audiosys_music_volume_set( game->audiosys, mus->volume_min );
+                        } else {
+                            audiosys_audio_source_t src;
+                            if( audio_ogg_source( game, music_index, &src ) ) {
+                                audiosys_music_switch( game->audiosys, src, 0.5f, 0.0f );
+                            } else {
+                                audiosys_music_stop( game->audiosys, 1.0f );
+                            }
+                            audiosys_music_volume_set( game->audiosys, mus->volume_min );
+                        }
+                        game->state.current_music = music_index;
                     }
-                }
-                game->state.current_music = music_index;
-            }
+                } break;
+                case YARN_AUDIO_TYPE_AMBIENCE: {
+                    yarn_audio_t const* amb = &audio->items[ i ];
+                    if( amb->stop ) {
+                        game->state.current_ambience = -1;
+                        audiosys_ambience_stop( game->audiosys, 1.0f );
+                    } else {
+                        int ambience_index = amb->audio_index;
+                        if( ambience_index == game->state.current_ambience ) {
+                            if( amb->restart ) {
+                                audiosys_ambience_position_set( game->audiosys, 0.0f );
+                            }
+                            audiosys_ambience_volume_set( game->audiosys, amb->volume_min );
+                        } else {
+                            audiosys_audio_source_t src;
+                            if( audio_ogg_source( game, ambience_index, &src ) ) {
+                                audiosys_ambience_switch( game->audiosys, src, 0.5f, 0.0f );
+                                if( amb->random ) {
+                                    float length = stb_vorbis_stream_length_in_seconds( (stb_vorbis*) src.instance );
+                                    float r = rand() / (float) RAND_MAX;
+                                    audiosys_ambience_position_set( game->audiosys, length * r );
+                                }
+                            } else {
+                                audiosys_ambience_stop( game->audiosys, 1.0f );
+                            }
+                            audiosys_ambience_volume_set( game->audiosys, amb->volume_min );
+                        }
+                        game->state.current_ambience = ambience_index;
+                    }
+                } break;
+                case YARN_AUDIO_TYPE_SOUND: {
+                    yarn_audio_t const* snd = &audio->items[ i ];
+                    for( int j = 0; j < game->sound_state.sounds_count; ++j ) {
+                        if( game->sound_state.sounds[ j ].audio_index == snd->audio_index ) {
+                            audiosys_sound_stop( game->audiosys, game->sound_state.sounds[ j ].handle, 0.1f );
+                            game->sound_state.sounds[ j-- ] = game->sound_state.sounds[ --game->sound_state.sounds_count ];
+                        }
+                    }
+                    if( !snd->stop ) {
+                        audiosys_audio_source_t src;
+                        if( audio_ogg_source( game, snd->audio_index, &src ) ) {
+                            AUDIOSYS_U64 handle = audiosys_sound_play( game->audiosys, src, 0.0f, 0.0f );
+                            game->sound_state.sounds[ game->sound_state.sounds_count ].audio_index = snd->audio_index;
+                            game->sound_state.sounds[ game->sound_state.sounds_count ].handle = handle;                        
+                            game->sound_state.sounds_count++;
+                            audiosys_sound_volume_set( game->audiosys, handle, snd->volume_min );
+                            if( snd->loop ) {
+                                audiosys_sound_loop_set( game->audiosys, handle, AUDIOSYS_LOOP_ON );
+                            }
+                        }
+                    }
+                } break;
+            }            
         }
     }
 }
