@@ -92,7 +92,7 @@ qoa_data_t* convert_audio( string audio_filename ) {
         }
 
         int converted_sample_count = (int)(sample_count * ( 22050.0f / (float) sample_rate ) );
-        float* converted_samples = malloc( sizeof( float ) * converted_sample_count );
+        float* converted_samples = (float*) malloc( sizeof( float ) * converted_sample_count );
     
         SRC_DATA src;
         src.data_in = samples;
@@ -111,7 +111,7 @@ qoa_data_t* convert_audio( string audio_filename ) {
             return NULL;
         }
 
-        short* converted_short_samples = malloc( sizeof( short ) * converted_sample_count );
+        short* converted_short_samples = (short*) malloc( sizeof( short ) * converted_sample_count );
         for( int i = 0; i < converted_sample_count; ++i ) {
             float sample = converted_samples[ i ] * 32767.0f;
             converted_short_samples[ i ] = (short)( sample > 32767.0f ? 32767.0f : sample < -32767.0f ? -32767.0f : sample );
