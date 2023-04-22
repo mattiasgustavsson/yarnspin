@@ -694,7 +694,7 @@ void *qoa_read(const char *filename, qoa_desc *qoa) {
 	bytes_read = fread(data, 1, size, f);
 	fclose(f);
 
-	sample_data = (short*)qoa_decode(data, bytes_read, qoa);
+	sample_data = (short*)qoa_decode((unsigned char*)data, bytes_read, qoa);
 	QOA_FREE(data);
 	return sample_data;
 }
