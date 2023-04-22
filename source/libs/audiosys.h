@@ -429,7 +429,7 @@ static audiosys_internal_voice_t* audiosys_internal_get_sound( audiosys_t* audio
 static AUDIOSYS_U64 audiosys_internal_add_sound( audiosys_t* audiosys, audiosys_internal_voice_t** sound, float priority ) {
 	if( audiosys->sounds_count >= audiosys->sounds_capacity ) {
 		int new_capacity = audiosys->sounds_capacity * 2;
-		AUDIOSYS_U64* new_sounds_by_priority = AUDIOSYS_MALLOC( memctx, sizeof( AUDIOSYS_U64 ) * new_capacity );
+		AUDIOSYS_U64* new_sounds_by_priority = (AUDIOSYS_U64*) AUDIOSYS_MALLOC( memctx, sizeof( AUDIOSYS_U64 ) * new_capacity );
 		audiosys_internal_voice_t* new_sounds = (audiosys_internal_voice_t*) AUDIOSYS_MALLOC( memctx, sizeof( audiosys_internal_voice_t ) * new_capacity );
 		AUDIOSYS_MEMCPY( new_sounds_by_priority, audiosys->sounds_by_priority, sizeof( AUDIOSYS_U64 ) * audiosys->sounds_count );
 		AUDIOSYS_MEMCPY( new_sounds, audiosys->sounds, sizeof( audiosys_internal_voice_t ) * audiosys->sounds_count );
