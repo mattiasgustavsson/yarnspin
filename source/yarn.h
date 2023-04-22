@@ -1,11 +1,6 @@
 
 typedef string string_id; // strings of type string_id should be compared with case insensitive comparison
 
-typedef struct audio_data_t {
-    uint32_t size;
-    uint8_t data[ 1 ];
-} audio_data_t;
-
 int buffer_write_string( buffer_t* buffer, char const* const* value, int count ) {
     for( int i = 0; i < count; ++i ) {
         char const* str = value[ i ];
@@ -1009,7 +1004,7 @@ typedef struct yarn_assets_t {
     pixelfont_t* font_name;
 
     array(palrle_data_t*)* bitmaps;
-    array(audio_data_t*)* audio;
+    array(qoa_data_t*)* audio;
 
     uint32_t frame_pc_size;
     void* frame_pc;
@@ -1032,7 +1027,7 @@ yarn_assets_t* empty_assets( void ) {
     assets.font_name = NULL;
 
     assets.bitmaps = managed_array(palrle_data_t*);
-    assets.audio = managed_array(audio_data_t*);
+    assets.audio = managed_array(qoa_data_t*);
 
     assets.frame_pc_size = 0;
     assets.frame_pc = NULL;
@@ -1142,12 +1137,12 @@ void load_assets( buffer_t* in, yarn_assets_t* assets, yarn_colormode_t colormod
         }
     }
 
-    assets->audio = managed_array(audio_data_t*);
+    assets->audio = managed_array(qoa_data_t*);
     int audio_count = read_int( in );
     for( int i = 0; i < audio_count; ++i ) {
         uint32_t size;
         buffer_read_u32( in, &size, 1 );
-        audio_data_t* audio = (audio_data_t*)manage_alloc( malloc( sizeof( audio_data_t ) + ( size - 1 ) ) );
+        qoa_data_t* audio = (qoa_data_t*)manage_alloc( malloc( sizeof( qoa_data_t ) + ( size - 1 ) ) );
         audio->size = size;
         buffer_read_u8( in, audio->data, size );
         array_add( assets->audio, &audio );
@@ -1497,12 +1492,12 @@ buffer_t* yarn_compile( char const* path ) {
     printf( "Processing audio\n" );
     for( int i = 0; i < yarn.audio_names->count; ++i ) {
         string_id audio_name = yarn.audio_names->items[ i ];
-        file_t* file = file_load( audio_name, FILE_MODE_BINARY, NULL );
-        audio_data_t* audio = (audio_data_t*)manage_alloc( malloc( sizeof( audio_data_t ) + ( file ? file->size : 0 ) - 1 ) );
-        audio->size = file ? (uint32_t) file->size : 0;
-        memcpy( audio->data, file->data, audio->size ); 
-        array_add( yarn.assets.audio, &audio );
-        file_destroy( file );
+        qoa_data_t* qoa = (qoa_data_t*)manage_alloc( convert_audio( audio_name) );
+        array_add( yarn.assets.audio, &qoa );
+        if( !qoa ) {
+            printf( "Failed to load audio: %s\n", audio_name );
+            no_error = false;
+        }
     }
 
     printf( "Processing frames\n" );

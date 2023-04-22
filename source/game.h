@@ -49,6 +49,7 @@ typedef struct game_t {
     int screen_width;
     int screen_height;
     audiosys_t* audiosys;
+    rnd_pcg_t* rnd;
     input_t* input;
     int mouse_x;
     int mouse_y;
@@ -225,7 +226,7 @@ void game_quickload( game_t* game ) {
 }
 
 
-void game_init( game_t* game, yarn_t* yarn, input_t* input, audiosys_t* audiosys, uint8_t* screen, uint32_t* screen_rgb, int width, int height ) {
+void game_init( game_t* game, yarn_t* yarn, input_t* input, audiosys_t* audiosys, rnd_pcg_t* rnd, uint8_t* screen, uint32_t* screen_rgb, int width, int height ) {
     memset( game, 0, sizeof( *game ) );
     game->delta_time = 0.0f;
     game->exit_flag = false;
@@ -235,6 +236,7 @@ void game_init( game_t* game, yarn_t* yarn, input_t* input, audiosys_t* audiosys
     game->screen_width = width;
     game->screen_height = height;
     game->audiosys = audiosys;
+    game->rnd = rnd;
     game->input = input;
     game->yarn = yarn;
     
@@ -369,22 +371,72 @@ gamestate_t terminate_update( game_t* game );
 void ingame_menu_update( game_t* game );
 
 
-void audio_ogg_release( void* instance ) {
-    stb_vorbis* vorbis = (stb_vorbis*) instance;
-    if( vorbis ) {
-        stb_vorbis_close( vorbis );
+typedef struct qoa_decode_t {
+    qoa_data_t* audio_data;
+    qoa_desc desc;
+    uint32_t start_pos;
+    uint32_t decode_pos;
+    uint32_t audio_position;
+    int samples_count;
+    short samples[ QOA_FRAME_LEN ];
+} qoa_decode_t;
+
+
+float audio_qoa_get_length( void* instance ) {
+    qoa_decode_t* qoa = (qoa_decode_t*) instance;
+    if( qoa ) {
+        return qoa->desc.samples / 22050.0f;
+    }
+    return 0.0f;
+}
+
+
+void audio_qoa_release( void* instance ) {
+    qoa_decode_t* qoa = (qoa_decode_t*) instance;
+    if( qoa ) {
+        free( qoa );
     }
 }
 
 
-int audio_ogg_read_samples( void* instance, float* sample_pairs, int sample_pairs_count ) {
-    stb_vorbis* vorbis = (stb_vorbis*) instance;
-    if( vorbis ) {
-        int res = stb_vorbis_get_samples_float_interleaved( vorbis, 2, sample_pairs, sample_pairs_count * 2 );
-        for( int i = 0; i < res; ++i ) {
-            sample_pairs[ i * 2 + 1 ] = sample_pairs[ i * 2 + 0 ];
+int audio_qoa_read_samples( void* instance, float* sample_pairs, int sample_pairs_count ) {
+    qoa_decode_t* qoa = (qoa_decode_t*) instance;
+    if( qoa ) {
+        int total_count = 0;
+        bool done = false;
+        while( sample_pairs_count > 0 ) {
+            int count = sample_pairs_count / 2 > qoa->samples_count ? qoa->samples_count : sample_pairs_count / 2;
+            for( int i = 0; i < count; ++i ) {
+                float sample = qoa->samples[ i ] / 32767.0f;
+                sample_pairs[ i * 4 + 0 ] = sample;
+                sample_pairs[ i * 4 + 1 ] = sample;
+                sample_pairs[ i * 4 + 2 ] = sample;
+                sample_pairs[ i * 4 + 3 ] = sample;
+            }
+            sample_pairs += 4 * count;
+            sample_pairs_count -= 2 * count;
+            total_count += count * 2;
+
+            memmove( qoa->samples, qoa->samples + count, sizeof( short ) * ( qoa->samples_count - count ) );
+            qoa->samples_count -= count;
+
+            if( qoa->samples_count == 0 && done ) {
+                break;
+            }
+
+            if( qoa->samples_count <= 0 ) {
+                uint32_t frame_len = 0;
+                uint32_t frame_size = qoa_decode_frame( qoa->audio_data->data + qoa->decode_pos, 
+                    qoa->audio_data->size - qoa->decode_pos, &qoa->desc, qoa->samples, &frame_len ); 
+                qoa->decode_pos += frame_size;
+                qoa->samples_count = frame_len;
+                if( frame_size < QOA_FRAME_SIZE( 1, QOA_SLICES_PER_FRAME ) ) {
+                    done = true;
+                }
+            }
         }
-        return res;
+        qoa->audio_position += total_count;
+        return total_count;
     } else {
         memset( sample_pairs, 0, sizeof( float ) * 2 * sample_pairs_count );
         return sample_pairs_count;
@@ -392,46 +444,60 @@ int audio_ogg_read_samples( void* instance, float* sample_pairs, int sample_pair
 }
 
 
-void audio_ogg_restart( void* instance ) {
-    stb_vorbis* vorbis = (stb_vorbis*) instance;
-    if( vorbis ) {
-        stb_vorbis_seek_start( vorbis );
+void audio_qoa_restart( void* instance ) {
+    qoa_decode_t* qoa = (qoa_decode_t*) instance;
+    if( qoa ) {
+        qoa->audio_position = 0;
+        qoa->samples_count = 0;
+        qoa->decode_pos = qoa->start_pos;
     }
 }
 
 
-void audio_ogg_set_position( void* instance, int position_in_sample_pairs ) { 
-    stb_vorbis* vorbis = (stb_vorbis*) instance;
-    if( vorbis ) {
-        stb_vorbis_seek_frame( vorbis, position_in_sample_pairs );
+void audio_qoa_set_position( void* instance, int position_in_sample_pairs ) { 
+    qoa_decode_t* qoa = (qoa_decode_t*) instance;
+    if( qoa ) {
+        int frame = position_in_sample_pairs / QOA_FRAME_LEN;
+        frame = frame < 0 ? 0 : frame >= qoa->desc.samples / QOA_FRAME_LEN ? qoa->desc.samples / QOA_FRAME_LEN : frame;
+        qoa->audio_position = frame * QOA_FRAME_LEN;
+        qoa->samples_count = 0;
+        qoa->decode_pos = qoa->start_pos + frame * qoa_max_frame_size( &qoa->desc );
     }
 }
 
 
-int audio_ogg_get_position( void* instance ) {
-    stb_vorbis* vorbis = (stb_vorbis*) instance;
-    if( vorbis ) {
-        return stb_vorbis_get_sample_offset( vorbis );
+int audio_qoa_get_position( void* instance ) {
+    qoa_decode_t* qoa = (qoa_decode_t*) instance;
+    if( qoa ) {
+          return qoa->audio_position;
     }
     return 0;
 }
 
 
-bool audio_ogg_source( game_t* game, int audio_index, audiosys_audio_source_t* src ) {
-    audio_data_t* audio_data = game->yarn->assets.audio->items[ audio_index ];
-    int error = 0;
-    stb_vorbis* ogg = stb_vorbis_open_memory( audio_data->data, audio_data->size, &error, NULL );
-    if( ogg ) {
-        src->instance = ogg;
-        src->release = audio_ogg_release;
-        src->read_samples = audio_ogg_read_samples;
-        src->restart = audio_ogg_restart;
-        src->set_position = audio_ogg_set_position;
-        src->get_position = audio_ogg_get_position;
-        return true;
-    } else {
-        return false;
-    }
+bool audio_qoa_source( game_t* game, int audio_index, audiosys_audio_source_t* src ) {
+    qoa_data_t* audio_data = game->yarn->assets.audio->items[ audio_index ];
+    qoa_desc desc;
+	uint32_t pos = qoa_decode_header( audio_data->data, audio_data->size, &desc );
+	if( !pos ) {
+		return false;
+	}
+
+    qoa_decode_t* qoa = (qoa_decode_t*) malloc( sizeof( qoa_decode_t ) );
+    qoa->audio_data = audio_data;
+    qoa->desc = desc;
+    qoa->start_pos = pos;
+    qoa->decode_pos = pos;
+    qoa->audio_position = 0;
+    qoa->samples_count = 0;
+
+    src->instance = qoa;
+    src->release = audio_qoa_release;
+    src->read_samples = audio_qoa_read_samples;
+    src->restart = audio_qoa_restart;
+    src->set_position = audio_qoa_set_position;
+    src->get_position = audio_qoa_get_position;
+    return true;
 }
 
 
@@ -770,15 +836,22 @@ void do_audio( game_t* game, array_param(yarn_audio_t)* audio_param ) {
                             if( mus->restart ) {
                                 audiosys_music_position_set( game->audiosys, 0.0f );
                             }
-                            audiosys_music_volume_set( game->audiosys, mus->volume_min );
+                            float volume = mus->volume_min + ( mus->volume_max - mus->volume_min ) * rnd_pcg_nextf( game->rnd );
+                            audiosys_music_volume_set( game->audiosys, volume );
                         } else {
                             audiosys_audio_source_t src;
-                            if( audio_ogg_source( game, music_index, &src ) ) {
+                            if( audio_qoa_source( game, music_index, &src ) ) {
                                 audiosys_music_switch( game->audiosys, src, 0.5f, 0.0f );
+                                if( mus->random ) {
+                                    float length = audio_qoa_get_length( src.instance );
+                                    float r = rnd_pcg_nextf( game->rnd );
+                                    audiosys_music_position_set( game->audiosys, length * r );
+                                }
                             } else {
                                 audiosys_music_stop( game->audiosys, 1.0f );
                             }
-                            audiosys_music_volume_set( game->audiosys, mus->volume_min );
+                            float volume = mus->volume_min + ( mus->volume_max - mus->volume_min ) * rnd_pcg_nextf( game->rnd );
+                            audiosys_music_volume_set( game->audiosys, volume );
                         }
                         game->state.current_music = music_index;
                     }
@@ -794,20 +867,22 @@ void do_audio( game_t* game, array_param(yarn_audio_t)* audio_param ) {
                             if( amb->restart ) {
                                 audiosys_ambience_position_set( game->audiosys, 0.0f );
                             }
-                            audiosys_ambience_volume_set( game->audiosys, amb->volume_min );
+                            float volume = amb->volume_min + ( amb->volume_max - amb->volume_min ) * rnd_pcg_nextf( game->rnd );
+                            audiosys_ambience_volume_set( game->audiosys, volume );
                         } else {
                             audiosys_audio_source_t src;
-                            if( audio_ogg_source( game, ambience_index, &src ) ) {
+                            if( audio_qoa_source( game, ambience_index, &src ) ) {
                                 audiosys_ambience_switch( game->audiosys, src, 0.5f, 0.0f );
                                 if( amb->random ) {
-                                    float length = stb_vorbis_stream_length_in_seconds( (stb_vorbis*) src.instance );
-                                    float r = rand() / (float) RAND_MAX;
+                                    float length = audio_qoa_get_length( src.instance );
+                                    float r = rnd_pcg_nextf( game->rnd );
                                     audiosys_ambience_position_set( game->audiosys, length * r );
                                 }
                             } else {
                                 audiosys_ambience_stop( game->audiosys, 1.0f );
                             }
-                            audiosys_ambience_volume_set( game->audiosys, amb->volume_min );
+                            float volume = amb->volume_min + ( amb->volume_max - amb->volume_min ) * rnd_pcg_nextf( game->rnd );
+                            audiosys_ambience_volume_set( game->audiosys, volume );
                         }
                         game->state.current_ambience = ambience_index;
                     }
@@ -822,12 +897,13 @@ void do_audio( game_t* game, array_param(yarn_audio_t)* audio_param ) {
                     }
                     if( !snd->stop ) {
                         audiosys_audio_source_t src;
-                        if( audio_ogg_source( game, snd->audio_index, &src ) ) {
+                        if( audio_qoa_source( game, snd->audio_index, &src ) ) {
                             AUDIOSYS_U64 handle = audiosys_sound_play( game->audiosys, src, 0.0f, 0.0f );
                             game->sound_state.sounds[ game->sound_state.sounds_count ].audio_index = snd->audio_index;
                             game->sound_state.sounds[ game->sound_state.sounds_count ].handle = handle;                        
                             game->sound_state.sounds_count++;
-                            audiosys_sound_volume_set( game->audiosys, handle, snd->volume_min );
+                            float volume = snd->volume_min + ( snd->volume_max - snd->volume_min ) * rnd_pcg_nextf( game->rnd );
+                            audiosys_sound_volume_set( game->audiosys, handle, volume );
                             if( snd->loop ) {
                                 audiosys_sound_loop_set( game->audiosys, handle, AUDIOSYS_LOOP_ON );
                             }
@@ -1004,7 +1080,7 @@ gamestate_t boot_update( game_t* game ) {
 
     if( game->yarn->screen_names->count > 0 && !( game->yarn->is_debug && ( game->yarn->debug_start_dialog >= 0 || game->yarn->debug_start_location >= 0  ) ) ) {
         audiosys_audio_source_t src;
-        if( audio_ogg_source( game, game->yarn->globals.logo_music, &src ) ) {
+        if( audio_qoa_source( game, game->yarn->globals.logo_music, &src ) ) {
             audiosys_music_play( game->audiosys, src, 0.0f );
             game->state.current_music = game->yarn->globals.logo_music;
         } else {

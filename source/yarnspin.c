@@ -27,6 +27,9 @@
 #include "libs/crtemu.h"
 #include "libs/cstr.h"
 #include "libs/dir.h"
+#include "libs/dr_flac.h"
+#include "libs/dr_mp3.h"
+#include "libs/dr_wav.h"
 #include "libs/frametimer.h"
 #include "libs/file.h"
 #include "libs/img.h"
@@ -35,6 +38,9 @@
 #include "libs/palettize.h"
 #include "libs/palrle.h"
 #include "libs/qoi.h"
+#include "libs/qoa.h"
+#include "libs/rnd.h"
+#include "libs/samplerate.h"
 #include "libs/stb_image.h"
 #include "libs/stb_image_resize.h"
 #include "libs/stb_image_write.h"
@@ -106,6 +112,7 @@ typedef cstr_t string;
 
 // yarnspin files
 #include "gfxconv.h"
+#include "audioconv.h"
 #include "yarn.h"
 #include "input.h"
 #include "game.h"
@@ -118,7 +125,7 @@ void sound_callback( APP_S16* sample_pairs, int sample_pairs_count, void* user_d
     
     audiosys_t* audiosys = (audiosys_t*) user_data;
     audiosys_render( audiosys, sample_pairs, sample_pairs_count );
-    
+   
     thread_mutex_unlock( &g_sound_mutex );
 }
 
@@ -210,18 +217,22 @@ int app_proc( app_t* app, void* user_data ) {
 
     audiosys_t* audiosys = audiosys_create( AUDIOSYS_DEFAULT_VOICE_COUNT, NULL );
 
-    // run game
     input_t input;
     input_init( &input, app );
+    
+    rnd_pcg_t rnd;
+    rnd_pcg_seed( &rnd, (RND_U32) app_time_count( app ) );
+    
+    // run game
     game_t game;
     if( yarn->globals.colormode == YARN_COLORMODE_PALETTE ) {
         canvas = (uint8_t*)malloc( screen_width * screen_height * sizeof( uint8_t ) );
         memset( canvas, 0, screen_width * screen_height * sizeof( uint8_t ) );
-        game_init( &game, yarn, &input, audiosys, canvas, NULL, screen_width, screen_height );
+        game_init( &game, yarn, &input, audiosys, &rnd, canvas, NULL, screen_width, screen_height );
     } else {
         canvas_rgb = (uint32_t*)malloc( screen_width * screen_height * sizeof( uint32_t ) );
         memset( canvas_rgb, 0, screen_width * screen_height * sizeof( uint32_t ) );
-        game_init( &game, yarn, &input, audiosys, NULL, canvas_rgb, screen_width, screen_height );
+        game_init( &game, yarn, &input, audiosys, &rnd, NULL, canvas_rgb, screen_width, screen_height );
     }
 
     thread_mutex_init( &g_sound_mutex );
@@ -693,6 +704,15 @@ int main( int argc, char** argv ) {
 #endif
 #include "libs/dir.h"
 
+#define DR_FLAC_IMPLEMENTATION
+#include "libs/dr_flac.h"
+
+#define DR_MP3_IMPLEMENTATION
+#include "libs/dr_mp3.h"
+
+#define DR_WAV_IMPLEMENTATION
+#include "libs/dr_wav.h"
+
 #define FILE_IMPLEMENTATION
 #include "libs/file.h"
 
@@ -744,6 +764,15 @@ uint32_t pixelfont_blend( uint32_t color1, uint32_t color2, uint8_t alpha )	{
 
 #define QOI_IMPLEMENTATION
 #include "libs/qoi.h"
+
+#define QOA_IMPLEMENTATION
+#include "libs/qoa.h"
+
+#define RND_IMPLEMENTATION
+#include "libs/rnd.h"
+
+#define SAMPLERATE_IMPLEMENTATION
+#include "libs/samplerate.h"
 
 #pragma warning( push )
 #pragma warning( disable: 4255 )
