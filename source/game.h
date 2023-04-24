@@ -127,7 +127,7 @@ void game_restart( game_t* game ) {
         bool value = false;
         if( game->yarn->is_debug ) {
             for( int j = 0; j < game->yarn->globals.debug_set_flags->count; ++j ) {
-                if( CMP( game->yarn->flag_ids->items[ i ], game->yarn->globals.debug_set_flags->items[ j ] ) ) {
+                if( cstr_compare_nocase( game->yarn->flag_ids->items[ i ], game->yarn->globals.debug_set_flags->items[ j ] ) ) {
                     value = true;
                     break;
                 }
@@ -139,7 +139,7 @@ void game_restart( game_t* game ) {
     for( int i = 0; i < game->yarn->item_ids->count; ++i ) {
         if( game->yarn->is_debug ) {
             for( int j = 0; j < game->yarn->globals.debug_get_items->count; ++j ) {
-                if( CMP( game->yarn->item_ids->items[ i ], game->yarn->globals.debug_get_items->items[ j ] ) ) {
+                if( cstr_compare_nocase( game->yarn->item_ids->items[ i ], game->yarn->globals.debug_get_items->items[ j ] ) ) {
                     array_add( game->state.items, &i );
                     break;
                 }
@@ -150,7 +150,7 @@ void game_restart( game_t* game ) {
     if( game->yarn->is_debug ) {
         for( int i = 0; i < game->yarn->globals.debug_attach_chars->count; ++i ) {
             for( int j = 0; j < game->yarn->characters->count; ++j ) {
-                if( CMP( game->yarn->characters->items[ j ].id, game->yarn->globals.debug_attach_chars->items[ i ] ) ) {
+                if( cstr_compare_nocase( game->yarn->characters->items[ j ].id, game->yarn->globals.debug_attach_chars->items[ i ] ) ) {
                     array_add( game->state.chars, &j );
                     break;
                 }

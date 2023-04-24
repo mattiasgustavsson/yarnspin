@@ -1,9 +1,4 @@
 
-typedef struct qoa_data_t {
-    uint32_t size;
-    uint8_t data[ 1 ];
-} qoa_data_t;
-
 
 qoa_data_t* convert_audio( string audio_filename ) {
     string processed_filename_no_ext = cstr_format( ".cache/audio/%s", cstr( cbasename( audio_filename ) ), cstr_mid( cextname( audio_filename ), 1, 0 ) ) ;

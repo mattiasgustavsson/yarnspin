@@ -6,5 +6,6 @@ cl ..\source\yarnspin.c yarnspin.res /nologo /O2 /Ob2 /Oi /Ot /Oy /MT /GL /GF /D
 pushd ..
 yarnspin --compile
 popd
-copy /b ..\yarnspin.exe + ..\yarnspin.dat yarnspin.exe
+cl ..\source\yarnspin.c yarnspin.res /nologo /O2 /Ob2 /Oi /Ot /Oy /MT /GL /GF /D "NDEBUG" /D "YARNSPIN_RUNTIME_ONLY" /Fe:runtime.exe /link /INCREMENTAL:NO /OPT:REF /OPT:ICF /LTCG /SUBSYSTEM:WINDOWS 
+copy /b runtime.exe + ..\yarnspin.dat ..\game.exe
 popd

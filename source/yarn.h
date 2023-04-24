@@ -1301,6 +1301,8 @@ void yarn_load( buffer_t* in, yarn_t* yarn, bool is_debug ) {
 }
 
 
+#ifndef YARNSPIN_RUNTIME_ONLY
+
 #include "yarn_lexer.h"
 #include "yarn_parser.h"
 #include "yarn_compiler.h"
@@ -1536,3 +1538,5 @@ buffer_t* yarn_compile( char const* path ) {
     cstr_rollback( str_restore );
     return buffer;
 }
+
+#endif

@@ -1,3 +1,7 @@
+#ifdef __wasm__
+    #define YARNSPIN_RUNTIME_ONLY
+#endif
+
 #define _CRT_NONSTDC_NO_DEPRECATE
 #define _CRT_SECURE_NO_WARNINGS
 
@@ -26,27 +30,14 @@
 #include "libs/buffer.h"
 #include "libs/crtemu.h"
 #include "libs/cstr.h"
-#include "libs/dir.h"
-#include "libs/dr_flac.h"
-#include "libs/dr_mp3.h"
-#include "libs/dr_wav.h"
 #include "libs/frametimer.h"
-#include "libs/file.h"
-#include "libs/img.h"
-#include "libs/ini.h"
-#include "libs/paldither.h"
-#include "libs/palettize.h"
 #include "libs/palrle.h"
 #include "libs/qoi.h"
 #include "libs/qoa.h"
 #include "libs/rnd.h"
-#include "libs/samplerate.h"
 #include "libs/stb_image.h"
 #include "libs/stb_image_resize.h"
 #include "libs/stb_image_write.h"
-#include "libs/stb_truetype.h"
-#include "libs/stb_vorbis.h"
-#include "libs/sysfont.h"
 #include "libs/thread.h"
 
 #define PIXELFONT_COLOR PIXELFONT_U8
@@ -59,6 +50,22 @@
 #define PIXELFONT_FUNC_NAME pixelfont_blit_rgb
 #include "libs/pixelfont.h"
 
+// Tools-only includes
+#ifndef YARNSPIN_RUNTIME_ONLY
+    #include "libs/dir.h"
+    #include "libs/dr_flac.h"
+    #include "libs/dr_mp3.h"
+    #include "libs/dr_wav.h"
+    #include "libs/file.h"
+    #include "libs/img.h"
+    #include "libs/ini.h"
+    #include "libs/paldither.h"
+    #include "libs/palettize.h"
+    #include "libs/samplerate.h"
+    #include "libs/stb_truetype.h"
+    #include "libs/stb_vorbis.h"
+    #include "libs/sysfont.h"
+#endif
 
 // Version number stored in the file .cache\VERSION, read at start of program
 int g_cache_version = 0;
@@ -66,18 +73,21 @@ int g_cache_version = 0;
 
 // forward declares for helper functions placed at the end of this file
 
-char const* cextname( char const* path );
-char const* cbasename( char const* path );
+#ifndef YARNSPIN_RUNTIME_ONLY
+    char const* cextname( char const* path );
+    char const* cbasename( char const* path );
 
-void delete_file( char const* filename );
-void create_path( char const* path, int pos );
-int file_more_recent( char const* source_path, char const* output_path );
-int file_exists( char const* filename );
-int folder_exists( char const* filename );
-char const* get_executable_filename( void );
+    void delete_file( char const* filename );
+    void create_path( char const* path, int pos );
+    int file_more_recent( char const* source_path, char const* output_path );
+    int file_exists( char const* filename );
+    int folder_exists( char const* filename );
 
-void* compress_lzma( void* data, size_t size, size_t* out_size );
+    void* compress_lzma( void* data, size_t size, size_t* out_size );
+#endif
+
 size_t decompress_lzma( void* compressed_data, size_t compressed_size, void* buffer, size_t size );
+char const* get_executable_filename( void );
 
 bool save_data( char const* name, void* data, size_t size );
 void* load_data( char const* name, size_t* out_size );
@@ -93,8 +103,10 @@ void array_deleter( void* context, void* ptr ) { (void) context; internal_array_
 void palrle_deleter( void* context, void* ptr ) { (void) context; palrle_free( (palrle_data_t*) ptr, NULL ); }
 #define manage_palrle( instance ) ARRAY_CAST( memmgr_add( &g_memmgr, instance, NULL, palrle_deleter ) )
 
-void paldither_deleter( void* context, void* ptr ) { (void) context; paldither_palette_destroy( (paldither_palette_t*) ptr, NULL ); }
-#define manage_paldither( instance ) ARRAY_CAST( memmgr_add( &g_memmgr, instance, NULL, paldither_deleter ) )
+#ifndef YARNSPIN_RUNTIME_ONLY
+    void paldither_deleter( void* context, void* ptr ) { (void) context; paldither_palette_destroy( (paldither_palette_t*) ptr, NULL ); }
+    #define manage_paldither( instance ) ARRAY_CAST( memmgr_add( &g_memmgr, instance, NULL, paldither_deleter ) )
+#endif
 
 void pixelfont_deleter( void* context, void* ptr ) { (void) context; free( ptr ); }
 #define manage_pixelfont( instance ) ARRAY_CAST( memmgr_add( &g_memmgr, instance, NULL, pixelfont_deleter ) )
@@ -110,9 +122,23 @@ typedef cstr_t string;
 #define ARRAY_COUNT( x ) ( sizeof( x ) / sizeof( *(x) ) )
 
 
+typedef struct qoi_data_t {
+    uint32_t size;
+    uint8_t data[ 1 ];
+} qoi_data_t;
+
+
+typedef struct qoa_data_t {
+    uint32_t size;
+    uint8_t data[ 1 ];
+} qoa_data_t;
+
+
 // yarnspin files
-#include "gfxconv.h"
-#include "audioconv.h"
+#ifndef YARNSPIN_RUNTIME_ONLY
+    #include "gfxconv.h"
+    #include "audioconv.h"
+#endif
 #include "yarn.h"
 #include "input.h"
 #include "game.h"
@@ -431,7 +457,7 @@ int app_proc( app_t* app, void* user_data ) {
 }
 
 
-#ifndef __wasm__
+#ifndef YARNSPIN_RUNTIME_ONLY
     #include "imgedit.h"
     void threads_init( void );
 #endif
@@ -457,7 +483,7 @@ int main( int argc, char** argv ) {
     #endif
 
     // if -i or --images parameter were specified, run image editor
-    #ifndef __wasm__
+    #ifndef YARNSPIN_RUNTIME_ONLY
         if( argc == 2 && ( strcmp( argv[ 1 ], "-i" ) == 0 || strcmp( argv[ 1 ], "--images" ) == 0 ) ) {
             threads_init();
             int result = -1;
@@ -469,7 +495,7 @@ int main( int argc, char** argv ) {
     #endif
 
     bool is_debug = false;
-    #ifndef __wasm__
+    #ifndef YARNSPIN_RUNTIME_ONLY
         bool no_compile = false;
         if( argc == 2 && ( strcmp( argv[ 1 ], "-r" ) == 0 || strcmp( argv[ 1 ], "--run" ) == 0 ) ) {
             no_compile = true;
@@ -696,49 +722,19 @@ int main( int argc, char** argv ) {
 #define CSTR_IMPLEMENTATION
 #include "libs/cstr.h"
 
-#define DIR_IMPLEMENTATION
-#ifdef _WIN32
-    #define DIR_WINDOWS
-#else
-    #define DIR_POSIX
-#endif
-#include "libs/dir.h"
-
-#define DR_FLAC_IMPLEMENTATION
-#include "libs/dr_flac.h"
-
-#define DR_MP3_IMPLEMENTATION
-#include "libs/dr_mp3.h"
-
-#define DR_WAV_IMPLEMENTATION
-#include "libs/dr_wav.h"
-
-#define FILE_IMPLEMENTATION
-#include "libs/file.h"
-
 #define FRAMETIMER_IMPLEMENTATION
 #include "libs/frametimer.h"
 
-#define IMG_IMPLEMENTATION
-#include "libs/img.h"
-
-#define INI_IMPLEMENTATION
-#include "libs/ini.h"
-
 #define LZMA_IMPLEMENTATION
 #include "libs/lzma.h"
-
-#define PALDITHER_IMPLEMENTATION
-#include "libs/paldither.h"
-
-#define PALETTIZE_IMPLEMENTATION
-#include "libs/palettize.h"
 
 #define PALRLE_IMPLEMENTATION
 #include "libs/palrle.h"
 
 #define PIXELFONT_IMPLEMENTATION
-#define PIXELFONT_BUILDER_IMPLEMENTATION
+#ifndef YARNSPIN_RUNTIME_ONLY
+    #define PIXELFONT_BUILDER_IMPLEMENTATION
+#endif
 #undef PIXELFONT_COLOR
 #undef PIXELFONT_FUNC_NAME
 #define PIXELFONT_COLOR PIXELFONT_U8
@@ -771,9 +767,6 @@ uint32_t pixelfont_blend( uint32_t color1, uint32_t color2, uint8_t alpha )	{
 #define RND_IMPLEMENTATION
 #include "libs/rnd.h"
 
-#define SAMPLERATE_IMPLEMENTATION
-#include "libs/samplerate.h"
-
 #pragma warning( push )
 #pragma warning( disable: 4255 )
 #pragma warning( disable: 4668 )
@@ -794,6 +787,43 @@ uint32_t pixelfont_blend( uint32_t color1, uint32_t color2, uint8_t alpha )	{
 #include "libs/stb_image_write.h"
 #pragma warning( pop )
 
+#ifndef YARNSPIN_RUNTIME_ONLY
+
+#define DIR_IMPLEMENTATION
+#ifdef _WIN32
+    #define DIR_WINDOWS
+#else
+    #define DIR_POSIX
+#endif
+#include "libs/dir.h"
+
+#define DR_FLAC_IMPLEMENTATION
+#include "libs/dr_flac.h"
+
+#define DR_MP3_IMPLEMENTATION
+#include "libs/dr_mp3.h"
+
+#define DR_WAV_IMPLEMENTATION
+#include "libs/dr_wav.h"
+
+#define FILE_IMPLEMENTATION
+#include "libs/file.h"
+
+#define IMG_IMPLEMENTATION
+#include "libs/img.h"
+
+#define INI_IMPLEMENTATION
+#include "libs/ini.h"
+
+#define PALDITHER_IMPLEMENTATION
+#include "libs/paldither.h"
+
+#define PALETTIZE_IMPLEMENTATION
+#include "libs/palettize.h"
+
+#define SAMPLERATE_IMPLEMENTATION
+#include "libs/samplerate.h"
+
 #define STB_TRUETYPE_IMPLEMENTATION
 #define STBTT_RASTERIZER_VERSION 1
 #include "libs/stb_truetype.h"
@@ -807,6 +837,8 @@ uint32_t pixelfont_blend( uint32_t color1, uint32_t color2, uint8_t alpha )	{
 #define SYSFONT_IMPLEMENTATION
 #include "libs/sysfont.h"
 #pragma warning( pop )
+
+#endif
 
 #ifndef __wasm__
     #if defined( __TINYC__ )
@@ -830,8 +862,29 @@ uint32_t pixelfont_blend( uint32_t color1, uint32_t color2, uint8_t alpha )	{
         #endif
     }
 #endif
+   
 
 #include <sys/stat.h>
+
+int file_exists( char const* filename ) {
+    struct stat result;
+    int ret = stat( filename, &result );
+    if( ret == 0 ) {
+        return result.st_mode & S_IFREG;
+    }
+
+    return 0;
+}
+
+int folder_exists( char const* filename ) {
+    struct stat result;
+    int ret = stat( filename, &result );
+    if( ret == 0 ) {
+        return result.st_mode & S_IFDIR;
+    }
+
+    return 0;
+}
 
 void makedir( char const* path ) {
     #ifdef _WIN32
@@ -841,6 +894,8 @@ void makedir( char const* path ) {
     #endif
 }
 
+
+#ifndef YARNSPIN_RUNTIME_ONLY
 
 void delete_file( char const* filename ) {
     #ifdef _WIN32
@@ -877,26 +932,6 @@ int file_more_recent( char const* source_path,  char const* output_path  ) {
     return file_last_changed( source_path ) > file_last_changed( output_path );
 }
 
-
-int file_exists( char const* filename ) {
-    struct stat result;
-    int ret = stat( filename, &result );
-    if( ret == 0 ) {
-        return result.st_mode & S_IFREG;
-    }
-
-    return 0;
-}
-
-int folder_exists( char const* filename ) {
-    struct stat result;
-    int ret = stat( filename, &result );
-    if( ret == 0 ) {
-        return result.st_mode & S_IFDIR;
-    }
-
-    return 0;
-}
 
 #ifndef _WIN32
     #include <strings.h>
@@ -983,7 +1018,7 @@ char const* cbasename( char const* path ) {
     return result;
 }
 
-
+#endif
 
 void* compress_lzma( void* data, size_t size, size_t* out_size ) {
 
@@ -1304,7 +1339,7 @@ void ensure_console_open( void ) {
 
 #endif
 
-
+#ifndef YARNSPIN_RUNTIME_ONLY
 
 void atarist_palettize( PALDITHER_U32* abgr, int width, int height, paldither_palette_t const* palette,
     paldither_type_t dither_type, PALDITHER_U8* output )
@@ -1598,3 +1633,5 @@ void atarist_palettize( PALDITHER_U32* abgr, int width, int height, paldither_pa
             }
         }
     }
+    
+    #endif

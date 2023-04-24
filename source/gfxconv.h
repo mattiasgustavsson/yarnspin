@@ -1310,13 +1310,6 @@ void atari_st( uint32_t* pixels, int width, int height ) {
 }
 
 
-
-typedef struct qoi_data_t {
-    uint32_t size;
-    uint8_t data[ 1 ];
-} qoi_data_t;
-
-
 qoi_data_t* convert_rgb( string image_filename, int width, int height, int bpp, float resolution_scale, bool jpeg ) {
     string ini_filename = cstr_cat( image_filename, ".ini" ); 
 
