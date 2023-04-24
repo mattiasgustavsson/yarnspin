@@ -4,7 +4,7 @@ qoa_data_t* convert_audio( string audio_filename ) {
     string processed_filename_no_ext = cstr_format( ".cache/audio/%s", cstr( cbasename( audio_filename ) ), cstr_mid( cextname( audio_filename ), 1, 0 ) ) ;
     string processed_filename = cstr_cat( processed_filename_no_ext, ".qoa" );
 
-    if( true || !file_exists( processed_filename ) || g_cache_version != YARNSPIN_VERSION ||
+    if( !file_exists( processed_filename ) || g_cache_version != YARNSPIN_VERSION ||
         file_more_recent( audio_filename, processed_filename ) ) {
 
         // try load as ogg

@@ -43,6 +43,7 @@ typedef struct game_t {
     gamestate_t new_state;
     bool disable_transition;
     bool ingame_menu;
+    bool savegame_menu;
     int transition_counter;
     uint8_t* screen;
     uint32_t* screen_rgb;
@@ -504,6 +505,9 @@ bool audio_qoa_source( game_t* game, int audio_index, audiosys_audio_source_t* s
 void game_update( game_t* game, float delta_time ) {
     if( game->ingame_menu ) {
         ingame_menu_update( game );
+        if( !game->ingame_menu && game->new_state != GAMESTATE_TERMINATE) {
+            audiosys_resume( game->audiosys );
+        }
         return;
     } else {
         if( was_key_pressed( game, APP_KEY_ESCAPE ) ) {
@@ -1014,26 +1018,75 @@ void do_actions( game_t* game, array_param(yarn_act_t)* act_param ) {
 }
 
 
+void savegame_menu_update( game_t* game ) {
+    cls( game );    
+    center( game, game->font_name, "SAVE GAME", 160, 6, game->color_opt );
+
+    for( int y = 0; y < 3; ++y ) {
+        for( int x = 0; x < 3; ++x ) {
+            int xp = 31 + x * 96;
+            int yp = 19 + y * 72;
+            box( game, 31 + x * 96, 19 + y * 72, 78, 53, game->color_disabled );
+            box( game, 32 + x * 96, 20 + y * 72, 75, 50, game->color_background );
+            char str[ 2 ] = { 0, 0 };
+            *str = '1' + x + y * 3;
+            text( game, game->font_opt, str, xp - 8, yp + 3, game->color_opt );
+       }
+    }
+
+    if( was_key_pressed( game, APP_KEY_1 ) ) {
+    }
+
+    if( was_key_pressed( game, APP_KEY_ESCAPE ) ) {
+        game->ingame_menu = false;
+        game->savegame_menu = false;
+    }
+}
+
 
 void ingame_menu_update( game_t* game ) {
+    if( game->savegame_menu ) {
+        savegame_menu_update( game );
+        return;
+    }
+    int mouse_x = input_get_mouse_x( game->input );
+    int mouse_y = input_get_mouse_y( game->input );
+    scale_for_resolution_inverse( game, &mouse_x, &mouse_y );
+
     box( game, 104, 46, 123, 163, game->color_background );
     box( game, 99, 39, 124, 164, game->color_background );
     box( game, 100, 40, 121, 161, game->color_opt );
     box( game, 102, 42, 118, 158, game->color_background );
-    int spacing = 25;
-    int ypos = 50 + ( 160 - ( 5 * spacing ) ) / 2 - spacing;
-    center( game, game->font_name, "RESUME", 160, ypos+=spacing, game->color_opt );
-    center( game, game->font_name, "SAVE GAME", 160, ypos+=spacing, game->color_opt );
-    center( game, game->font_name, "LOAD GAME", 160, ypos+=spacing, game->color_opt );
-    center( game, game->font_name, "RESTART", 160, ypos+=spacing, game->color_opt );
-    center( game, game->font_name, "QUIT", 160, ypos+=spacing, game->color_opt );
-    if( was_key_pressed( game, APP_KEY_ESCAPE ) || was_key_pressed( game, APP_KEY_1 ) ) {
+
+    int spacing = 20;
+    int ypos = 40 + ( 160 - ( 6 * spacing ) ) / 2 - spacing;
+    int option = ( mouse_y - ypos ) / spacing - 1;
+    if( option > 5 || option == 3 ) {
+        option = -1;
+    }
+
+    if( option >= 0 ) {
+        box( game, 110, ypos + ( option + 1 ) * spacing + 3, 100, spacing - 8, game->color_opt );
+    }
+
+    int offs = ( spacing - game->font_name->height ) / 2;
+    center( game, game->font_name, "RESUME", 160, offs + ( ypos+=spacing ), option == 0 ? game->color_background : game->color_opt );
+    center( game, game->font_name, "SAVE GAME", 160, offs + ( ypos+=spacing ), option == 1 ? game->color_background : game->color_opt );
+    center( game, game->font_name, "LOAD GAME", 160, offs + ( ypos+=spacing ), option == 2 ? game->color_background : game->color_opt );
+    center( game, game->font_name, "OPTION", 160, offs + ( ypos+=spacing ), option == 3 ? game->color_background : game->color_disabled );
+    center( game, game->font_name, "RESTART", 160, offs + ( ypos+=spacing ), option == 4 ? game->color_background : game->color_opt );
+    center( game, game->font_name, "QUIT", 160, offs + ( ypos+=spacing ), option == 5 ? game->color_background : game->color_opt );
+    bool clicked = was_key_pressed( game, APP_KEY_LBUTTON );
+    if( was_key_pressed( game, APP_KEY_ESCAPE ) || was_key_pressed( game, APP_KEY_1 ) || ( clicked && option == 0 ) ) {
         game->ingame_menu = false;
-        audiosys_resume( game->audiosys );
-    } else if( was_key_pressed( game, APP_KEY_2 ) ) {
-    } else if( was_key_pressed( game, APP_KEY_3 ) ) {
-    } else if( was_key_pressed( game, APP_KEY_4 ) ) {
-    } else if( was_key_pressed( game, APP_KEY_5 ) ) {
+    } else if( was_key_pressed( game, APP_KEY_2 ) || ( clicked && option == 1 ) ) {
+        game->savegame_menu = true;
+    } else if( was_key_pressed( game, APP_KEY_3 ) || ( clicked && option == 2 ) ) {
+    } else if( was_key_pressed( game, APP_KEY_4 ) || ( clicked && option == 3 ) ) {
+    } else if( was_key_pressed( game, APP_KEY_5 ) || ( clicked && option == 4 ) ) {
+        game->restart_requested = true;    
+        game->ingame_menu = false;
+    } else if( was_key_pressed( game, APP_KEY_6 ) || ( clicked && option == 5 ) ) {
         game->new_state = GAMESTATE_TERMINATE;
         game->ingame_menu = false;
     }
