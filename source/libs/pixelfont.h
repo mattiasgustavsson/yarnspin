@@ -151,7 +151,7 @@ void PIXELFONT_FUNC_NAME( pixelfont_t const* font, int x, int y, char const* tex
                 last_space_char_count = line_char_count;
                 last_space_width = line_width;
                 }
-            PIXELFONT_U8 const* g = font->glyphs + font->offsets[ (int) *tstr ];
+            PIXELFONT_U8 const* g = font->glyphs + font->offsets[ (uint8_t)( *tstr ) ];
             line_width += (PIXELFONT_I8) *g++;
             int w = *g++;
             g += font->height * w;
@@ -185,7 +185,7 @@ void PIXELFONT_FUNC_NAME( pixelfont_t const* font, int x, int y, char const* tex
 
         for( int c = 0; c < line_char_count; ++c )
             {
-            PIXELFONT_U8 const* g = font->glyphs + font->offsets[ (int) *str ];
+            PIXELFONT_U8 const* g = font->glyphs + font->offsets[ (uint8_t)( *str ) ];
             x += (PIXELFONT_I8) *g++;
             int w = *g++;
             int h = font->height;

@@ -49,6 +49,8 @@ typedef struct game_t {
     uint32_t* screen_rgb;
     int screen_width;
     int screen_height;
+    uint8_t* screenshot;
+    uint32_t* screenshot_rgb;
     audiosys_t* audiosys;
     rnd_pcg_t* rnd;
     input_t* input;
@@ -240,7 +242,10 @@ void game_init( game_t* game, yarn_t* yarn, input_t* input, audiosys_t* audiosys
     game->rnd = rnd;
     game->input = input;
     game->yarn = yarn;
-    
+
+    game->screenshot = game->screen ? (uint8_t*) manage_alloc( malloc( width * height * sizeof( uint8_t ) ) ) : NULL;
+    game->screenshot_rgb = game->screen_rgb ? (uint32_t*) manage_alloc( malloc( width * height * sizeof( uint32_t ) ) ) : NULL;
+        
     game->state.flags = managed_array( bool );
     game->state.items = managed_array( int );
     game->state.chars = managed_array( int );
@@ -477,6 +482,9 @@ int audio_qoa_get_position( void* instance ) {
 
 
 bool audio_qoa_source( game_t* game, int audio_index, audiosys_audio_source_t* src ) {
+    if( audio_index < 0 ) {
+        return false;
+    }
     qoa_data_t* audio_data = game->yarn->assets.audio->items[ audio_index ];
     qoa_desc desc;
 	uint32_t pos = qoa_decode_header( audio_data->data, audio_data->size, &desc );
@@ -511,6 +519,11 @@ void game_update( game_t* game, float delta_time ) {
         return;
     } else {
         if( was_key_pressed( game, APP_KEY_ESCAPE ) ) {
+            if( game->screen_rgb ) {
+                memcpy( game->screenshot_rgb, game->screen_rgb, sizeof( uint32_t ) * game->screen_width * game->screen_height );
+            } else {
+                memcpy( game->screenshot, game->screen, sizeof( uint8_t ) * game->screen_width * game->screen_height );
+            }
             game->ingame_menu = true;
             audiosys_pause( game->audiosys );
             if( game->screen ) {
@@ -668,6 +681,17 @@ void draw( game_t* game, int bitmap_index, int x, int y ) {
     }
 }
 
+
+void draw_raw( game_t* game, int x, int y, uint32_t* pixels, int w, int h ) {
+    scale_for_resolution( game, &x, &y );
+    if( game->screen ) {
+//        palrle_blit( game->yarn->assets.bitmaps->items[ bitmap_index ], x, y, game->screen, game->screen_width, game->screen_height );
+    } else {
+        for( int i = 0; i < h; ++i ) {
+            memcpy( game->screen_rgb + x + ( y + i ) * game->screen_width, pixels + i * w, w * sizeof( uint32_t ) );
+        }
+    }
+}
 
 void box( game_t* game, int x, int y, int w, int h, int c ) {
     scale_for_resolution( game, &x, &y );
@@ -1018,22 +1042,100 @@ void do_actions( game_t* game, array_param(yarn_act_t)* act_param ) {
 }
 
 
+void save_game( game_t* game, int slot ) {
+    buffer_t* buffer = buffer_create();
+
+
+    char const* names[] = { "savegame.001", "savegame.002", "savegame.003", "savegame.004", "savegame.005", 
+        "savegame.006", "savegame.007", "savegame.008", "savegame.009",  };
+
+    if( slot < 1 || slot > 9 ) {
+        return;
+    }
+
+    char const* name = names[ slot - 1 ];
+
+    buffer_destroy( buffer );
+}
+
+
+uint32_t* make_thumbnail_rgb( uint32_t* screenshot_rgb, int screen_width, int screen_height, int thumb_width, int thumb_height ) {
+    uint32_t* thumb = (uint32_t*) malloc( thumb_width * thumb_height * sizeof( uint32_t ) * 2 );
+    memset( thumb, 0, thumb_width * thumb_height * sizeof( uint32_t ) * 2 );
+
+    stbir_resize_uint8( (unsigned char*) screenshot_rgb, screen_width, screen_height, screen_width * 4, 
+        (unsigned char*)( thumb + thumb_width * thumb_height ), thumb_width, thumb_height, thumb_width * 4, 4 );
+    
+    float filter[ 9 ] = {
+        -1.0f, -1.0f, -1.0f,
+        -1.0f,  9.0f, -1.0f,
+        -1.0f, -1.0f, -1.0f,
+    };
+    for( int y = 1; y < thumb_height - 1; ++y ) {
+        for( int x = 1; x < thumb_width - 1; ++x ) {
+            float r = 0.0f;
+            float g = 0.0f;
+            float b = 0.0f;
+            for( int fx = -1; fx <= 1; ++fx ) {
+                for( int fy = -1; fy <= 1; ++fy ) {
+                    uint32_t c = thumb[ thumb_width * thumb_height + x + fx + ( y + fy ) * thumb_width ];
+                    r += ( filter[ ( 1 + fx ) + ( 1 + fy ) * 3 ] ) * ( ( c & 0xff ) / 255.0f );
+                    g += ( filter[ ( 1 + fx ) + ( 1 + fy ) * 3 ] ) * ( ( ( c >> 8 ) & 0xff ) / 255.0f );
+                    b += ( filter[ ( 1 + fx ) + ( 1 + fy ) * 3 ] ) * ( ( ( c >> 16 ) & 0xff ) / 255.0f );
+                }
+            }
+            uint32_t c = thumb[ thumb_width * thumb_height + x + y * thumb_width ];
+            r = r * 0.25f + 0.75f * ( ( c & 0xff ) / 255.0f );
+            g = g * 0.25f + 0.75f * ( ( ( c >> 8 ) & 0xff ) / 255.0f );
+            b = b * 0.25f + 0.75f * ( ( ( c >> 16 ) & 0xff ) / 255.0f );
+            r = r < 0.0f ? 0.0f : r > 1.0f ? 1.0f : r;
+            g = g < 0.0f ? 0.0f : g > 1.0f ? 1.0f : g;
+            b = b < 0.0f ? 0.0f : b > 1.0f ? 1.0f : b;
+            uint32_t col = ( ( uint32_t)( r * 255.0f ) ) | ( ( ( uint32_t)( g * 255.0f ) ) << 8 ) | ( ( ( uint32_t)( b * 255.0f ) ) << 16 );
+            thumb[ x + y * thumb_width ] = col | 0xff000000;
+        }
+    }
+    return thumb;
+}
+
+
+uint8_t* make_thumbnail( uint8_t* screenshot, int screen_width, int screen_height, int thumb_width, int thumb_height ) {
+    return NULL;
+}
+
+
 void savegame_menu_update( game_t* game ) {
     cls( game );    
+
+    int thumb_width = 75;
+    int thumb_height = 57;
+    scale_for_resolution( game, &thumb_width, &thumb_height );
+    uint32_t* thumb_rgb = game->screen_rgb ? make_thumbnail_rgb( game->screenshot_rgb, game->screen_width, game->screen_height, thumb_width, thumb_height ) : NULL;
+    uint8_t* thumb = game->screen ? make_thumbnail( game->screenshot, game->screen_width, game->screen_height, thumb_width, thumb_height ) : NULL;
+   
     center( game, game->font_name, "SAVE GAME", 160, 6, game->color_opt );
 
     for( int y = 0; y < 3; ++y ) {
         for( int x = 0; x < 3; ++x ) {
             int xp = 31 + x * 96;
             int yp = 19 + y * 72;
-            box( game, 31 + x * 96, 19 + y * 72, 78, 53, game->color_disabled );
-            box( game, 32 + x * 96, 20 + y * 72, 75, 50, game->color_background );
+            box( game, 31 + x * 96, 19 + y * 72, 78, 60, game->color_disabled );
+            box( game, 32 + x * 96, 20 + y * 72, 75, 57, game->color_background );
             char str[ 2 ] = { 0, 0 };
             *str = '1' + x + y * 3;
             text( game, game->font_opt, str, xp - 8, yp + 3, game->color_opt );
+            if( thumb_rgb ) {
+                draw_raw( game, 32 + x * 96, 20 + y * 72, thumb_rgb, thumb_width, thumb_height );
+            }
        }
     }
 
+    if( thumb_rgb ) {
+        free( thumb_rgb );
+    }
+    if( thumb ) {
+        free( thumb );
+    }
     if( was_key_pressed( game, APP_KEY_1 ) ) {
     }
 
@@ -1132,12 +1234,14 @@ gamestate_t boot_update( game_t* game ) {
     #endif
 
     if( game->yarn->screen_names->count > 0 && !( game->yarn->is_debug && ( game->yarn->debug_start_dialog >= 0 || game->yarn->debug_start_location >= 0  ) ) ) {
-        audiosys_audio_source_t src;
-        if( audio_qoa_source( game, game->yarn->globals.logo_music, &src ) ) {
-            audiosys_music_play( game->audiosys, src, 0.0f );
-            game->state.current_music = game->yarn->globals.logo_music;
-        } else {
-            game->state.current_music = -1;
+        if( game->yarn->globals.logo_music >= 0 ) {
+            audiosys_audio_source_t src;
+            if( audio_qoa_source( game, game->yarn->globals.logo_music, &src ) ) {
+                audiosys_music_play( game->audiosys, src, 0.0f );
+                game->state.current_music = game->yarn->globals.logo_music;
+            } else {
+                game->state.current_music = -1;
+            }
         }
         return GAMESTATE_TITLE;
     } else if( game->state.current_location >= 0 ) {
@@ -1537,7 +1641,6 @@ gamestate_t dialog_update( game_t* game ) {
         yarn_character_t* character = &game->yarn->characters->items[ game->dialog.chr_index ];
         center( game, game->font_name, character->name, 160, 6, game->color_name );
         if( character->face_index >= 0 ) {
-            box( game, 104, 18, 112, 112, game->color_facebg );
             draw( game, character->face_index, 104, 18 );
         }
     }

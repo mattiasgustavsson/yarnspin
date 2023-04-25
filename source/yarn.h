@@ -839,8 +839,8 @@ yarn_globals_t* empty_globals( void ) {
     globals.font_items_size = 0;
     globals.font_name = cstr( "fonts/Sierra-SCI-Menu-Font.ttf" );
     globals.font_name_size = 0;
-    globals.resolution = YARN_RESOLUTION_LOW;
-    globals.colormode = YARN_COLORMODE_RGB;
+    globals.resolution = YARN_RESOLUTION_RETRO;
+    globals.colormode = YARN_COLORMODE_PALETTE;
     globals.display_filters = managed_array(int);
     globals.logo_indices = managed_array(int);
     globals.logo_music = -1;
