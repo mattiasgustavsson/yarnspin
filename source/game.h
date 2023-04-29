@@ -546,7 +546,7 @@ void game_update( game_t* game, float delta_time ) {
             audiosys_resume( game->audiosys );
         }
         return;
-    } else {
+    } else if( game->current_state != GAMESTATE_BOOT ) {
         if( was_key_pressed( game, APP_KEY_ESCAPE ) ) {
             if( game->screen_rgb ) {
                 memcpy( game->screenshot_rgb, game->screen_rgb, sizeof( uint32_t ) * game->screen_width * game->screen_height );
@@ -1160,8 +1160,13 @@ void save_game( game_t* game, int slot ) {
     if( thumb_rgb ) {
         buffer_write_u32( buffer, thumb_rgb, thumb_width * thumb_height );
     }
-    buffer_write_char( buffer, "01 Jan 1900", 12 );
-    buffer_write_char( buffer, "12:00", 6 );   
+    datetime_t dt = get_datetime();
+    char str[ 16 ];
+    char const* months[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+    sprintf( str, "%02d %s %04d", dt.day, months[ dt.month ], dt.year );
+    buffer_write_char( buffer, str, 12 );
+    sprintf( str, "%02d:%02d", dt.hour, dt.minute );
+    buffer_write_char( buffer, str, 6 );   
 
 
     buffer_write_i32( buffer, &game->state.current_location, 1 );

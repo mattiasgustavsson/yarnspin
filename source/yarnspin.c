@@ -22,6 +22,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 // Library includes
 #include "libs/app.h"
@@ -90,6 +91,16 @@ char const* get_executable_filename( void );
 
 bool save_data( char const* name, void* data, size_t size );
 void* load_data( char const* name, size_t* out_size );
+
+typedef struct datetime_t {
+    int day;
+    int month;
+    int year;
+    int hour;
+    int minute;
+} datetime_t;
+
+datetime_t get_datetime( void );
 
 // automatic memory management helper stuff
 
@@ -1119,6 +1130,42 @@ void ensure_console_open( void ) {
 
 #ifdef __wasm__
 
+    WAJIC(int, web_datetime_day, (), {
+        let date = new Date();
+        return date.getDate();
+    })
+
+    WAJIC(int, web_datetime_month, (), {
+        let date = new Date();
+        return date.getMonth();
+    })
+
+    WAJIC(int, web_datetime_year, (), {
+        let date = new Date();
+        return date.getFullYear();
+    })
+
+    WAJIC(int, web_datetime_hour, (), {
+        let date = new Date();
+        return date.getHours();
+    })
+
+    WAJIC(int, web_datetime_minute, (), {
+        let date = new Date();
+        return date.getMinutes();
+    })
+
+    datetime_t get_datetime( void ) {
+        datetime_t dt = { 0 };
+        dt.day = web_datetime_day();
+        dt.month = web_datetime_month();
+        dt.year = web_datetime_year();
+        dt.hour = web_datetime_hour();
+        dt.minute = web_datetime_minute();
+        return dt;
+    }
+
+
     char* base64enc( unsigned char const* data, size_t input_length, size_t* out_size ) {
         static const char encoding_table[] = {
             'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
@@ -1167,6 +1214,7 @@ void ensure_console_open( void ) {
         return encoded_data;
 
     }
+
 
     void* base64dec( char const* data, size_t input_length, size_t* out_size ) {
         static const unsigned char decoding_table[256] = {
@@ -1268,6 +1316,19 @@ void ensure_console_open( void ) {
     }
 
 #else
+
+    datetime_t get_datetime( void ) {
+        time_t t = time( NULL );
+        struct tm lt = *localtime( &t );
+        datetime_t dt;
+        dt.day = lt.tm_mday;
+        dt.month = lt.tm_mon;
+        dt.year = lt.tm_year + 1900;
+        dt.hour = lt.tm_hour;
+        dt.minute = lt.tm_min;
+        return dt;
+    }
+
 
     bool save_data( char const* name, void* data, size_t size ) {
         if( !folder_exists( "savegame" ) ) {
