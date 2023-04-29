@@ -70,7 +70,6 @@
 // Version number stored in the file .cache\VERSION, read at start of program
 int g_cache_version = 0;
 
-
 // forward declares for helper functions placed at the end of this file
 
 #ifndef YARNSPIN_RUNTIME_ONLY
@@ -1161,7 +1160,6 @@ void ensure_console_open( void ) {
             encoded_data[ output_length - 1 - i ] = '=';
         }
 
-        output_length = output_length - 2 + mod_table[ input_length % 3 ];
         encoded_data[ output_length ] = 0;
         if( out_size ) {
             *out_size = output_length;
@@ -1250,9 +1248,9 @@ void ensure_console_open( void ) {
 
     bool save_data( char const* name, void* data, size_t size ) {
         char* str = base64enc( data, size, NULL );
-        web_storage_save( name, str );
+        bool result = web_storage_save( name, str );
         free( str );
-        return false;
+        return result;
     }
 
     void* load_data( char const* name, size_t* out_size ) {        

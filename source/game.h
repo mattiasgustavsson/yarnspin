@@ -33,6 +33,33 @@ typedef struct stack_entry_t {
     int index;
 } stack_entry_t;
 
+
+typedef struct state_data_t {
+    int current_location;
+    int current_dialog;
+    int current_image;
+    int current_music;
+    int current_ambience;
+    int logo_index;
+    array(bool)* flags;
+    array(int)* items;
+    array(int)* chars;
+    array(stack_entry_t)* section_stack;
+} state_data_t;
+
+
+typedef struct savegame_t {
+    uint32_t version;
+    int thumb_width;
+    int thumb_height;
+    uint8_t* thumb;
+    uint32_t* thumb_rgb;
+    char date[ 12 ];
+    char time[ 6 ];
+    state_data_t state;
+} savegame_t;
+
+
 typedef struct game_t {
     float delta_time;
     bool exit_flag;
@@ -44,6 +71,7 @@ typedef struct game_t {
     bool disable_transition;
     bool ingame_menu;
     bool savegame_menu;
+    bool loadgame_menu;
     int transition_counter;
     uint8_t* screen;
     uint32_t* screen_rgb;
@@ -79,18 +107,9 @@ typedef struct game_t {
         int chr_index;
         int enable_options;
     } dialog;
-    struct {
-        int current_location;
-        int current_dialog;
-        int current_image;
-        int current_music;
-        int current_ambience;
-        int logo_index;
-        array(bool)* flags;
-        array(int)* items;
-        array(int)* chars;
-        array(stack_entry_t)* section_stack;
-    } state, quicksave;
+    state_data_t state;
+    state_data_t quicksave;
+    savegame_t savegames[ 9 ];
     struct {
         struct {
             int audio_index;
@@ -172,53 +191,28 @@ void game_restart( game_t* game ) {
 }
 
 
-void game_quicksave( game_t* game ) {
-    game->quicksave.current_location = game->state.current_location;    
-    game->quicksave.current_dialog = game->state.current_dialog;    
-    game->quicksave.current_image = game->state.current_image;    
-    game->quicksave.logo_index = game->state.logo_index;    
-    array_clear( game->quicksave.flags );
-    for( int i = 0; i < game->state.flags->count; ++i ) {
-        array_add( game->quicksave.flags, &game->state.flags->items[ i ] );
-    }
-    array_clear( game->quicksave.items );
-    for( int i = 0; i < game->state.items->count; ++i ) {
-        array_add( game->quicksave.items, &game->state.items->items[ i ] );
-    }
-    array_clear( game->quicksave.chars );
-    for( int i = 0; i < game->state.chars->count; ++i ) {
-        array_add( game->quicksave.chars, &game->state.chars->items[ i ] );
-    }
-    array_clear( game->quicksave.section_stack );
-    for( int i = 0; i < game->state.section_stack->count; ++i ) {
-        array_add( game->quicksave.section_stack, &game->state.section_stack->items[ i ] );
-    }
-}
-
-
-void game_quickload( game_t* game ) {
+void game_load_state( game_t* game, state_data_t* data ) {
     game_restart( game );
-    game->quickload_requested = false;
 
-    game->state.current_location = game->quicksave.current_location;    
-    game->state.current_dialog = game->quicksave.current_dialog;    
-    game->state.current_image = game->quicksave.current_image;    
-    game->state.logo_index = game->quicksave.logo_index;    
+    game->state.current_location = data->current_location;    
+    game->state.current_dialog = data->current_dialog;    
+    game->state.current_image = data->current_image;    
+    game->state.logo_index = data->logo_index;    
     array_clear( game->state.flags );
-    for( int i = 0; i < game->quicksave.flags->count; ++i ) {
-        array_add( game->state.flags, &game->quicksave.flags->items[ i ] );
+    for( int i = 0; i < data->flags->count; ++i ) {
+        array_add( game->state.flags, &data->flags->items[ i ] );
     }
     array_clear( game->state.items );
-    for( int i = 0; i < game->quicksave.items->count; ++i ) {
-        array_add( game->state.items, &game->quicksave.items->items[ i ] );
+    for( int i = 0; i < data->items->count; ++i ) {
+        array_add( game->state.items, &data->items->items[ i ] );
     }
     array_clear( game->state.chars );
-    for( int i = 0; i < game->quicksave.chars->count; ++i ) {
-        array_add( game->state.chars, &game->quicksave.chars->items[ i ] );
+    for( int i = 0; i < data->chars->count; ++i ) {
+        array_add( game->state.chars, &data->chars->items[ i ] );
     }
     array_clear( game->state.section_stack );
-    for( int i = 0; i < game->quicksave.section_stack->count; ++i ) {
-        array_add( game->state.section_stack, &game->quicksave.section_stack->items[ i ] );
+    for( int i = 0; i < data->section_stack->count; ++i ) {
+        array_add( game->state.section_stack, &data->section_stack->items[ i ] );
     }
 
     if( game->state.current_location >= 0 ) {
@@ -226,6 +220,41 @@ void game_quickload( game_t* game ) {
     } else if( game->state.current_dialog >= 0 ) {
         game->new_state = GAMESTATE_DIALOG;
     }
+}
+
+
+void game_save_state( game_t* game, state_data_t* data ) {
+    data->current_location = game->state.current_location;    
+    data->current_dialog = game->state.current_dialog;    
+    data->current_image = game->state.current_image;    
+    data->logo_index = game->state.logo_index;    
+    array_clear( data->flags );
+    for( int i = 0; i < game->state.flags->count; ++i ) {
+        array_add( data->flags, &game->state.flags->items[ i ] );
+    }
+    array_clear( data->items );
+    for( int i = 0; i < game->state.items->count; ++i ) {
+        array_add( data->items, &game->state.items->items[ i ] );
+    }
+    array_clear( data->chars );
+    for( int i = 0; i < game->state.chars->count; ++i ) {
+        array_add( data->chars, &game->state.chars->items[ i ] );
+    }
+    array_clear( data->section_stack );
+    for( int i = 0; i < game->state.section_stack->count; ++i ) {
+        array_add( data->section_stack, &game->state.section_stack->items[ i ] );
+    }
+}
+
+
+void game_quicksave( game_t* game ) {
+    game_save_state( game, &game->quicksave );
+}
+
+
+void game_quickload( game_t* game ) {
+    game->quickload_requested = false;
+    game_load_state( game, &game->quicksave );
 }
 
 
@@ -682,11 +711,19 @@ void draw( game_t* game, int bitmap_index, int x, int y ) {
 }
 
 
-void draw_raw( game_t* game, int x, int y, uint32_t* pixels, int w, int h ) {
+void draw_raw( game_t* game, int x, int y, uint8_t* pixels, int w, int h ) {
     scale_for_resolution( game, &x, &y );
     if( game->screen ) {
-//        palrle_blit( game->yarn->assets.bitmaps->items[ bitmap_index ], x, y, game->screen, game->screen_width, game->screen_height );
-    } else {
+        for( int i = 0; i < h; ++i ) {
+            memcpy( game->screen + x + ( y + i ) * game->screen_width, pixels + i * w, w * sizeof( uint8_t ) );
+        }
+    }
+}
+
+
+void draw_raw_rgb( game_t* game, int x, int y, uint32_t* pixels, int w, int h ) {
+    scale_for_resolution( game, &x, &y );
+    if( game->screen_rgb ) {
         for( int i = 0; i < h; ++i ) {
             memcpy( game->screen_rgb + x + ( y + i ) * game->screen_width, pixels + i * w, w * sizeof( uint32_t ) );
         }
@@ -1042,23 +1079,6 @@ void do_actions( game_t* game, array_param(yarn_act_t)* act_param ) {
 }
 
 
-void save_game( game_t* game, int slot ) {
-    buffer_t* buffer = buffer_create();
-
-
-    char const* names[] = { "savegame.001", "savegame.002", "savegame.003", "savegame.004", "savegame.005", 
-        "savegame.006", "savegame.007", "savegame.008", "savegame.009",  };
-
-    if( slot < 1 || slot > 9 ) {
-        return;
-    }
-
-    char const* name = names[ slot - 1 ];
-
-    buffer_destroy( buffer );
-}
-
-
 uint32_t* make_thumbnail_rgb( uint32_t* screenshot_rgb, int screen_width, int screen_height, int thumb_width, int thumb_height ) {
     uint32_t* thumb = (uint32_t*) malloc( thumb_width * thumb_height * sizeof( uint32_t ) * 2 );
     memset( thumb, 0, thumb_width * thumb_height * sizeof( uint32_t ) * 2 );
@@ -1100,35 +1120,82 @@ uint32_t* make_thumbnail_rgb( uint32_t* screenshot_rgb, int screen_width, int sc
 
 
 uint8_t* make_thumbnail( uint8_t* screenshot, int screen_width, int screen_height, int thumb_width, int thumb_height ) {
-    return NULL;
+    uint8_t* thumb = (uint8_t*) malloc( thumb_width * thumb_height * sizeof( uint8_t ) );
+    memset( thumb, 0, thumb_width * thumb_height * sizeof( uint8_t ) );
+    for( int y = 0; y < thumb_height; ++y ) {
+        for( int x = 0; x < thumb_width; ++x ) {
+            int fx = ( x * ( screen_width / (float) thumb_width ) );
+            int fy = ( y * ( screen_height / (float) thumb_height ) );
+            thumb[ x + y * thumb_width ] = screenshot[ fx + fy * screen_width ];
+        }
+    }
+    return thumb;
 }
 
 
-void savegame_menu_update( game_t* game ) {
-    cls( game );    
+static char const* savegame_names[] = { "savegame.001", "savegame.002", "savegame.003", "savegame.004", "savegame.005", 
+    "savegame.006", "savegame.007", "savegame.008", "savegame.009",  };
+
+
+void save_game( game_t* game, int slot ) {
+    if( slot < 1 || slot > 9 ) {
+        return;
+    }
 
     int thumb_width = 75;
     int thumb_height = 57;
     scale_for_resolution( game, &thumb_width, &thumb_height );
     uint32_t* thumb_rgb = game->screen_rgb ? make_thumbnail_rgb( game->screenshot_rgb, game->screen_width, game->screen_height, thumb_width, thumb_height ) : NULL;
     uint8_t* thumb = game->screen ? make_thumbnail( game->screenshot, game->screen_width, game->screen_height, thumb_width, thumb_height ) : NULL;
-   
-    center( game, game->font_name, "SAVE GAME", 160, 6, game->color_opt );
+ 
+    buffer_t* buffer = buffer_create();
 
-    for( int y = 0; y < 3; ++y ) {
-        for( int x = 0; x < 3; ++x ) {
-            int xp = 31 + x * 96;
-            int yp = 19 + y * 72;
-            box( game, 31 + x * 96, 19 + y * 72, 78, 60, game->color_disabled );
-            box( game, 32 + x * 96, 20 + y * 72, 75, 57, game->color_background );
-            char str[ 2 ] = { 0, 0 };
-            *str = '1' + x + y * 3;
-            text( game, game->font_opt, str, xp - 8, yp + 3, game->color_opt );
-            if( thumb_rgb ) {
-                draw_raw( game, 32 + x * 96, 20 + y * 72, thumb_rgb, thumb_width, thumb_height );
-            }
-       }
+    uint32_t version = 0; // TODO: version field in script
+    buffer_write_u32( buffer, &version, 1 );
+    buffer_write_i32( buffer, &thumb_width, 1 );
+    buffer_write_i32( buffer, &thumb_height, 1 );
+    if( thumb ) {
+        buffer_write_u8( buffer, thumb, thumb_width * thumb_height );
     }
+    if( thumb_rgb ) {
+        buffer_write_u32( buffer, thumb_rgb, thumb_width * thumb_height );
+    }
+    buffer_write_char( buffer, "01 Jan 1900", 12 );
+    buffer_write_char( buffer, "12:00", 6 );   
+
+
+    buffer_write_i32( buffer, &game->state.current_location, 1 );
+    buffer_write_i32( buffer, &game->state.current_dialog, 1 );
+    buffer_write_i32( buffer, &game->state.current_image, 1 );
+    buffer_write_i32( buffer, &game->state.current_music, 1 );
+    buffer_write_i32( buffer, &game->state.current_ambience, 1 );
+    buffer_write_i32( buffer, &game->state.logo_index, 1 );
+
+    buffer_write_i32( buffer, &game->state.flags->count, 1 );
+    buffer_write_bool( buffer, game->state.flags->items, game->state.flags->count );
+
+    buffer_write_i32( buffer, &game->state.items->count, 1 );
+    buffer_write_i32( buffer, game->state.items->items, game->state.items->count );
+
+    buffer_write_i32( buffer, &game->state.chars->count, 1 );
+    buffer_write_i32( buffer, game->state.chars->items, game->state.chars->count );
+
+    buffer_write_i32( buffer, &game->state.section_stack->count, 1 );
+    for( int i = 0; i < game->state.section_stack->count; ++i ) {
+        buffer_write_bool( buffer, &game->state.section_stack->items[ i ].is_location, 1 );
+        buffer_write_i32( buffer, &game->state.section_stack->items[ i ].index, 1  );
+    }
+
+
+    char const* name = savegame_names[ slot - 1 ];
+
+    bool success = save_data( name, buffer_data( buffer ), buffer_size( buffer ) );
+    if( success ) {
+        game->ingame_menu = false;
+        game->savegame_menu = false;
+    }
+
+    buffer_destroy( buffer );
 
     if( thumb_rgb ) {
         free( thumb_rgb );
@@ -1136,7 +1203,171 @@ void savegame_menu_update( game_t* game ) {
     if( thumb ) {
         free( thumb );
     }
-    if( was_key_pressed( game, APP_KEY_1 ) ) {
+}
+
+
+void load_game( game_t* game, int slot ) {
+    if( slot < 1 || slot > 9 ) {
+        return;
+    }
+    savegame_t* savegame = &game->savegames[ slot - 1 ];
+    if( savegame->thumb || savegame->thumb_rgb ) {
+        game_load_state( game, &savegame->state );   
+        game->ingame_menu = false;
+        game->loadgame_menu = false;
+    }
+}
+
+
+void load_savegames( game_t* game ) {
+    memset( game->savegames, 0, sizeof( game->savegames ) );
+    for( int i = 0; i < 9; ++i ) {
+        savegame_t* savegame = &game->savegames[ i ];
+        size_t size = 0;
+        void* data = load_data( savegame_names[ i ], &size );
+        if( data ) {
+            buffer_t* buffer = buffer_map( data, size );
+            buffer_read_u32( buffer, &savegame->version, 1 );
+            buffer_read_i32( buffer, &savegame->thumb_width, 1 );
+            buffer_read_i32( buffer, &savegame->thumb_height, 1 );
+            savegame->thumb = game->screen ? (uint8_t*) manage_alloc( malloc( savegame->thumb_width * savegame->thumb_height * sizeof( uint8_t ) ) ) : NULL;
+            savegame->thumb_rgb = game->screen_rgb ? (uint32_t*) manage_alloc( malloc( savegame->thumb_width * savegame->thumb_height * sizeof( uint32_t ) ) ) : NULL;
+            if( savegame->thumb ) {
+                buffer_read_u8( buffer, savegame->thumb, savegame->thumb_width * savegame->thumb_height );
+            }
+            if( savegame->thumb_rgb ) {
+                buffer_read_u32( buffer, savegame->thumb_rgb, savegame->thumb_width * savegame->thumb_height );
+            }
+            buffer_read_char( buffer, savegame->date, 12 );
+            buffer_read_char( buffer, savegame->time, 6 );
+
+            buffer_read_i32( buffer, &savegame->state.current_location, 1 );
+            buffer_read_i32( buffer, &savegame->state.current_dialog, 1 );
+            buffer_read_i32( buffer, &savegame->state.current_image, 1 );
+            buffer_read_i32( buffer, &savegame->state.current_music, 1 );
+            buffer_read_i32( buffer, &savegame->state.current_ambience, 1 );
+            buffer_read_i32( buffer, &savegame->state.logo_index, 1 );
+
+            savegame->state.flags = managed_array( bool );
+            savegame->state.items = managed_array( int );
+            savegame->state.chars = managed_array( int );
+            savegame->state.section_stack = managed_array( stack_entry_t );
+
+            int flags_count = 0;
+            buffer_read_i32( buffer, &flags_count, 1 );
+            for( int i = 0; i < flags_count; ++i ) {
+                bool flag = false;
+                buffer_read_bool( buffer, &flag, 1 );
+                array_add( savegame->state.flags, &flag );
+            }
+
+            int items_count = 0;
+            buffer_read_i32( buffer, &items_count, 1 );
+            for( int i = 0; i < items_count; ++i ) {
+                int item = false;
+                buffer_read_i32( buffer, &item, 1 );
+                array_add( savegame->state.items, &item );
+            }
+
+            int chars_count = 0;
+            buffer_read_i32( buffer, &chars_count, 1 );
+            for( int i = 0; i < chars_count; ++i ) {
+                int item = false;
+                buffer_read_i32( buffer, &item, 1 );
+                array_add( savegame->state.chars, &item );
+            }
+
+            int stack_count = 0;
+            buffer_read_i32( buffer, &stack_count, 1 );
+            for( int i = 0; i < stack_count; ++i ) {
+                stack_entry_t stack;
+                buffer_read_bool( buffer, &stack.is_location, 1 );
+                buffer_read_i32( buffer, &stack.index, 1 );
+                array_add( savegame->state.section_stack, &stack );
+            }
+
+            buffer_destroy( buffer );
+            free( data );
+        }
+    }
+}
+
+
+void savegame_menu_update( game_t* game ) {
+    cls( game );    
+
+    center( game, game->font_name, "SAVE GAME", 160, 6, game->color_opt );
+
+    int mouse_x = input_get_mouse_x( game->input );
+    int mouse_y = input_get_mouse_y( game->input );
+    scale_for_resolution_inverse( game, &mouse_x, &mouse_y );
+
+    int hover_index = 0;
+    for( int y = 0; y < 3; ++y ) {
+        for( int x = 0; x < 3; ++x ) {
+            savegame_t* savegame = &game->savegames[ x + y * 3 ];
+            bool valid_slot = savegame->thumb || savegame->thumb_rgb;
+            int xp = 31 + x * 96;
+            int yp = 19 + y * 72;
+            bool hover = mouse_x >= xp && mouse_x < xp + 78 && mouse_y >= yp && mouse_y < yp + 60;
+            if( hover ) {
+                hover_index = x + y * 3 + 1;
+            }
+            box( game, 31 + x * 96, 19 + y * 72, 78, 60, hover ? game->color_opt : game->color_disabled );
+            box( game, 32 + x * 96, 20 + y * 72, 75, 57, game->color_background );
+            char str[ 2 ] = { 0, 0 };
+            *str = '1' + x + y * 3;
+            text( game, game->font_opt, str, xp - 8, yp + 3, game->color_opt );
+
+            if( savegame->thumb ) {
+                draw_raw( game, 32 + x * 96, 20 + y * 72, savegame->thumb, savegame->thumb_width, savegame->thumb_height );
+            }
+            if( savegame->thumb_rgb ) {
+                draw_raw_rgb( game, 32 + x * 96, 20 + y * 72, savegame->thumb_rgb, savegame->thumb_width, savegame->thumb_height );
+            }
+
+            char datetime[ 20 ] = "";
+            strcat( datetime, savegame->date );
+            strcat( datetime, "  " );
+            strcat( datetime, savegame->time );
+            center( game, game->font_txt, datetime, xp + 39, yp + 60, game->color_txt );
+       }
+    }
+
+    if( was_key_pressed( game, APP_KEY_1 ) || ( hover_index == 1 && was_key_pressed( game, APP_KEY_LBUTTON ) ) ) {
+        save_game( game, 1 );
+    }
+
+    if( was_key_pressed( game, APP_KEY_2 ) || ( hover_index == 2 && was_key_pressed( game, APP_KEY_LBUTTON ) ) ) {
+        save_game( game, 2 );
+    }
+
+    if( was_key_pressed( game, APP_KEY_3 ) || ( hover_index == 3 && was_key_pressed( game, APP_KEY_LBUTTON ) ) ) {
+        save_game( game, 3 );
+    }
+
+    if( was_key_pressed( game, APP_KEY_4 ) || ( hover_index == 4 && was_key_pressed( game, APP_KEY_LBUTTON ) ) ) {
+        save_game( game, 4 );
+    }
+
+    if( was_key_pressed( game, APP_KEY_5 ) || ( hover_index == 5 && was_key_pressed( game, APP_KEY_LBUTTON ) ) ) {
+        save_game( game, 5 );
+    }
+
+    if( was_key_pressed( game, APP_KEY_6 ) || ( hover_index == 6 && was_key_pressed( game, APP_KEY_LBUTTON ) ) ) {
+        save_game( game, 6 );
+    }
+
+    if( was_key_pressed( game, APP_KEY_7 ) || ( hover_index == 7 && was_key_pressed( game, APP_KEY_LBUTTON ) ) ) {
+        save_game( game, 7 );
+    }
+
+    if( was_key_pressed( game, APP_KEY_8 ) || ( hover_index == 8 && was_key_pressed( game, APP_KEY_LBUTTON ) ) ) {
+        save_game( game, 8 );
+    }
+
+    if( was_key_pressed( game, APP_KEY_9 ) || ( hover_index == 9 && was_key_pressed( game, APP_KEY_LBUTTON ) ) ) {
+        save_game( game, 9 );
     }
 
     if( was_key_pressed( game, APP_KEY_ESCAPE ) ) {
@@ -1146,9 +1377,97 @@ void savegame_menu_update( game_t* game ) {
 }
 
 
+void loadgame_menu_update( game_t* game ) {
+    cls( game );    
+
+    center( game, game->font_name, "LOAD GAME", 160, 6, game->color_opt );
+
+    int mouse_x = input_get_mouse_x( game->input );
+    int mouse_y = input_get_mouse_y( game->input );
+    scale_for_resolution_inverse( game, &mouse_x, &mouse_y );
+
+    int hover_index = 0;
+    for( int y = 0; y < 3; ++y ) {
+        for( int x = 0; x < 3; ++x ) {
+            savegame_t* savegame = &game->savegames[ x + y * 3 ];
+            bool valid_slot = savegame->thumb || savegame->thumb_rgb;
+            int xp = 31 + x * 96;
+            int yp = 19 + y * 72;
+            bool hover = mouse_x >= xp && mouse_x < xp + 78 && mouse_y >= yp && mouse_y < yp + 60;
+            if( hover ) {
+                hover_index = x + y * 3 + 1;
+            }
+            box( game, 31 + x * 96, 19 + y * 72, 78, 60, hover && valid_slot ? game->color_opt : game->color_disabled );
+            box( game, 32 + x * 96, 20 + y * 72, 75, 57, game->color_background );
+            char str[ 2 ] = { 0, 0 };
+            *str = '1' + x + y * 3;
+            text( game, game->font_opt, str, xp - 8, yp + 3, game->color_opt );
+
+            if( savegame->thumb ) {
+                draw_raw( game, 32 + x * 96, 20 + y * 72, savegame->thumb, savegame->thumb_width, savegame->thumb_height );
+            }
+            if( savegame->thumb_rgb ) {
+                draw_raw_rgb( game, 32 + x * 96, 20 + y * 72, savegame->thumb_rgb, savegame->thumb_width, savegame->thumb_height );
+            }
+
+            char datetime[ 20 ] = "";
+            strcat( datetime, savegame->date );
+            strcat( datetime, "  " );
+            strcat( datetime, savegame->time );
+            center( game, game->font_txt, datetime, xp + 39, yp + 60, game->color_txt );
+       }
+    }
+
+    if( was_key_pressed( game, APP_KEY_1 ) || ( hover_index == 1 && was_key_pressed( game, APP_KEY_LBUTTON ) ) ) {
+        load_game( game, 1 );
+    }
+
+    if( was_key_pressed( game, APP_KEY_2 ) || ( hover_index == 2 && was_key_pressed( game, APP_KEY_LBUTTON ) ) ) {
+        load_game( game, 2 );
+    }
+
+    if( was_key_pressed( game, APP_KEY_3 ) || ( hover_index == 3 && was_key_pressed( game, APP_KEY_LBUTTON ) ) ) {
+        load_game( game, 3 );
+    }
+
+    if( was_key_pressed( game, APP_KEY_4 ) || ( hover_index == 4 && was_key_pressed( game, APP_KEY_LBUTTON ) ) ) {
+        load_game( game, 4 );
+    }
+
+    if( was_key_pressed( game, APP_KEY_5 ) || ( hover_index == 5 && was_key_pressed( game, APP_KEY_LBUTTON ) ) ) {
+        load_game( game, 5 );
+    }
+
+    if( was_key_pressed( game, APP_KEY_6 ) || ( hover_index == 6 && was_key_pressed( game, APP_KEY_LBUTTON ) ) ) {
+        load_game( game, 6 );
+    }
+
+    if( was_key_pressed( game, APP_KEY_7 ) || ( hover_index == 7 && was_key_pressed( game, APP_KEY_LBUTTON ) ) ) {
+        load_game( game, 7 );
+    }
+
+    if( was_key_pressed( game, APP_KEY_8 ) || ( hover_index == 8 && was_key_pressed( game, APP_KEY_LBUTTON ) ) ) {
+        load_game( game, 8 );
+    }
+
+    if( was_key_pressed( game, APP_KEY_9 ) || ( hover_index == 9 && was_key_pressed( game, APP_KEY_LBUTTON ) ) ) {
+        load_game( game, 9 );
+    }
+
+    if( was_key_pressed( game, APP_KEY_ESCAPE ) ) {
+        game->ingame_menu = false;
+        game->loadgame_menu = false;
+    }
+}
+
+
 void ingame_menu_update( game_t* game ) {
     if( game->savegame_menu ) {
         savegame_menu_update( game );
+        return;
+    }
+    if( game->loadgame_menu ) {
+        loadgame_menu_update( game );
         return;
     }
     int mouse_x = input_get_mouse_x( game->input );
@@ -1183,7 +1502,10 @@ void ingame_menu_update( game_t* game ) {
         game->ingame_menu = false;
     } else if( was_key_pressed( game, APP_KEY_2 ) || ( clicked && option == 1 ) ) {
         game->savegame_menu = true;
+        load_savegames( game );
     } else if( was_key_pressed( game, APP_KEY_3 ) || ( clicked && option == 2 ) ) {
+        game->loadgame_menu = true;
+        load_savegames( game );
     } else if( was_key_pressed( game, APP_KEY_4 ) || ( clicked && option == 3 ) ) {
     } else if( was_key_pressed( game, APP_KEY_5 ) || ( clicked && option == 4 ) ) {
         game->restart_requested = true;    
@@ -1193,7 +1515,6 @@ void ingame_menu_update( game_t* game ) {
         game->ingame_menu = false;
     }
 }
-
 
 
 // boot
@@ -1260,6 +1581,7 @@ gamestate_t title_init( game_t* game ) {
     ++game->state.logo_index;
     return GAMESTATE_NO_CHANGE;
 }
+
 
 gamestate_t title_update( game_t* game ) {
     if( game->state.logo_index < game->yarn->globals.logo_indices->count ) {

@@ -52,6 +52,7 @@ typedef struct buffer_t buffer_t;
 
 buffer_t* buffer_create( void );
 buffer_t* buffer_load( const char* filename );
+buffer_t* buffer_map( void* data, size_t size );
 void buffer_destroy( buffer_t* buffer );
 bool buffer_save( buffer_t* buffer, char const* filename );
 void buffer_resize( buffer_t* buffer, size_t size );
@@ -114,6 +115,7 @@ struct buffer_t {
     size_t size;
     size_t position;
     void* data;
+    int is_mapped;
 };
 
 
@@ -123,6 +125,7 @@ buffer_t* buffer_create( void ) {
     buffer->size = 0;
     buffer->position = 0;
     buffer->data = malloc( buffer->capacity );
+    buffer->is_mapped = 0;
     return buffer;
 }
 
@@ -154,12 +157,29 @@ buffer_t* buffer_load( const char* filename ) {
     buffer->size = size;
     buffer->position = 0;
     buffer->data = data;
+    buffer->is_mapped = 0;
+    return buffer;
+}
+
+
+buffer_t* buffer_map( void* data, size_t size ) {
+    if( !data ) {
+        return NULL;
+    }
+    buffer_t* buffer = (buffer_t*) malloc( sizeof( buffer_t) );
+    buffer->capacity = size;
+    buffer->size = size;
+    buffer->position = 0;
+    buffer->data = data;
+    buffer->is_mapped = 1;
     return buffer;
 }
 
 
 void buffer_destroy( buffer_t* buffer ) {
-    free( buffer->data );
+    if( !buffer->is_mapped ) {
+        free( buffer->data );
+    }
     free( buffer );
 }
 
@@ -176,6 +196,9 @@ bool buffer_save( buffer_t* buffer, char const* filename ) {
 
 
 void buffer_resize( buffer_t* buffer, size_t size ) {
+    if( buffer->is_mapped ) {
+        return;
+    }
     if( size > buffer->capacity ) {
         while( size > buffer->capacity ) {
             buffer->capacity *= 2;
@@ -285,6 +308,7 @@ int buffer_read_bool( buffer_t* buffer, bool* value, int count ) BUFFER_READ_IMP
             int result = 0; \
             for( int i = 0; i < count; ++i ) { \
                 if( buffer->position + sizeof( *value ) > buffer->size ) { \
+                    if( buffer->is_mapped ) break; \
                     buffer->size = buffer->position + sizeof( *value ); \
                     while( buffer->size > buffer->capacity ) { \
                         buffer->capacity *= 2; \
@@ -303,6 +327,7 @@ int buffer_read_bool( buffer_t* buffer, bool* value, int count ) BUFFER_READ_IMP
             int result = 0; \
             for( int i = 0; i < count; ++i ) { \
                 if( buffer->position + sizeof( *value ) > buffer->size ) { \
+                    if( buffer->is_mapped ) break; \
                     buffer->size = buffer->position + sizeof( *value ); \
                     while( buffer->size > buffer->capacity ) { \
                         buffer->capacity *= 2; \
