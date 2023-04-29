@@ -1194,7 +1194,7 @@ void save_game( game_t* game, int slot ) {
 
     char const* name = savegame_names[ slot - 1 ];
 
-    bool success = save_data( name, buffer_data( buffer ), buffer_size( buffer ) );
+    bool success = save_data( game->yarn->globals.title, name, buffer_data( buffer ), buffer_size( buffer ) );
     if( success ) {
         game->ingame_menu = false;
         game->savegame_menu = false;
@@ -1229,7 +1229,7 @@ void load_savegames( game_t* game ) {
     for( int i = 0; i < 9; ++i ) {
         savegame_t* savegame = &game->savegames[ i ];
         size_t size = 0;
-        void* data = load_data( savegame_names[ i ], &size );
+        void* data = load_data( game->yarn->globals.title, savegame_names[ i ], &size );
         if( data ) {
             buffer_t* buffer = buffer_map( data, size );
             buffer_read_u32( buffer, &savegame->version, 1 );
