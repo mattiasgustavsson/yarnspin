@@ -398,7 +398,7 @@ bool extract_declaration_fields( parser_section_t* section, yarn_t* yarn, compil
                     continue;
                 }
 
-                if( CMP( str, "restart" ) || CMP( str, "random" ) || CMP( str, "resume" ) || CMP( str, "loop" ) || CMP( str, "stop" ) || extract_time_range( str, NULL, NULL ) || extract_volume_range( str, NULL, NULL ) ) {
+                if( CMP( str, "restart" ) || CMP( str, "random" ) || CMP( str, "resume" ) || CMP( str, "noloop" ) || CMP( str, "loop" ) || CMP( str, "stop" ) || extract_time_range( str, NULL, NULL ) || extract_volume_range( str, NULL, NULL ) ) {
                     continue;
                 }
                 
@@ -651,6 +651,7 @@ bool compile_cond( array_param(string)* data_param, yarn_cond_or_t* compiled_con
 bool compile_audio( yarn_audio_t* audio, parser_declaration_t* decl, yarn_t* yarn ) {
     bool no_error = true;
     audio->type = CMP( decl->keyword, "mus" ) ? YARN_AUDIO_TYPE_MUSIC : CMP( decl->keyword, "amb" ) ? YARN_AUDIO_TYPE_AMBIENCE : YARN_AUDIO_TYPE_SOUND;               
+    audio->loop = audio->type == YARN_AUDIO_TYPE_SOUND ? false : true;
     string audio_name = NULL;
     for( int i = 0; i < decl->data->count; ++i ) {
         string_id str = cstr_trim( decl->data->items[ i ] );               
@@ -678,6 +679,12 @@ bool compile_audio( yarn_audio_t* audio, parser_declaration_t* decl, yarn_t* yar
                 no_error = false;
             }
             audio->loop = true;
+        } else if( CMP( str, "noloop" ) ) {
+            if( audio->type == YARN_AUDIO_TYPE_SOUND ) {
+                printf( "%s(%d): 'noloop' can not be specified for 'snd:'(they never loop by default)\n", decl->filename, decl->line_number );
+                no_error = false;
+            }
+            audio->loop = false;
         } else if( CMP( str, "stop" ) ) {
             audio->stop = true;
         } else if( extract_time_range( str, audio->type == YARN_AUDIO_TYPE_SOUND ? &audio->delay_min : &audio->crossfade_min, audio->type == YARN_AUDIO_TYPE_SOUND ? &audio->delay_max : &audio->crossfade_max ) ) {

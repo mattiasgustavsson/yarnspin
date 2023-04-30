@@ -196,7 +196,7 @@ static void audiosys_internal_handles_init( audiosys_internal_handles_t* handles
 
 
 static void audiosys_internal_handles_term( audiosys_internal_handles_t* handles ) {
-	AUDIOSYS_FREE( handles->memctx, handles->data );
+	//AUDIOSYS_FREE( handles->memctx, handles->data );
 }
 
 

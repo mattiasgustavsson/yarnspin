@@ -70,8 +70,8 @@ void state_data_copy( state_data_t* dest, state_data_t* src ) {
     dest->current_location = src->current_location;    
     dest->current_dialog = src->current_dialog;    
     dest->current_image = src->current_image;    
-    dest->current_music = src->current_music;    
-    dest->current_ambience = src->current_ambience;    
+    //dest->current_music = src->current_music;    
+    //dest->current_ambience = src->current_ambience;    
     dest->logo_index = src->logo_index;    
     dest->first_chr = src->first_chr;
     dest->first_use = src->first_use;
@@ -1020,6 +1020,7 @@ void do_audio( game_t* game, array_param(yarn_audio_t)* audio_param ) {
                             float volume = mus->volume_min + ( mus->volume_max - mus->volume_min ) * rnd_pcg_nextf( game->rnd );
                             audiosys_music_volume_set( game->audiosys, volume );
                         }
+                        audiosys_music_loop_set( game->audiosys, mus->loop );
                         game->state.current_music = music_index;
                     }
                 } break;
@@ -1051,13 +1052,14 @@ void do_audio( game_t* game, array_param(yarn_audio_t)* audio_param ) {
                             float volume = amb->volume_min + ( amb->volume_max - amb->volume_min ) * rnd_pcg_nextf( game->rnd );
                             audiosys_ambience_volume_set( game->audiosys, volume );
                         }
+                        audiosys_ambience_loop_set( game->audiosys, amb->loop );
                         game->state.current_ambience = ambience_index;
                     }
                 } break;
                 case YARN_AUDIO_TYPE_SOUND: {
                     yarn_audio_t const* snd = &audio->items[ i ];
                     for( int j = 0; j < game->sound_state.sounds_count; ++j ) {
-                        if( game->sound_state.sounds[ j ].audio_index == snd->audio_index ) {
+                        if( ( snd->stop && snd->audio_index == -1 ) || game->sound_state.sounds[ j ].audio_index == snd->audio_index ) {
                             audiosys_sound_stop( game->audiosys, game->sound_state.sounds[ j ].handle, 0.1f );
                             game->sound_state.sounds[ j-- ] = game->sound_state.sounds[ --game->sound_state.sounds_count ];
                         }
