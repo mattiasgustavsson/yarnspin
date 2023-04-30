@@ -1020,7 +1020,7 @@ void do_audio( game_t* game, array_param(yarn_audio_t)* audio_param ) {
                             float volume = mus->volume_min + ( mus->volume_max - mus->volume_min ) * rnd_pcg_nextf( game->rnd );
                             audiosys_music_volume_set( game->audiosys, volume );
                         }
-                        audiosys_music_loop_set( game->audiosys, mus->loop );
+                        audiosys_music_loop_set( game->audiosys, mus->loop ? AUDIOSYS_LOOP_ON : AUDIOSYS_LOOP_OFF );
                         game->state.current_music = music_index;
                     }
                 } break;
@@ -1052,7 +1052,7 @@ void do_audio( game_t* game, array_param(yarn_audio_t)* audio_param ) {
                             float volume = amb->volume_min + ( amb->volume_max - amb->volume_min ) * rnd_pcg_nextf( game->rnd );
                             audiosys_ambience_volume_set( game->audiosys, volume );
                         }
-                        audiosys_ambience_loop_set( game->audiosys, amb->loop );
+                        audiosys_ambience_loop_set( game->audiosys, amb->loop ? AUDIOSYS_LOOP_ON : AUDIOSYS_LOOP_OFF );
                         game->state.current_ambience = ambience_index;
                     }
                 } break;
