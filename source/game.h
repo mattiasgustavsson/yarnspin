@@ -41,11 +41,138 @@ typedef struct state_data_t {
     int current_music;
     int current_ambience;
     int logo_index;
+    bool first_chr;
+    bool first_use;
     array(bool)* flags;
     array(int)* items;
     array(int)* chars;
     array(stack_entry_t)* section_stack;
 } state_data_t;
+
+
+void state_data_reset( state_data_t* data ) {
+    data->current_location = -1;
+    data->current_dialog = -1;
+    data->current_image = -1;
+    data->current_music = -1;
+    data->current_ambience = -1;
+    data->logo_index = 0;
+    data->first_chr = true;
+    data->first_use = true;
+    array_clear( data->flags );
+    array_clear( data->items  );
+    array_clear( data->chars  );
+    array_clear( data->section_stack );
+}
+
+
+void state_data_copy( state_data_t* dest, state_data_t* src ) {
+    dest->current_location = src->current_location;    
+    dest->current_dialog = src->current_dialog;    
+    dest->current_image = src->current_image;    
+    dest->current_music = src->current_music;    
+    dest->current_ambience = src->current_ambience;    
+    dest->logo_index = src->logo_index;    
+    dest->first_chr = src->first_chr;
+    dest->first_use = src->first_use;
+
+    array_clear( dest->flags );
+    for( int i = 0; i < src->flags->count; ++i ) {
+        array_add( dest->flags, &src->flags->items[ i ] );
+    }
+    
+    array_clear( dest->items );
+    for( int i = 0; i < src->items->count; ++i ) {
+        array_add( dest->items, &src->items->items[ i ] );
+    }
+    
+    array_clear( dest->chars );
+    for( int i = 0; i < src->chars->count; ++i ) {
+        array_add( dest->chars, &src->chars->items[ i ] );
+    }
+    
+    array_clear( dest->section_stack );
+    for( int i = 0; i < src->section_stack->count; ++i ) {
+        array_add( dest->section_stack, &src->section_stack->items[ i ] );
+    }
+}
+
+
+void state_data_write( state_data_t* data, buffer_t* buffer ) {
+    buffer_write_i32( buffer, &data->current_location, 1 );
+    buffer_write_i32( buffer, &data->current_dialog, 1 );
+    buffer_write_i32( buffer, &data->current_image, 1 );
+    buffer_write_i32( buffer, &data->current_music, 1 );
+    buffer_write_i32( buffer, &data->current_ambience, 1 );
+    buffer_write_i32( buffer, &data->logo_index, 1 );
+    buffer_write_bool( buffer, &data->first_chr, 1 );
+    buffer_write_bool( buffer, &data->first_use, 1 );
+
+    buffer_write_i32( buffer, &data->flags->count, 1 );
+    buffer_write_bool( buffer, data->flags->items, data->flags->count );
+
+    buffer_write_i32( buffer, &data->items->count, 1 );
+    buffer_write_i32( buffer, data->items->items, data->items->count );
+
+    buffer_write_i32( buffer, &data->chars->count, 1 );
+    buffer_write_i32( buffer, data->chars->items, data->chars->count );
+
+    buffer_write_i32( buffer, &data->section_stack->count, 1 );
+    for( int i = 0; i < data->section_stack->count; ++i ) {
+        buffer_write_bool( buffer, &data->section_stack->items[ i ].is_location, 1 );
+        buffer_write_i32( buffer, &data->section_stack->items[ i ].index, 1  );
+    }
+}
+
+
+void state_data_read( state_data_t* data, buffer_t* buffer ) {
+    buffer_read_i32( buffer, &data->current_location, 1 );
+    buffer_read_i32( buffer, &data->current_dialog, 1 );
+    buffer_read_i32( buffer, &data->current_image, 1 );
+    buffer_read_i32( buffer, &data->current_music, 1 );
+    buffer_read_i32( buffer, &data->current_ambience, 1 );
+    buffer_read_i32( buffer, &data->logo_index, 1 );
+    buffer_read_bool( buffer, &data->first_chr, 1 );
+    buffer_read_bool( buffer, &data->first_use, 1 );
+
+    data->flags = managed_array( bool );
+    data->items = managed_array( int );
+    data->chars = managed_array( int );
+    data->section_stack = managed_array( stack_entry_t );
+
+    int flags_count = 0;
+    buffer_read_i32( buffer, &flags_count, 1 );
+    for( int i = 0; i < flags_count; ++i ) {
+        bool flag = false;
+        buffer_read_bool( buffer, &flag, 1 );
+        array_add( data->flags, &flag );
+    }
+
+    int items_count = 0;
+    buffer_read_i32( buffer, &items_count, 1 );
+    for( int i = 0; i < items_count; ++i ) {
+        int item = false;
+        buffer_read_i32( buffer, &item, 1 );
+        array_add( data->items, &item );
+    }
+
+    int chars_count = 0;
+    buffer_read_i32( buffer, &chars_count, 1 );
+    for( int i = 0; i < chars_count; ++i ) {
+        int item = false;
+        buffer_read_i32( buffer, &item, 1 );
+        array_add( data->chars, &item );
+    }
+
+    int stack_count = 0;
+    buffer_read_i32( buffer, &stack_count, 1 );
+    for( int i = 0; i < stack_count; ++i ) {
+        stack_entry_t stack;
+        buffer_read_bool( buffer, &stack.is_location, 1 );
+        buffer_read_i32( buffer, &stack.index, 1 );
+        array_add( data->section_stack, &stack );
+    }
+}
 
 
 typedef struct savegame_t {
@@ -62,6 +189,9 @@ typedef struct savegame_t {
 
 typedef struct game_t {
     float delta_time;
+    int blink_count;
+    int blink_wait;
+    bool blink_visible;
     bool exit_flag;
     bool exit_requested;
     bool restart_requested;    
@@ -124,17 +254,8 @@ typedef struct game_t {
 
 void game_restart( game_t* game ) {
     audiosys_stop_all( game->audiosys );
-    game->state.current_location = -1;
-    game->state.current_dialog = -1;
-    game->state.current_image = -1;
-    game->state.current_music = -1;
-    game->state.current_ambience = -1;
+    state_data_reset( &game->state );
 
-    game->state.logo_index = 0;
-    array_clear( game->state.flags );
-    array_clear( game->state.items  );
-    array_clear( game->state.chars  );
-    array_clear( game->state.section_stack );
     game->state.current_location = game->yarn->start_location;
     game->state.current_dialog = game->yarn->start_dialog;
     if( game->yarn->is_debug && game->yarn->debug_start_location >= 0 ) {
@@ -149,7 +270,7 @@ void game_restart( game_t* game ) {
         bool value = false;
         if( game->yarn->is_debug ) {
             for( int j = 0; j < game->yarn->globals.debug_set_flags->count; ++j ) {
-                if( cstr_compare_nocase( game->yarn->flag_ids->items[ i ], game->yarn->globals.debug_set_flags->items[ j ] ) ) {
+                if( cstr_compare_nocase( game->yarn->flag_ids->items[ i ], game->yarn->globals.debug_set_flags->items[ j ] ) == 0 ) {
                     value = true;
                     break;
                 }
@@ -161,7 +282,7 @@ void game_restart( game_t* game ) {
     for( int i = 0; i < game->yarn->item_ids->count; ++i ) {
         if( game->yarn->is_debug ) {
             for( int j = 0; j < game->yarn->globals.debug_get_items->count; ++j ) {
-                if( cstr_compare_nocase( game->yarn->item_ids->items[ i ], game->yarn->globals.debug_get_items->items[ j ] ) ) {
+                if( cstr_compare_nocase( game->yarn->item_ids->items[ i ], game->yarn->globals.debug_get_items->items[ j ] ) == 0 ) {
                     array_add( game->state.items, &i );
                     break;
                 }
@@ -172,7 +293,7 @@ void game_restart( game_t* game ) {
     if( game->yarn->is_debug ) {
         for( int i = 0; i < game->yarn->globals.debug_attach_chars->count; ++i ) {
             for( int j = 0; j < game->yarn->characters->count; ++j ) {
-                if( cstr_compare_nocase( game->yarn->characters->items[ j ].id, game->yarn->globals.debug_attach_chars->items[ i ] ) ) {
+                if( cstr_compare_nocase( game->yarn->characters->items[ j ].id, game->yarn->globals.debug_attach_chars->items[ i ] ) == 0 ) {
                     array_add( game->state.chars, &j );
                     break;
                 }
@@ -194,26 +315,7 @@ void game_restart( game_t* game ) {
 void game_load_state( game_t* game, state_data_t* data ) {
     game_restart( game );
 
-    game->state.current_location = data->current_location;    
-    game->state.current_dialog = data->current_dialog;    
-    game->state.current_image = data->current_image;    
-    game->state.logo_index = data->logo_index;    
-    array_clear( game->state.flags );
-    for( int i = 0; i < data->flags->count; ++i ) {
-        array_add( game->state.flags, &data->flags->items[ i ] );
-    }
-    array_clear( game->state.items );
-    for( int i = 0; i < data->items->count; ++i ) {
-        array_add( game->state.items, &data->items->items[ i ] );
-    }
-    array_clear( game->state.chars );
-    for( int i = 0; i < data->chars->count; ++i ) {
-        array_add( game->state.chars, &data->chars->items[ i ] );
-    }
-    array_clear( game->state.section_stack );
-    for( int i = 0; i < data->section_stack->count; ++i ) {
-        array_add( game->state.section_stack, &data->section_stack->items[ i ] );
-    }
+    state_data_copy( &game->state, data );
 
     if( game->state.current_location >= 0 ) {
         game->new_state = GAMESTATE_LOCATION;
@@ -224,26 +326,7 @@ void game_load_state( game_t* game, state_data_t* data ) {
 
 
 void game_save_state( game_t* game, state_data_t* data ) {
-    data->current_location = game->state.current_location;    
-    data->current_dialog = game->state.current_dialog;    
-    data->current_image = game->state.current_image;    
-    data->logo_index = game->state.logo_index;    
-    array_clear( data->flags );
-    for( int i = 0; i < game->state.flags->count; ++i ) {
-        array_add( data->flags, &game->state.flags->items[ i ] );
-    }
-    array_clear( data->items );
-    for( int i = 0; i < game->state.items->count; ++i ) {
-        array_add( data->items, &game->state.items->items[ i ] );
-    }
-    array_clear( data->chars );
-    for( int i = 0; i < game->state.chars->count; ++i ) {
-        array_add( data->chars, &game->state.chars->items[ i ] );
-    }
-    array_clear( data->section_stack );
-    for( int i = 0; i < game->state.section_stack->count; ++i ) {
-        array_add( data->section_stack, &game->state.section_stack->items[ i ] );
-    }
+    state_data_copy( data, &game->state );   
 }
 
 
@@ -271,6 +354,10 @@ void game_init( game_t* game, yarn_t* yarn, input_t* input, audiosys_t* audiosys
     game->rnd = rnd;
     game->input = input;
     game->yarn = yarn;
+
+    game->blink_count = 0;
+    game->blink_wait = 100;
+    game->blink_visible = true;
 
     game->screenshot = game->screen ? (uint8_t*) manage_alloc( malloc( width * height * sizeof( uint8_t ) ) ) : NULL;
     game->screenshot_rgb = game->screen_rgb ? (uint32_t*) manage_alloc( malloc( width * height * sizeof( uint32_t ) ) ) : NULL;
@@ -540,6 +627,21 @@ bool audio_qoa_source( game_t* game, int audio_index, audiosys_audio_source_t* s
 
 
 void game_update( game_t* game, float delta_time ) {
+	if( game->blink_count > 0 ) {
+		--game->blink_count;
+		if( game->blink_count > 0 ) {
+			game->blink_visible = game->blink_count % 30 < 15;
+		} else {
+			game->blink_visible = true;
+		}
+	} else {
+		--game->blink_wait;
+		if( game->blink_wait <= 0 ) {
+			game->blink_wait = 200;
+			game->blink_count = 100;
+		}
+	}
+
     if( game->ingame_menu ) {
         ingame_menu_update( game );
         if( !game->ingame_menu && game->new_state != GAMESTATE_TERMINATE) {
@@ -937,7 +1039,7 @@ void do_audio( game_t* game, array_param(yarn_audio_t)* audio_param ) {
                         } else {
                             audiosys_audio_source_t src;
                             if( audio_qoa_source( game, ambience_index, &src ) ) {
-                                audiosys_ambience_switch( game->audiosys, src, 0.5f, 0.0f );
+                                audiosys_ambience_cross_fade( game->audiosys, src, 0.2f );
                                 if( amb->random ) {
                                     float length = audio_qoa_get_length( src.instance );
                                     float r = rnd_pcg_nextf( game->rnd );
@@ -1168,29 +1270,7 @@ void save_game( game_t* game, int slot ) {
     sprintf( str, "%02d:%02d", dt.hour, dt.minute );
     buffer_write_char( buffer, str, 6 );   
 
-
-    buffer_write_i32( buffer, &game->state.current_location, 1 );
-    buffer_write_i32( buffer, &game->state.current_dialog, 1 );
-    buffer_write_i32( buffer, &game->state.current_image, 1 );
-    buffer_write_i32( buffer, &game->state.current_music, 1 );
-    buffer_write_i32( buffer, &game->state.current_ambience, 1 );
-    buffer_write_i32( buffer, &game->state.logo_index, 1 );
-
-    buffer_write_i32( buffer, &game->state.flags->count, 1 );
-    buffer_write_bool( buffer, game->state.flags->items, game->state.flags->count );
-
-    buffer_write_i32( buffer, &game->state.items->count, 1 );
-    buffer_write_i32( buffer, game->state.items->items, game->state.items->count );
-
-    buffer_write_i32( buffer, &game->state.chars->count, 1 );
-    buffer_write_i32( buffer, game->state.chars->items, game->state.chars->count );
-
-    buffer_write_i32( buffer, &game->state.section_stack->count, 1 );
-    for( int i = 0; i < game->state.section_stack->count; ++i ) {
-        buffer_write_bool( buffer, &game->state.section_stack->items[ i ].is_location, 1 );
-        buffer_write_i32( buffer, &game->state.section_stack->items[ i ].index, 1  );
-    }
-
+    state_data_write( &game->state, buffer );
 
     char const* name = savegame_names[ slot - 1 ];
 
@@ -1246,50 +1326,7 @@ void load_savegames( game_t* game ) {
             buffer_read_char( buffer, savegame->date, 12 );
             buffer_read_char( buffer, savegame->time, 6 );
 
-            buffer_read_i32( buffer, &savegame->state.current_location, 1 );
-            buffer_read_i32( buffer, &savegame->state.current_dialog, 1 );
-            buffer_read_i32( buffer, &savegame->state.current_image, 1 );
-            buffer_read_i32( buffer, &savegame->state.current_music, 1 );
-            buffer_read_i32( buffer, &savegame->state.current_ambience, 1 );
-            buffer_read_i32( buffer, &savegame->state.logo_index, 1 );
-
-            savegame->state.flags = managed_array( bool );
-            savegame->state.items = managed_array( int );
-            savegame->state.chars = managed_array( int );
-            savegame->state.section_stack = managed_array( stack_entry_t );
-
-            int flags_count = 0;
-            buffer_read_i32( buffer, &flags_count, 1 );
-            for( int i = 0; i < flags_count; ++i ) {
-                bool flag = false;
-                buffer_read_bool( buffer, &flag, 1 );
-                array_add( savegame->state.flags, &flag );
-            }
-
-            int items_count = 0;
-            buffer_read_i32( buffer, &items_count, 1 );
-            for( int i = 0; i < items_count; ++i ) {
-                int item = false;
-                buffer_read_i32( buffer, &item, 1 );
-                array_add( savegame->state.items, &item );
-            }
-
-            int chars_count = 0;
-            buffer_read_i32( buffer, &chars_count, 1 );
-            for( int i = 0; i < chars_count; ++i ) {
-                int item = false;
-                buffer_read_i32( buffer, &item, 1 );
-                array_add( savegame->state.chars, &item );
-            }
-
-            int stack_count = 0;
-            buffer_read_i32( buffer, &stack_count, 1 );
-            for( int i = 0; i < stack_count; ++i ) {
-                stack_entry_t stack;
-                buffer_read_bool( buffer, &stack.is_location, 1 );
-                buffer_read_i32( buffer, &stack.index, 1 );
-                array_add( savegame->state.section_stack, &stack );
-            }
+            state_data_read( &savegame->state, buffer );
 
             buffer_destroy( buffer );
             free( data );
@@ -1532,26 +1569,9 @@ gamestate_t boot_init( game_t* game ) {
 
 gamestate_t boot_update( game_t* game ) {
     (void) game;
-    #ifdef __wasm__
-        static int blink_count = 0;
-        static int blink_wait = 100;
-        static bool visible = true;
-	    if( blink_count > 0 ) {
-		    --blink_count;
-		    if( blink_count > 0 ) {
-			    visible = blink_count % 30 < 15;
-		    } else {
-			    visible = true;
-		    }
-	    } else {
-		    --blink_wait;
-		    if( blink_wait <= 0 ) {
-			    blink_wait = 200;
-			    blink_count = 100;
-		    }
-	    }
+    #ifdef __wasm__       
         cls( game );
-        if( visible ) {
+        if( game->blink_visible ) {
             center( game, game->yarn->assets.font_name, "CLICK TO START", 160, 120 - game->yarn->assets.font_name->height / 2, game->color_name );
         }
         if( !was_key_pressed( game, APP_KEY_LBUTTON ) ) {
@@ -1731,6 +1751,9 @@ gamestate_t location_update( game_t* game ) {
                 if( game->state.items->items[ i ] == location->use->items[ j ].item_indices->items[ k ] ) {
                     if( game->queued_dialog < 0 && game->queued_location < 0 ) {
                         color = (uint8_t) game->color_use;
+                        if( game->state.first_use && !game->blink_visible ) {
+                            color = (uint8_t) game->color_background;
+                        }
                         enabled = true;
                     }
                 }
@@ -1766,7 +1789,10 @@ gamestate_t location_update( game_t* game ) {
         int color = game->color_chr;
         if( game->queued_dialog >= 0 || game->queued_location >= 0 ) {
             color = game->color_disabled;
+        } else if( game->state.first_chr && !game->blink_visible ) {
+            color = (uint8_t) game->color_background;
         }
+
 
         pixelfont_bounds_t b = center( game,  game->font_chr, game->yarn->characters->items[ location->chr->items[ i ].chr_indices->items[ 0 ] ].short_name, 32, ypos, color );
         if( game->queued_dialog < 0 && game->queued_location < 0 ) {
@@ -1821,6 +1847,7 @@ gamestate_t location_update( game_t* game ) {
                 continue;
             }
             if( c == chr ) {
+                game->state.first_chr= false;
                 do_actions( game, location->chr->items[ i ].act );
             }
             ++c;
@@ -1834,6 +1861,7 @@ gamestate_t location_update( game_t* game ) {
                 for( int k = 0; k < location->use->items[ j ].item_indices->count; ++k ) {
                     if( game->state.items->items[ i ] == location->use->items[ j ].item_indices->items[ k ] ) {
                         if( i == use ) {
+                            game->state.first_use = false;
                             do_actions( game, location->use->items[ j ].act );
                         }
                     }

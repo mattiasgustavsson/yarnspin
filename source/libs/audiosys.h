@@ -707,7 +707,7 @@ void audiosys_render( audiosys_t* audiosys, AUDIOSYS_S16* output_sample_pairs, i
 	if( audiosys->use_soft_clip ) {
 		for( int i = 0; i < sample_pairs_count * 2; ++i ) {
 			float s = audiosys->mixing_buffer[ i ];
-			s *= audiosys->gain;
+			s *= audiosys->gain * 0.5f;
 			s = s < -1.0f ? -2.0f / 3.0f : s > 1.0f ? 2.0f / 3.0f : s - ( s * s * s ) / 3; // soft clip 
 			s *= 32000.0f;
 			output_sample_pairs[ i ] = (AUDIOSYS_S16)( s );
@@ -715,7 +715,7 @@ void audiosys_render( audiosys_t* audiosys, AUDIOSYS_S16* output_sample_pairs, i
 	} else {
 		for( int i = 0; i < sample_pairs_count * 2; ++i ) {
 			float s = audiosys->mixing_buffer[ i ];
-			s *= audiosys->gain;
+			s *= audiosys->gain * 0.5f;
 			s = s < -1.0f ? -1.0f : s > 1.0f ? 1.0f : s;
 			s *= 32000.0f;
 			output_sample_pairs[ i ] = (AUDIOSYS_S16)( s );
