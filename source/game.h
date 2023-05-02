@@ -625,6 +625,31 @@ bool audio_qoa_source( game_t* game, int audio_index, audiosys_audio_source_t* s
     return true;
 }
 
+void enter_menu( game_t* game ) {
+    if( game->screen_rgb ) {
+        memcpy( game->screenshot_rgb, game->screen_rgb, sizeof( uint32_t ) * game->screen_width * game->screen_height );
+    } else {
+        memcpy( game->screenshot, game->screen, sizeof( uint8_t ) * game->screen_width * game->screen_height );
+    }
+    game->ingame_menu = true;
+    audiosys_pause( game->audiosys );
+    if( game->screen ) {
+        for( int y = 0; y < game->screen_height; ++y ) {
+            for( int x = 0; x < game->screen_width; ++x ) {
+                if( ( x + y ) & 1 ) {
+                    game->screen[ x + y * game->screen_width ] = game->color_background;
+                }
+            }
+        }
+    } else {
+        for( int y = 0; y < game->screen_height; ++y ) {
+            for( int x = 0; x < game->screen_width; ++x ) {
+                game->screen_rgb[ x + y * game->screen_width ] = blend_rgb( game->screen_rgb[ x + y * game->screen_width ], 0x000000, 127 );
+            }
+        }
+    }
+}
+
 
 void game_update( game_t* game, float delta_time ) {
 	if( game->blink_count > 0 ) {
@@ -650,28 +675,7 @@ void game_update( game_t* game, float delta_time ) {
         return;
     } else if( game->current_state != GAMESTATE_BOOT ) {
         if( was_key_pressed( game, APP_KEY_ESCAPE ) ) {
-            if( game->screen_rgb ) {
-                memcpy( game->screenshot_rgb, game->screen_rgb, sizeof( uint32_t ) * game->screen_width * game->screen_height );
-            } else {
-                memcpy( game->screenshot, game->screen, sizeof( uint8_t ) * game->screen_width * game->screen_height );
-            }
-            game->ingame_menu = true;
-            audiosys_pause( game->audiosys );
-            if( game->screen ) {
-                for( int y = 0; y < game->screen_height; ++y ) {
-                    for( int x = 0; x < game->screen_width; ++x ) {
-                        if( ( x + y ) & 1 ) {
-                            game->screen[ x + y * game->screen_width ] = game->color_background;
-                        }
-                    }
-                }
-            } else {
-                for( int y = 0; y < game->screen_height; ++y ) {
-                    for( int x = 0; x < game->screen_width; ++x ) {
-                        game->screen_rgb[ x + y * game->screen_width ] = blend_rgb( game->screen_rgb[ x + y * game->screen_width ], 0x000000, 127 );
-                    }
-                }
-            }
+            enter_menu( game );
             return;
         }
     }
@@ -857,6 +861,40 @@ void box( game_t* game, int x, int y, int w, int h, int c ) {
         }
     }
 }
+
+
+void menu_icon( game_t* game, int x, int y, int c ) {
+    scale_for_resolution( game, &x, &y );
+    int s = 8;
+    scale_for_resolution( game, &s, NULL );
+    int h = s / 2;
+    if( game->screen ) {
+        for( int iy = 0; iy < h; ++iy ) {
+            for( int ix = 0; ix < s; ++ix ) {
+                int xp = x + ix;
+                int yp = y + iy;
+                if( xp >= 0 && xp < game->screen_width && yp >= 0 && yp < game->screen_height ) {
+                    game->screen[ xp + yp * game->screen_width ] = (uint8_t) c;
+                }
+            }
+            ++x;
+            s -= 2;
+        }
+    } else {
+        for( int iy = 0; iy < h; ++iy ) {
+            for( int ix = 0; ix < s; ++ix ) {
+                int xp = x + ix;
+                int yp = y + iy;
+                if( xp >= 0 && xp < game->screen_width && yp >= 0 && yp < game->screen_height ) {
+                    game->screen_rgb[ xp + yp * game->screen_width ] = game->yarn->assets.palette[ c ];
+                }
+            }
+            ++x;
+            s -= 2;
+        }
+    }
+}
+
 
 
 pixelfont_bounds_t center( game_t* game, pixelfont_t* font, string str, int x, int y, int color ) {
@@ -1670,7 +1708,18 @@ gamestate_t location_update( game_t* game ) {
     int mouse_y = input_get_mouse_y( game->input );
     scale_for_resolution_inverse( game, &mouse_x, &mouse_y );
 
-    if( game->queued_dialog >= 0 && ( was_key_pressed( game, APP_KEY_LBUTTON ) || was_key_pressed( game, APP_KEY_SPACE ) ) ) {
+    // background_location:
+    if( yarn->globals.background_location >= 0 ) {
+        draw( game, yarn->globals.background_location, 0, 0 );
+    }
+
+    bool menu_hover = mouse_y < 8 && mouse_x > 300;
+    if( menu_hover ) {
+        box( game, 308, 0, 10, 6, game->color_opt );
+    }
+    menu_icon( game, 309, 1, menu_hover ? game->color_background : game->color_opt );    
+
+    if( game->queued_dialog >= 0 && ( ( was_key_pressed( game, APP_KEY_LBUTTON ) && !menu_hover ) || was_key_pressed( game, APP_KEY_SPACE ) ) ) {
         game->state.current_location = -1;
         if( game->state.current_dialog >= 0 ) {
             game->state.current_dialog = game->queued_dialog;
@@ -1686,11 +1735,6 @@ gamestate_t location_update( game_t* game ) {
         return GAMESTATE_LOCATION;
     }
 
-
-    // background_location:
-    if( yarn->globals.background_location >= 0 ) {
-        draw( game, yarn->globals.background_location, 0, 0 );
-    }
 
     // img:
     for( int i = 0; i < location->img->count; ++i ) {
@@ -1831,6 +1875,11 @@ gamestate_t location_update( game_t* game ) {
         }
     }
 
+    if( menu_hover && was_key_pressed( game, APP_KEY_LBUTTON ) ) {
+        enter_menu( game );
+        return GAMESTATE_NO_CHANGE;
+    }
+
     if( game->queued_dialog < 0 && game->queued_location < 0 ) {
         c = 0;
         for( int i = 0; i < location->opt->count; ++i ) {
@@ -1957,6 +2006,12 @@ gamestate_t dialog_update( game_t* game ) {
         draw( game, yarn->globals.background_dialog, 0, 0 );
     }
 
+    bool menu_hover = mouse_y < 8 && mouse_x > 300;
+    if( menu_hover ) {
+        box( game, 308, 0, 10, 6, game->color_opt );
+    }
+    menu_icon( game, 309, 1, menu_hover ? game->color_background : game->color_opt );    
+
     // phrase:
     int phrase_count = 0;
     for( int i = 0; i < dialog->phrase->count; ++i ) {
@@ -2064,6 +2119,11 @@ gamestate_t dialog_update( game_t* game ) {
             }
         }
         ++c;
+    }
+
+    if( menu_hover && was_key_pressed( game, APP_KEY_LBUTTON ) ) {
+        enter_menu( game );
+        return GAMESTATE_NO_CHANGE;
     }
 
     if( game->queued_dialog >= 0 && game->dialog.enable_options == 2  ) {
