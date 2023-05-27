@@ -40,6 +40,7 @@
 #include "libs/stb_image_resize.h"
 #include "libs/stb_image_write.h"
 #include "libs/thread.h"
+#include "libs/ya_getopt.h"
 
 #define PIXELFONT_COLOR PIXELFONT_U8
 #define PIXELFONT_FUNC_NAME pixelfont_blit
@@ -492,9 +493,46 @@ int main( int argc, char** argv ) {
         opengl_preinit();
     #endif
 
+
+    bool opt_images = false;
+    bool opt_run = false;
+    bool opt_debug = false;
+    bool opt_compile = false;
+    bool opt_nosound = false;
+
+    static struct option long_options[] = {
+        { "images",  no_argument, NULL, 'i' },
+        { "run",     no_argument, NULL, 'r' },
+        { "debug",   no_argument, NULL, 'd' },
+        { "compile", no_argument, NULL, 'c' },
+        { "nosound", no_argument, NULL, 'n' },
+        { NULL,      0,           NULL, 0 }
+    };
+
+    int opt = 0;
+    while( ( opt = ya_getopt_long( argc, argv, "irdcn", long_options, NULL ) ) != -1 ) {
+        switch( opt ) {
+            case 'i': {
+                opt_images = true;
+            } break;
+            case 'r': {
+                opt_run = true;
+            } break;
+            case 'd': {
+                opt_debug = true;
+            } break;
+            case 'c': {
+                opt_compile = true;
+            } break;
+            case 'n': {
+                opt_nosound = true;
+            } break;
+        }
+    }
+
     // if -i or --images parameter were specified, run image editor
     #ifndef YARNSPIN_RUNTIME_ONLY
-        if( argc == 2 && ( strcmp( argv[ 1 ], "-i" ) == 0 || strcmp( argv[ 1 ], "--images" ) == 0 ) ) {
+        if( opt_images ) {
             threads_init();
             int result = -1;
             while( result < 0 ) {
@@ -506,14 +544,8 @@ int main( int argc, char** argv ) {
 
     bool is_debug = false;
     #ifndef YARNSPIN_RUNTIME_ONLY
-        bool no_compile = false;
-        if( argc == 2 && ( strcmp( argv[ 1 ], "-r" ) == 0 || strcmp( argv[ 1 ], "--run" ) == 0 ) ) {
-            no_compile = true;
-        }
- 
-        if( argc == 2 && ( strcmp( argv[ 1 ], "-d" ) == 0 || strcmp( argv[ 1 ], "--debug" ) == 0 ) ) {
-            is_debug = true;
-        }
+        bool no_compile = opt_run;
+        is_debug = opt_debug;
 
         // compile yarn
         if( folder_exists( "scripts" ) && !no_compile ) {
@@ -693,7 +725,7 @@ int main( int argc, char** argv ) {
     }
 
     // if -c or --compile parameter were specified, don't run the game, just exit after compiling the yarn
-    if( argc == 2 && ( strcmp( argv[ 1 ], "-c" ) == 0 || strcmp( argv[ 1 ], "--compile" ) == 0 ) ) {
+    if( opt_compile ) {
         return EXIT_SUCCESS;
     }
 
@@ -797,56 +829,60 @@ uint32_t pixelfont_blend( uint32_t color1, uint32_t color2, uint8_t alpha )	{
 #include "libs/stb_image_write.h"
 #pragma warning( pop )
 
+#define YA_GETOPT_IMPLEMENTATION
+#include "libs/ya_getopt.h"
+
+
 #ifndef YARNSPIN_RUNTIME_ONLY
 
-#define DIR_IMPLEMENTATION
-#ifdef _WIN32
-    #define DIR_WINDOWS
-#else
-    #define DIR_POSIX
-#endif
-#include "libs/dir.h"
+    #define DIR_IMPLEMENTATION
+    #ifdef _WIN32
+        #define DIR_WINDOWS
+    #else
+        #define DIR_POSIX
+    #endif
+    #include "libs/dir.h"
 
-#define DR_FLAC_IMPLEMENTATION
-#include "libs/dr_flac.h"
+    #define DR_FLAC_IMPLEMENTATION
+    #include "libs/dr_flac.h"
 
-#define DR_MP3_IMPLEMENTATION
-#include "libs/dr_mp3.h"
+    #define DR_MP3_IMPLEMENTATION
+    #include "libs/dr_mp3.h"
 
-#define DR_WAV_IMPLEMENTATION
-#include "libs/dr_wav.h"
+    #define DR_WAV_IMPLEMENTATION
+    #include "libs/dr_wav.h"
 
-#define FILE_IMPLEMENTATION
-#include "libs/file.h"
+    #define FILE_IMPLEMENTATION
+    #include "libs/file.h"
 
-#define IMG_IMPLEMENTATION
-#include "libs/img.h"
+    #define IMG_IMPLEMENTATION
+    #include "libs/img.h"
 
-#define INI_IMPLEMENTATION
-#include "libs/ini.h"
+    #define INI_IMPLEMENTATION
+    #include "libs/ini.h"
 
-#define PALDITHER_IMPLEMENTATION
-#include "libs/paldither.h"
+    #define PALDITHER_IMPLEMENTATION
+    #include "libs/paldither.h"
 
-#define PALETTIZE_IMPLEMENTATION
-#include "libs/palettize.h"
+    #define PALETTIZE_IMPLEMENTATION
+    #include "libs/palettize.h"
 
-#define SAMPLERATE_IMPLEMENTATION
-#include "libs/samplerate.h"
+    #define SAMPLERATE_IMPLEMENTATION
+    #include "libs/samplerate.h"
 
-#define STB_TRUETYPE_IMPLEMENTATION
-#define STBTT_RASTERIZER_VERSION 1
-#include "libs/stb_truetype.h"
+    #define STB_TRUETYPE_IMPLEMENTATION
+    #define STBTT_RASTERIZER_VERSION 1
+    #include "libs/stb_truetype.h"
 
-#define STB_VORBIS_IMPLEMENTATION
-#include "libs/stb_vorbis.h"
+    #define STB_VORBIS_IMPLEMENTATION
+    #include "libs/stb_vorbis.h"
 
-#pragma warning( push )
-#pragma warning( disable: 4456 )
-#pragma warning( disable: 4457 )
-#define SYSFONT_IMPLEMENTATION
-#include "libs/sysfont.h"
-#pragma warning( pop )
+    #pragma warning( push )
+    #pragma warning( disable: 4456 )
+    #pragma warning( disable: 4457 )
+    #define SYSFONT_IMPLEMENTATION
+    #include "libs/sysfont.h"
+    #pragma warning( pop )
 
 #endif
 
