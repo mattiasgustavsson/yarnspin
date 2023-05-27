@@ -72,6 +72,9 @@
 // Version number stored in the file .cache\VERSION, read at start of program
 int g_cache_version = 0;
 
+// Is sound disabled on commandline?
+bool g_disable_sound = false;
+
 // forward declares for helper functions placed at the end of this file
 
 #ifndef YARNSPIN_RUNTIME_ONLY
@@ -273,7 +276,9 @@ int app_proc( app_t* app, void* user_data ) {
     }
 
     thread_mutex_init( &g_sound_mutex );
-    app_sound( app, 735 * 8, sound_callback, audiosys );
+    if( !g_disable_sound ) {
+        app_sound( app, 735 * 8, sound_callback, audiosys );
+    }
 
     // main loop
     APP_U64 time = 0;
@@ -733,6 +738,10 @@ int main( int argc, char** argv ) {
     yarn_t yarn;
     yarn_load( decompressed_yarn, &yarn, is_debug );
     buffer_destroy( decompressed_yarn );
+
+    if( opt_nosound ) {
+        g_disable_sound = true;
+    }
 
     return app_run( app_proc, &yarn, NULL, NULL, NULL );
 }
