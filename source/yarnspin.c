@@ -75,6 +75,9 @@ int g_cache_version = 0;
 // Is sound disabled on commandline?
 bool g_disable_sound = false;
 
+// Command line windowed mode override
+bool g_windowed_mode = false;
+
 // forward declares for helper functions placed at the end of this file
 
 #ifndef YARNSPIN_RUNTIME_ONLY
@@ -208,7 +211,7 @@ int app_proc( app_t* app, void* user_data ) {
     }
 
     #ifndef __wasm__
-        bool fullscreen = true;
+        bool fullscreen = true && ( !g_windowed_mode );
     #else
         bool fullscreen = false;
     #endif
@@ -504,18 +507,20 @@ int main( int argc, char** argv ) {
     bool opt_debug = false;
     bool opt_compile = false;
     bool opt_nosound = false;
+    bool opt_window = false;
 
     static struct option long_options[] = {
-        { "images",  no_argument, NULL, 'i' },
-        { "run",     no_argument, NULL, 'r' },
-        { "debug",   no_argument, NULL, 'd' },
-        { "compile", no_argument, NULL, 'c' },
-        { "nosound", no_argument, NULL, 'n' },
+        { "images", no_argument, NULL, 'i' },
+        { "run",    no_argument, NULL, 'r' },
+        { "debug",  no_argument, NULL, 'd' },
+        { "compile",no_argument, NULL, 'c' },
+        { "nosound",no_argument, NULL, 'n' },
+        { "window", no_argument, NULL, 'w' },
         { NULL,      0,           NULL, 0 }
     };
 
     int opt = 0;
-    while( ( opt = ya_getopt_long( argc, argv, "irdcn", long_options, NULL ) ) != -1 ) {
+    while( ( opt = ya_getopt_long( argc, argv, "irdcnw", long_options, NULL ) ) != -1 ) {
         switch( opt ) {
             case 'i': {
                 opt_images = true;
@@ -531,6 +536,9 @@ int main( int argc, char** argv ) {
             } break;
             case 'n': {
                 opt_nosound = true;
+            } break;
+            case 'w': {
+                opt_window = true;
             } break;
         }
     }
@@ -741,6 +749,10 @@ int main( int argc, char** argv ) {
 
     if( opt_nosound ) {
         g_disable_sound = true;
+    }
+
+    if( opt_window ) {
+        g_windowed_mode = true;
     }
 
     return app_run( app_proc, &yarn, NULL, NULL, NULL );
