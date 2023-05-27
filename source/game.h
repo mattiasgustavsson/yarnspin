@@ -1713,7 +1713,7 @@ gamestate_t location_update( game_t* game ) {
         draw( game, yarn->globals.background_location, 0, 0 );
     }
 
-    bool menu_hover = mouse_y < 8 && mouse_x > 300;
+    bool menu_hover = mouse_y < 13 && mouse_x > 295;
     if( menu_hover ) {
         box( game, 308, 0, 10, 6, game->color_opt );
     }
