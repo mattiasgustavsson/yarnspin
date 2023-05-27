@@ -41,8 +41,7 @@ typedef struct state_data_t {
     int current_music;
     int current_ambience;
     int logo_index;
-    bool first_chr;
-    bool first_use;
+    bool first_chr_or_use;
     array(bool)* flags;
     array(int)* items;
     array(int)* chars;
@@ -57,8 +56,7 @@ void state_data_reset( state_data_t* data ) {
     data->current_music = -1;
     data->current_ambience = -1;
     data->logo_index = 0;
-    data->first_chr = true;
-    data->first_use = true;
+    data->first_chr_or_use = true;
     array_clear( data->flags );
     array_clear( data->items  );
     array_clear( data->chars  );
@@ -73,8 +71,7 @@ void state_data_copy( state_data_t* dest, state_data_t* src ) {
     //dest->current_music = src->current_music;    
     //dest->current_ambience = src->current_ambience;    
     dest->logo_index = src->logo_index;    
-    dest->first_chr = src->first_chr;
-    dest->first_use = src->first_use;
+    dest->first_chr_or_use = src->first_chr_or_use;
 
     array_clear( dest->flags );
     for( int i = 0; i < src->flags->count; ++i ) {
@@ -105,8 +102,7 @@ void state_data_write( state_data_t* data, buffer_t* buffer ) {
     buffer_write_i32( buffer, &data->current_music, 1 );
     buffer_write_i32( buffer, &data->current_ambience, 1 );
     buffer_write_i32( buffer, &data->logo_index, 1 );
-    buffer_write_bool( buffer, &data->first_chr, 1 );
-    buffer_write_bool( buffer, &data->first_use, 1 );
+    buffer_write_bool( buffer, &data->first_chr_or_use, 1 );
 
     buffer_write_i32( buffer, &data->flags->count, 1 );
     buffer_write_bool( buffer, data->flags->items, data->flags->count );
@@ -132,8 +128,7 @@ void state_data_read( state_data_t* data, buffer_t* buffer ) {
     buffer_read_i32( buffer, &data->current_music, 1 );
     buffer_read_i32( buffer, &data->current_ambience, 1 );
     buffer_read_i32( buffer, &data->logo_index, 1 );
-    buffer_read_bool( buffer, &data->first_chr, 1 );
-    buffer_read_bool( buffer, &data->first_use, 1 );
+    buffer_read_bool( buffer, &data->first_chr_or_use, 1 );
 
     data->flags = managed_array( bool );
     data->items = managed_array( int );
@@ -1797,7 +1792,7 @@ gamestate_t location_update( game_t* game ) {
                 if( game->state.items->items[ i ] == location->use->items[ j ].item_indices->items[ k ] ) {
                     if( game->queued_dialog < 0 && game->queued_location < 0 ) {
                         color = (uint8_t) game->color_use;
-                        if( game->state.first_use && !game->blink_visible ) {
+                        if( game->state.first_chr_or_use && !game->blink_visible ) {
                             color = (uint8_t) game->color_background;
                         }
                         enabled = true;
@@ -1835,7 +1830,7 @@ gamestate_t location_update( game_t* game ) {
         int color = game->color_chr;
         if( game->queued_dialog >= 0 || game->queued_location >= 0 ) {
             color = game->color_disabled;
-        } else if( game->state.first_chr && !game->blink_visible ) {
+        } else if( game->state.first_chr_or_use && !game->blink_visible ) {
             color = (uint8_t) game->color_background;
         }
 
@@ -1898,7 +1893,7 @@ gamestate_t location_update( game_t* game ) {
                 continue;
             }
             if( c == chr ) {
-                game->state.first_chr= false;
+                game->state.first_chr_or_use = false;
                 do_actions( game, location->chr->items[ i ].act );
             }
             ++c;
@@ -1912,7 +1907,7 @@ gamestate_t location_update( game_t* game ) {
                 for( int k = 0; k < location->use->items[ j ].item_indices->count; ++k ) {
                     if( game->state.items->items[ i ] == location->use->items[ j ].item_indices->items[ k ] ) {
                         if( i == use ) {
-                            game->state.first_use = false;
+                            game->state.first_chr_or_use = false;
                             do_actions( game, location->use->items[ j ].act );
                         }
                     }
