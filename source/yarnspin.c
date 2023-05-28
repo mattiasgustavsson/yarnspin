@@ -157,6 +157,7 @@ typedef struct qoa_data_t {
     #include "audioconv.h"
 #endif
 #include "yarn.h"
+#include "render.h"
 #include "input.h"
 #include "game.h"
 
@@ -266,17 +267,20 @@ int app_proc( app_t* app, void* user_data ) {
     rnd_pcg_t rnd;
     rnd_pcg_seed( &rnd, (RND_U32) app_time_count( app ) );
     
-    // run game
-    game_t game;
+    render_t render;
     if( yarn->globals.colormode == YARN_COLORMODE_PALETTE ) {
         canvas = (uint8_t*)malloc( screen_width * screen_height * sizeof( uint8_t ) );
         memset( canvas, 0, screen_width * screen_height * sizeof( uint8_t ) );
-        game_init( &game, yarn, &input, audiosys, &rnd, canvas, NULL, screen_width, screen_height );
+        render_init( &render, yarn, canvas, NULL, screen_width, screen_height );
     } else {
         canvas_rgb = (uint32_t*)malloc( screen_width * screen_height * sizeof( uint32_t ) );
         memset( canvas_rgb, 0, screen_width * screen_height * sizeof( uint32_t ) );
-        game_init( &game, yarn, &input, audiosys, &rnd, NULL, canvas_rgb, screen_width, screen_height );
+        render_init( &render, yarn, NULL, canvas_rgb, screen_width, screen_height );
     }
+
+    // run game
+    game_t game;
+    game_init( &game, yarn, &render, &input, audiosys, &rnd );
 
     thread_mutex_init( &g_sound_mutex );
     if( !g_disable_sound ) {
@@ -297,13 +301,13 @@ int app_proc( app_t* app, void* user_data ) {
         if( game.yarn->is_debug ) {
             char const* dbgstr = "debug";
             pixelfont_bounds_t bounds;
-            pixelfont_blit( game.yarn->assets.font_description, 0, 0, dbgstr, 0, NULL, game.screen_width, game.screen_height,
+            pixelfont_blit( render.yarn->assets.font_description, 0, 0, dbgstr, 0, NULL, render.screen_width, render.screen_height,
                     PIXELFONT_ALIGN_LEFT, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, &bounds );            
-            if( game.screen ) {
-                pixelfont_blit( game.yarn->assets.font_description, game.screen_width - bounds.width - 1, game.screen_height - bounds.height, dbgstr, (uint8_t)game.color_disabled, game.screen, game.screen_width, game.screen_height,
+            if( render.screen ) {
+                pixelfont_blit( render.yarn->assets.font_description, render.screen_width - bounds.width - 1, render.screen_height - bounds.height, dbgstr, (uint8_t)render.color_disabled, render.screen, render.screen_width, render.screen_height,
                     PIXELFONT_ALIGN_LEFT, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, NULL );
             } else {
-                pixelfont_blit_rgb( game.yarn->assets.font_description, game.screen_width - bounds.width - 1, game.screen_height - bounds.height, dbgstr, 0x404040, game.screen_rgb, game.screen_width, game.screen_height,
+                pixelfont_blit_rgb( render.yarn->assets.font_description, render.screen_width - bounds.width - 1, render.screen_height - bounds.height, dbgstr, 0x404040, render.screen_rgb, render.screen_width, render.screen_height,
                     PIXELFONT_ALIGN_LEFT, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, NULL );
             }
 
@@ -321,7 +325,7 @@ int app_proc( app_t* app, void* user_data ) {
 
         APP_U32 transition = (APP_U32)( ( 255 * abs( game.transition_counter ) / 10 ) );
         APP_U32 fade = transition << 16 | transition << 8 | transition;
-        uint32_t bg = yarn->assets.palette[ game.color_background ];
+        uint32_t bg = yarn->assets.palette[ render.color_background ];
         #define RGBMUL32( a, b) \
             ( ( ( ( ( ( (a) >> 16U ) & 0xffU ) * ( ( (b) >> 16U ) & 0xffU ) ) >> 8U ) << 16U ) | \
                 ( ( ( ( ( (a) >> 8U  ) & 0xffU ) * ( ( (b) >> 8U  ) & 0xffU ) ) >> 8U ) << 8U  ) | \
@@ -412,7 +416,7 @@ int app_proc( app_t* app, void* user_data ) {
         } else if( crtemu_tv ) {
             int offset_x = 22;
             int offset_y = 33;
-            scale_for_resolution( &game, &offset_x, &offset_y );
+            scale_for_resolution( &render, &offset_x, &offset_y );
             if( canvas ) {
                 for( int y = 0; y < screen_height; ++y ) {
                     for( int x = 0; x < screen_width; ++x ) {

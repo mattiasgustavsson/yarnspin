@@ -1,13 +1,3 @@
-uint32_t blend_rgb( uint32_t color1, uint32_t color2, uint8_t alpha ) {
-    uint64_t c1 = (uint64_t) color1;
-    uint64_t c2 = (uint64_t) color2;
-    uint64_t a = (uint64_t)( alpha );
-    // bit magic to alpha blend R G B with single mul
-    c1 = ( c1 | ( c1 << 24 ) ) & 0x00ff00ff00ffull;
-    c2 = ( c2 | ( c2 << 24 ) ) & 0x00ff00ff00ffull;
-    uint64_t o = ( ( ( ( c2 - c1 ) * a ) >> 8 ) + c1 ) & 0x00ff00ff00ffull; 
-    return (uint32_t) ( o | ( o >> 24 ) );
-}
 
 
 typedef enum gamestate_t {
@@ -19,13 +9,6 @@ typedef enum gamestate_t {
     GAMESTATE_EXIT,
     GAMESTATE_TERMINATE,
 } gamestate_t;
-
-
-typedef struct rgbimage_t {
-    uint32_t width;
-    uint32_t height;
-    uint32_t pixels[ 1 ];
-} rgbimage_t;
 
 
 typedef struct stack_entry_t {
@@ -198,33 +181,15 @@ typedef struct game_t {
     bool savegame_menu;
     bool loadgame_menu;
     int transition_counter;
-    uint8_t* screen;
-    uint32_t* screen_rgb;
-    int screen_width;
-    int screen_height;
-    uint8_t* screenshot;
-    uint32_t* screenshot_rgb;
+    render_t* render;
     audiosys_t* audiosys;
     rnd_pcg_t* rnd;
     input_t* input;
     int mouse_x;
     int mouse_y;
-    int color_background;
-    int color_disabled;
-    int color_txt;
-    int color_opt;
-    int color_chr;
-    int color_use;
-    int color_name;
-    int color_facebg;
     yarn_t* yarn;
     int queued_location;
     int queued_dialog;
-    pixelfont_t* font_txt;
-    pixelfont_t* font_opt;
-    pixelfont_t* font_chr;
-    pixelfont_t* font_use;
-    pixelfont_t* font_name;
     struct {
         float limit;
         int phrase_index;
@@ -243,7 +208,6 @@ typedef struct game_t {
         int sounds_count;
         int sounds_capacity;
     } sound_state;
-    rgbimage_t** rgbimages;
 } game_t;
 
 
@@ -336,15 +300,12 @@ void game_quickload( game_t* game ) {
 }
 
 
-void game_init( game_t* game, yarn_t* yarn, input_t* input, audiosys_t* audiosys, rnd_pcg_t* rnd, uint8_t* screen, uint32_t* screen_rgb, int width, int height ) {
+void game_init( game_t* game, yarn_t* yarn, render_t* render, input_t* input, audiosys_t* audiosys, rnd_pcg_t* rnd ) {
     memset( game, 0, sizeof( *game ) );
     game->delta_time = 0.0f;
     game->exit_flag = false;
     game->exit_requested = false;
-    game->screen = screen;
-    game->screen_rgb = screen_rgb;
-    game->screen_width = width;
-    game->screen_height = height;
+    game->render = render;
     game->audiosys = audiosys;
     game->rnd = rnd;
     game->input = input;
@@ -354,9 +315,6 @@ void game_init( game_t* game, yarn_t* yarn, input_t* input, audiosys_t* audiosys
     game->blink_wait = 100;
     game->blink_visible = true;
 
-    game->screenshot = game->screen ? (uint8_t*) manage_alloc( malloc( width * height * sizeof( uint8_t ) ) ) : NULL;
-    game->screenshot_rgb = game->screen_rgb ? (uint32_t*) manage_alloc( malloc( width * height * sizeof( uint32_t ) ) ) : NULL;
-        
     game->state.flags = managed_array( bool );
     game->state.items = managed_array( int );
     game->state.chars = managed_array( int );
@@ -373,98 +331,6 @@ void game_init( game_t* game, yarn_t* yarn, input_t* input, audiosys_t* audiosys
     game->sound_state.sounds_capacity = 256;
     game->sound_state.sounds = ARRAY_CAST( manage_alloc( malloc( sizeof( *game->sound_state.sounds ) * game->sound_state.sounds_capacity ) ) );
     memset( game->sound_state.sounds, 0, sizeof( *game->sound_state.sounds ) * game->sound_state.sounds_capacity );
-
-    int darkest_index = 0;
-    int darkest_luma = 65536;
-    int brightest_index = 0;
-    int brightest_luma = 0;
-    int facebg_index = 0;
-    int facebg_luma = 65536;
-    int disabled_index = 0;
-    int disabled_luma = 65536;
-
-    int facebg_lumaref = 54 * 0x28 + 182 * 0x28 + 19 * 0x28;
-    int disabled_lumaref = 54 * 0x70 + 182 * 0x70 + 19 * 0x70;
-    for( int i = 0; i < yarn->assets.palette_count; ++i ) {
-        int c = (int)( yarn->assets.palette[ i ] & 0x00ffffff );
-        int r = c & 0xff;
-        int g = ( c >> 8 ) & 0xff;
-        int b = ( c >> 16 ) & 0xff;
-        int l = 54 * r + 182 * g + 19 * b;
-        if( l <= darkest_luma ) { darkest_luma = l; darkest_index = i; }
-        if( l >= brightest_luma ) { brightest_luma = l; brightest_index = i; }
-        int coldiff = ( abs( r - g ) + abs( g - b ) + abs( r - b ) ) * 64;
-        if( abs( l - facebg_lumaref ) + coldiff <= facebg_luma ) { facebg_luma = abs( l - facebg_lumaref ) + coldiff; facebg_index = i; }
-        if( abs( l - disabled_lumaref ) + coldiff <= disabled_luma ) { disabled_luma = abs( l - disabled_lumaref ) + coldiff; disabled_index = i; }
-    }
-
-    if( disabled_index == darkest_index ) {
-        disabled_luma = 65536;
-        for( int i = 0; i < yarn->assets.palette_count; ++i ) {
-            if( i == darkest_index ) continue;
-            int c = (int)( yarn->assets.palette[ i ] & 0x00ffffff );
-            int r = c & 0xff;
-            int g = ( c >> 8 ) & 0xff;
-            int b = ( c >> 16 ) & 0xff;
-            int l = 54 * r + 182 * g + 19 * b;
-            if( l <= disabled_luma ) { disabled_luma = l; disabled_index = i; }
-        }
-    }
-
-    game->font_txt = yarn->assets.font_description;
-    game->font_opt = yarn->assets.font_options;
-    game->font_chr = yarn->assets.font_characters;
-    game->font_use = yarn->assets.font_items;
-    game->font_name = yarn->assets.font_name;
-    game->color_background = yarn->globals.color_background;
-    game->color_disabled = yarn->globals.color_disabled;
-    game->color_txt = yarn->globals.color_txt;
-    game->color_opt = yarn->globals.color_opt;
-    game->color_chr = yarn->globals.color_chr;
-    game->color_use = yarn->globals.color_use;
-    game->color_name = yarn->globals.color_name;
-    game->color_facebg = yarn->globals.color_facebg;
-
-    if( game->color_background < 0 ) game->color_background = (uint8_t)darkest_index;
-    if( game->color_disabled < 0 ) game->color_disabled = (uint8_t)disabled_index;
-    if( game->color_txt < 0 ) game->color_txt = (uint8_t)brightest_index;
-    if( game->color_opt < 0 ) game->color_opt = (uint8_t)brightest_index;
-    if( game->color_chr < 0 ) game->color_chr = (uint8_t)brightest_index;
-    if( game->color_use < 0 ) game->color_use = (uint8_t)brightest_index;
-    if( game->color_name < 0 ) game->color_name = (uint8_t)brightest_index;
-    if( game->color_facebg < 0 ) game->color_facebg = (uint8_t)facebg_index;
-
-    if( game->yarn->globals.colormode != YARN_COLORMODE_PALETTE ) {
-        game->rgbimages = (rgbimage_t**)manage_alloc( malloc( sizeof( rgbimage_t* ) * game->yarn->assets.bitmaps->count ) );
-        for( int i = 0; i < game->yarn->assets.bitmaps->count; ++i ) {
-            bool jpeg = game->yarn->globals.colormode == YARN_COLORMODE_RGB && game->yarn->globals.resolution == YARN_RESOLUTION_FULL;
-            qoi_data_t* qoi = (qoi_data_t*)game->yarn->assets.bitmaps->items[ i ];
-            if( !jpeg ) {        
-                qoi_desc desc;
-                uint32_t* pixels = (uint32_t*)qoi_decode( qoi->data, qoi->size, &desc, 4 ); 
-                rgbimage_t* image = (rgbimage_t*)manage_alloc( malloc( sizeof( rgbimage_t) + ( desc.width * desc.height - 1 ) * sizeof( uint32_t ) ) );
-                image->width = desc.width;
-                image->height = desc.height;
-                uint32_t bgcolor = game->yarn->assets.palette[ game->color_background ];
-                for( int i = 0; i < image->width * image->height; ++i ) {
-                    uint32_t c = pixels[ i ];
-                    uint8_t a = (uint8_t)( c >> 24 );
-                    image->pixels[ i ] = blend_rgb( bgcolor, c, a );
-                }
-                game->rgbimages[ i ] = image;
-                free( pixels );
-            } else {
-                int width, height, c;
-                stbi_uc* pixels = stbi_load_from_memory( qoi->data, qoi->size, &width, &height, &c, 4 );
-                rgbimage_t* image = (rgbimage_t*)manage_alloc( malloc( sizeof( rgbimage_t) + ( width * height - 1 ) * sizeof( uint32_t ) ) );
-                image->width = width;
-                image->height = height;
-                memcpy( image->pixels, pixels, width * height * sizeof( uint32_t ) );
-                game->rgbimages[ i ] = image;
-                free( pixels );
-            }
-        }
-    }
 }
 
 bool was_key_pressed( game_t* game, int key ) {
@@ -621,25 +487,25 @@ bool audio_qoa_source( game_t* game, int audio_index, audiosys_audio_source_t* s
 }
 
 void enter_menu( game_t* game ) {
-    if( game->screen_rgb ) {
-        memcpy( game->screenshot_rgb, game->screen_rgb, sizeof( uint32_t ) * game->screen_width * game->screen_height );
+    if( game->render->screen_rgb ) {
+        memcpy( game->render->screenshot_rgb, game->render->screen_rgb, sizeof( uint32_t ) * game->render->screen_width * game->render->screen_height );
     } else {
-        memcpy( game->screenshot, game->screen, sizeof( uint8_t ) * game->screen_width * game->screen_height );
+        memcpy( game->render->screenshot, game->render->screen, sizeof( uint8_t ) * game->render->screen_width * game->render->screen_height );
     }
     game->ingame_menu = true;
     audiosys_pause( game->audiosys );
-    if( game->screen ) {
-        for( int y = 0; y < game->screen_height; ++y ) {
-            for( int x = 0; x < game->screen_width; ++x ) {
+    if( game->render->screen ) {
+        for( int y = 0; y < game->render->screen_height; ++y ) {
+            for( int x = 0; x < game->render->screen_width; ++x ) {
                 if( ( x + y ) & 1 ) {
-                    game->screen[ x + y * game->screen_width ] = game->color_background;
+                    game->render->screen[ x + y * game->render->screen_width ] = game->render->color_background;
                 }
             }
         }
     } else {
-        for( int y = 0; y < game->screen_height; ++y ) {
-            for( int x = 0; x < game->screen_width; ++x ) {
-                game->screen_rgb[ x + y * game->screen_width ] = blend_rgb( game->screen_rgb[ x + y * game->screen_width ], 0x000000, 127 );
+        for( int y = 0; y < game->render->screen_height; ++y ) {
+            for( int x = 0; x < game->render->screen_width; ++x ) {
+                game->render->screen_rgb[ x + y * game->render->screen_width ] = blend_rgb( game->render->screen_rgb[ x + y * game->render->screen_width ], 0x000000, 127 );
             }
         }
     }
@@ -762,218 +628,6 @@ void game_update( game_t* game, float delta_time ) {
         game->disable_transition = true;
         game->exit_requested = false;
     }
-}
-
-
-void cls( game_t* game ) {
-    if( game->screen ) {
-        memset( game->screen, game->color_background, (size_t) game->screen_width * game->screen_height );
-    } else {
-        uint32_t c = game->yarn->assets.palette[ game->color_background ];
-        for( int i = 0; i < game->screen_width * game->screen_height ; ++i ) {
-            game->screen_rgb[ i ] = c;
-        }
-    }
-}
-
-
-void scale_for_resolution( game_t* game, int* x, int* y ) {
-    float scale_factors[] = { 1.0f, 1.25f, 1.5f, 2.0f, 4.5f };
-    if( x ) {
-        *x = (int)( *x * scale_factors[ (int) game->yarn->globals.resolution ] );
-    }
-    if( y ) {
-        *y = (int)( *y * scale_factors[ (int) game->yarn->globals.resolution ] );
-    }
-}
-
-
-void scale_for_resolution_inverse( game_t* game, int* x, int* y ) {
-    float scale_factors[] = { 1.0f, 1.25f, 1.5f, 2.0f, 4.5f };
-    if( x ) {
-        *x = (int)( *x / scale_factors[ (int) game->yarn->globals.resolution ] );
-    }
-    if( y ) {
-        *y = (int)( *y / scale_factors[ (int) game->yarn->globals.resolution ] );
-    }
-}
-
-
-void draw( game_t* game, int bitmap_index, int x, int y ) {
-    scale_for_resolution( game, &x, &y );
-    if( game->screen ) {
-        palrle_blit( game->yarn->assets.bitmaps->items[ bitmap_index ], x, y, game->screen, game->screen_width, game->screen_height );
-    } else {
-        rgbimage_t* image = game->rgbimages[ bitmap_index ];
-        for( int i = 0; i < image->height; ++i ) {
-            memcpy( game->screen_rgb + x + ( y +i ) * game->screen_width, image->pixels + i * image->width, image->width * sizeof( uint32_t ) );
-        }
-    }
-}
-
-
-void draw_raw( game_t* game, int x, int y, uint8_t* pixels, int w, int h ) {
-    scale_for_resolution( game, &x, &y );
-    if( game->screen ) {
-        for( int i = 0; i < h; ++i ) {
-            memcpy( game->screen + x + ( y + i ) * game->screen_width, pixels + i * w, w * sizeof( uint8_t ) );
-        }
-    }
-}
-
-
-void draw_raw_rgb( game_t* game, int x, int y, uint32_t* pixels, int w, int h ) {
-    scale_for_resolution( game, &x, &y );
-    if( game->screen_rgb ) {
-        for( int i = 0; i < h; ++i ) {
-            memcpy( game->screen_rgb + x + ( y + i ) * game->screen_width, pixels + i * w, w * sizeof( uint32_t ) );
-        }
-    }
-}
-
-void box( game_t* game, int x, int y, int w, int h, int c ) {
-    scale_for_resolution( game, &x, &y );
-    scale_for_resolution( game, &w, &h );
-    if( game->screen ) {
-        for( int iy = 0; iy < h; ++iy ) {
-            for( int ix = 0; ix < w; ++ix ) {
-                int xp = x + ix;
-                int yp = y + iy;
-                if( xp >= 0 && xp < game->screen_width && yp >= 0 && yp < game->screen_height ) {
-                    game->screen[ xp + yp * game->screen_width ] = (uint8_t) c;
-                }
-            }
-        }
-    } else {
-        for( int iy = 0; iy < h; ++iy ) {
-            for( int ix = 0; ix < w; ++ix ) {
-                int xp = x + ix;
-                int yp = y + iy;
-                if( xp >= 0 && xp < game->screen_width && yp >= 0 && yp < game->screen_height ) {
-                    game->screen_rgb[ xp + yp * game->screen_width ] = game->yarn->assets.palette[ c ];
-                }
-            }
-        }
-    }
-}
-
-
-void menu_icon( game_t* game, int x, int y, int c ) {
-    scale_for_resolution( game, &x, &y );
-    int s = 8;
-    scale_for_resolution( game, &s, NULL );
-    int h = s / 2;
-    if( game->screen ) {
-        for( int iy = 0; iy < h; ++iy ) {
-            for( int ix = 0; ix < s; ++ix ) {
-                int xp = x + ix;
-                int yp = y + iy;
-                if( xp >= 0 && xp < game->screen_width && yp >= 0 && yp < game->screen_height ) {
-                    game->screen[ xp + yp * game->screen_width ] = (uint8_t) c;
-                }
-            }
-            ++x;
-            s -= 2;
-        }
-    } else {
-        for( int iy = 0; iy < h; ++iy ) {
-            for( int ix = 0; ix < s; ++ix ) {
-                int xp = x + ix;
-                int yp = y + iy;
-                if( xp >= 0 && xp < game->screen_width && yp >= 0 && yp < game->screen_height ) {
-                    game->screen_rgb[ xp + yp * game->screen_width ] = game->yarn->assets.palette[ c ];
-                }
-            }
-            ++x;
-            s -= 2;
-        }
-    }
-}
-
-
-
-pixelfont_bounds_t center( game_t* game, pixelfont_t* font, string str, int x, int y, int color ) {
-    scale_for_resolution( game, &x, &y );
-    pixelfont_bounds_t bounds;
-    if( game->screen ) {
-        pixelfont_blit( font, x, y, str, (uint8_t)color, game->screen, game->screen_width, game->screen_height,
-            PIXELFONT_ALIGN_CENTER, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, &bounds );
-    } else {
-        pixelfont_blit_rgb( font, x, y, str, game->yarn->assets.palette[ color ], game->screen_rgb, game->screen_width, game->screen_height,
-            PIXELFONT_ALIGN_CENTER, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, &bounds );
-    }
-    scale_for_resolution_inverse( game, &bounds.width, &bounds.height );
-    return bounds;
-}
-
-
-pixelfont_bounds_t center_wrap( game_t* game, pixelfont_t* font, string str, int x, int y, int color, int wrap_width ) {
-    scale_for_resolution( game, &x, &y );
-    scale_for_resolution( game, &wrap_width, NULL );
-    pixelfont_bounds_t bounds;
-    x -= wrap_width / 2;
-    if( game->screen ) {
-        pixelfont_blit( font, x, y, str, (uint8_t)color, game->screen, game->screen_width, game->screen_height,
-            PIXELFONT_ALIGN_CENTER, wrap_width, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF,
-            &bounds );
-    } else {
-        pixelfont_blit_rgb( font, x, y, str, game->yarn->assets.palette[ color ], game->screen_rgb, game->screen_width, game->screen_height,
-            PIXELFONT_ALIGN_CENTER, wrap_width, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF,
-            &bounds );
-    }
-    scale_for_resolution_inverse( game, &bounds.width, &bounds.height );
-    return bounds;
-}
-
-
-pixelfont_bounds_t text( game_t* game, pixelfont_t* font, string str, int x, int y, int color ) {
-    scale_for_resolution( game, &x, &y );
-    pixelfont_bounds_t bounds;
-    if( game->screen ) {
-        pixelfont_blit( font, x, y, str, (uint8_t)color, game->screen, game->screen_width, game->screen_height,
-            PIXELFONT_ALIGN_LEFT, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, &bounds );
-    } else {
-        pixelfont_blit_rgb( font, x, y, str, game->yarn->assets.palette[ color ], game->screen_rgb, game->screen_width, game->screen_height,
-            PIXELFONT_ALIGN_LEFT, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, &bounds );
-    }
-    scale_for_resolution_inverse( game, &bounds.width, &bounds.height );
-    return bounds;
-}
-
-
-void wrap( game_t* game, pixelfont_t* font, string str, int x, int y, int color, int wrap_width ) {
-    scale_for_resolution( game, &x, &y );
-    scale_for_resolution( game, &wrap_width, NULL );
-    if( game->screen ) {
-        pixelfont_blit( font, x, y, str, (uint8_t)color, game->screen, game->screen_width, game->screen_height,
-            PIXELFONT_ALIGN_LEFT, wrap_width, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF,
-            NULL );
-    } else {
-        pixelfont_blit_rgb( font, x, y, str, game->yarn->assets.palette[ color ], game->screen_rgb, game->screen_width, game->screen_height,
-            PIXELFONT_ALIGN_LEFT, wrap_width, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF,
-            NULL );
-    }
-}
-
-
-void wrap_limit( game_t* game, pixelfont_t* font, string str, int x, int y, int color, int wrap_width, int limit ) {
-    scale_for_resolution( game, &x, &y );
-    scale_for_resolution( game, &wrap_width, NULL );
-    if( game->screen ) {
-        pixelfont_blit( font, x, y, str, (uint8_t)color, game->screen, game->screen_width, game->screen_height,
-            PIXELFONT_ALIGN_LEFT, wrap_width, 0, 0, limit, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF,
-            PIXELFONT_UNDERLINE_OFF, NULL );
-    } else {
-        pixelfont_blit_rgb( font, x, y, str, game->yarn->assets.palette[ color ], game->screen_rgb, game->screen_width, game->screen_height,
-            PIXELFONT_ALIGN_LEFT, wrap_width, 0, 0, limit, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF,
-            PIXELFONT_UNDERLINE_OFF, NULL );
-    }
-}
-
-
-int font_height( game_t* game, int height ) {
-    scale_for_resolution_inverse( game, &height, NULL );
-    return height;
 }
 
 
@@ -1281,9 +935,9 @@ void save_game( game_t* game, int slot ) {
 
     int thumb_width = 75;
     int thumb_height = 57;
-    scale_for_resolution( game, &thumb_width, &thumb_height );
-    uint32_t* thumb_rgb = game->screen_rgb ? make_thumbnail_rgb( game->screenshot_rgb, game->screen_width, game->screen_height, thumb_width, thumb_height ) : NULL;
-    uint8_t* thumb = game->screen ? make_thumbnail( game->screenshot, game->screen_width, game->screen_height, thumb_width, thumb_height ) : NULL;
+    scale_for_resolution( game->render, &thumb_width, &thumb_height );
+    uint32_t* thumb_rgb = game->render->screen_rgb ? make_thumbnail_rgb( game->render->screenshot_rgb, game->render->screen_width, game->render->screen_height, thumb_width, thumb_height ) : NULL;
+    uint8_t* thumb = game->render->screen ? make_thumbnail( game->render->screenshot, game->render->screen_width, game->render->screen_height, thumb_width, thumb_height ) : NULL;
  
     buffer_t* buffer = buffer_create();
 
@@ -1350,8 +1004,8 @@ void load_savegames( game_t* game ) {
             buffer_read_u32( buffer, &savegame->version, 1 );
             buffer_read_i32( buffer, &savegame->thumb_width, 1 );
             buffer_read_i32( buffer, &savegame->thumb_height, 1 );
-            savegame->thumb = game->screen ? (uint8_t*) manage_alloc( malloc( savegame->thumb_width * savegame->thumb_height * sizeof( uint8_t ) ) ) : NULL;
-            savegame->thumb_rgb = game->screen_rgb ? (uint32_t*) manage_alloc( malloc( savegame->thumb_width * savegame->thumb_height * sizeof( uint32_t ) ) ) : NULL;
+            savegame->thumb = game->render->screen ? (uint8_t*) manage_alloc( malloc( savegame->thumb_width * savegame->thumb_height * sizeof( uint8_t ) ) ) : NULL;
+            savegame->thumb_rgb = game->render->screen_rgb ? (uint32_t*) manage_alloc( malloc( savegame->thumb_width * savegame->thumb_height * sizeof( uint32_t ) ) ) : NULL;
             if( savegame->thumb ) {
                 buffer_read_u8( buffer, savegame->thumb, savegame->thumb_width * savegame->thumb_height );
             }
@@ -1371,13 +1025,13 @@ void load_savegames( game_t* game ) {
 
 
 void savegame_menu_update( game_t* game ) {
-    cls( game );    
+    cls( game->render );    
 
-    center( game, game->font_name, "SAVE GAME", 160, 6, game->color_opt );
+    center( game->render, game->render->font_name, "SAVE GAME", 160, 6, game->render->color_opt );
 
     int mouse_x = input_get_mouse_x( game->input );
     int mouse_y = input_get_mouse_y( game->input );
-    scale_for_resolution_inverse( game, &mouse_x, &mouse_y );
+    scale_for_resolution_inverse( game->render, &mouse_x, &mouse_y );
 
     int hover_index = 0;
     for( int y = 0; y < 3; ++y ) {
@@ -1390,24 +1044,24 @@ void savegame_menu_update( game_t* game ) {
             if( hover ) {
                 hover_index = x + y * 3 + 1;
             }
-            box( game, 31 + x * 96, 19 + y * 72, 78, 60, hover ? game->color_opt : game->color_disabled );
-            box( game, 32 + x * 96, 20 + y * 72, 75, 57, game->color_background );
+            box( game->render, 31 + x * 96, 19 + y * 72, 78, 60, hover ? game->render->color_opt : game->render->color_disabled );
+            box( game->render, 32 + x * 96, 20 + y * 72, 75, 57, game->render->color_background );
             char str[ 2 ] = { 0, 0 };
             *str = '1' + x + y * 3;
-            text( game, game->font_opt, str, xp - 8, yp + 3, game->color_opt );
+            text( game->render, game->render->font_opt, str, xp - 8, yp + 3, game->render->color_opt );
 
             if( savegame->thumb ) {
-                draw_raw( game, 32 + x * 96, 20 + y * 72, savegame->thumb, savegame->thumb_width, savegame->thumb_height );
+                draw_raw( game->render, 32 + x * 96, 20 + y * 72, savegame->thumb, savegame->thumb_width, savegame->thumb_height );
             }
             if( savegame->thumb_rgb ) {
-                draw_raw_rgb( game, 32 + x * 96, 20 + y * 72, savegame->thumb_rgb, savegame->thumb_width, savegame->thumb_height );
+                draw_raw_rgb( game->render, 32 + x * 96, 20 + y * 72, savegame->thumb_rgb, savegame->thumb_width, savegame->thumb_height );
             }
 
             char datetime[ 20 ] = "";
             strcat( datetime, savegame->date );
             strcat( datetime, "  " );
             strcat( datetime, savegame->time );
-            center( game, game->font_txt, datetime, xp + 39, yp + 60, game->color_txt );
+            center( game->render, game->render->font_txt, datetime, xp + 39, yp + 60, game->render->color_txt );
        }
     }
 
@@ -1455,13 +1109,13 @@ void savegame_menu_update( game_t* game ) {
 
 
 void loadgame_menu_update( game_t* game ) {
-    cls( game );    
+    cls( game->render );    
 
-    center( game, game->font_name, "LOAD GAME", 160, 6, game->color_opt );
+    center( game->render, game->render->font_name, "LOAD GAME", 160, 6, game->render->color_opt );
 
     int mouse_x = input_get_mouse_x( game->input );
     int mouse_y = input_get_mouse_y( game->input );
-    scale_for_resolution_inverse( game, &mouse_x, &mouse_y );
+    scale_for_resolution_inverse( game->render, &mouse_x, &mouse_y );
 
     int hover_index = 0;
     for( int y = 0; y < 3; ++y ) {
@@ -1474,24 +1128,24 @@ void loadgame_menu_update( game_t* game ) {
             if( hover ) {
                 hover_index = x + y * 3 + 1;
             }
-            box( game, 31 + x * 96, 19 + y * 72, 78, 60, hover && valid_slot ? game->color_opt : game->color_disabled );
-            box( game, 32 + x * 96, 20 + y * 72, 75, 57, game->color_background );
+            box( game->render, 31 + x * 96, 19 + y * 72, 78, 60, hover && valid_slot ? game->render->color_opt : game->render->color_disabled );
+            box( game->render, 32 + x * 96, 20 + y * 72, 75, 57, game->render->color_background );
             char str[ 2 ] = { 0, 0 };
             *str = '1' + x + y * 3;
-            text( game, game->font_opt, str, xp - 8, yp + 3, game->color_opt );
+            text( game->render, game->render->font_opt, str, xp - 8, yp + 3, game->render->color_opt );
 
             if( savegame->thumb ) {
-                draw_raw( game, 32 + x * 96, 20 + y * 72, savegame->thumb, savegame->thumb_width, savegame->thumb_height );
+                draw_raw( game->render, 32 + x * 96, 20 + y * 72, savegame->thumb, savegame->thumb_width, savegame->thumb_height );
             }
             if( savegame->thumb_rgb ) {
-                draw_raw_rgb( game, 32 + x * 96, 20 + y * 72, savegame->thumb_rgb, savegame->thumb_width, savegame->thumb_height );
+                draw_raw_rgb( game->render, 32 + x * 96, 20 + y * 72, savegame->thumb_rgb, savegame->thumb_width, savegame->thumb_height );
             }
 
             char datetime[ 20 ] = "";
             strcat( datetime, savegame->date );
             strcat( datetime, "  " );
             strcat( datetime, savegame->time );
-            center( game, game->font_txt, datetime, xp + 39, yp + 60, game->color_txt );
+            center( game->render, game->render->font_txt, datetime, xp + 39, yp + 60, game->render->color_txt );
        }
     }
 
@@ -1549,12 +1203,12 @@ void ingame_menu_update( game_t* game ) {
     }
     int mouse_x = input_get_mouse_x( game->input );
     int mouse_y = input_get_mouse_y( game->input );
-    scale_for_resolution_inverse( game, &mouse_x, &mouse_y );
+    scale_for_resolution_inverse( game->render, &mouse_x, &mouse_y );
 
-    box( game, 104, 46, 123, 163, game->color_background );
-    box( game, 99, 39, 124, 164, game->color_background );
-    box( game, 100, 40, 121, 161, game->color_opt );
-    box( game, 102, 42, 118, 158, game->color_background );
+    box( game->render, 104, 46, 123, 163, game->render->color_background );
+    box( game->render, 99, 39, 124, 164, game->render->color_background );
+    box( game->render, 100, 40, 121, 161, game->render->color_opt );
+    box( game->render, 102, 42, 118, 158, game->render->color_background );
 
     int spacing = 20;
     int ypos = 40 + ( 160 - ( 6 * spacing ) ) / 2 - spacing;
@@ -1564,16 +1218,16 @@ void ingame_menu_update( game_t* game ) {
     }
 
     if( option >= 0 ) {
-        box( game, 110, ypos + ( option + 1 ) * spacing + 3, 100, spacing - 8, game->color_opt );
+        box( game->render, 110, ypos + ( option + 1 ) * spacing + 3, 100, spacing - 8, game->render->color_opt );
     }
 
-    int offs = ( spacing - game->font_name->height ) / 2;
-    center( game, game->font_name, "RESUME", 160, offs + ( ypos+=spacing ), option == 0 ? game->color_background : game->color_opt );
-    center( game, game->font_name, "SAVE GAME", 160, offs + ( ypos+=spacing ), option == 1 ? game->color_background : game->color_opt );
-    center( game, game->font_name, "LOAD GAME", 160, offs + ( ypos+=spacing ), option == 2 ? game->color_background : game->color_opt );
-    center( game, game->font_name, "OPTION", 160, offs + ( ypos+=spacing ), option == 3 ? game->color_background : game->color_disabled );
-    center( game, game->font_name, "RESTART", 160, offs + ( ypos+=spacing ), option == 4 ? game->color_background : game->color_opt );
-    center( game, game->font_name, "QUIT", 160, offs + ( ypos+=spacing ), option == 5 ? game->color_background : game->color_opt );
+    int offs = ( spacing - game->render->font_name->height ) / 2;
+    center( game->render, game->render->font_name, "RESUME", 160, offs + ( ypos+=spacing ), option == 0 ? game->render->color_background : game->render->color_opt );
+    center( game->render, game->render->font_name, "SAVE GAME", 160, offs + ( ypos+=spacing ), option == 1 ? game->render->color_background : game->render->color_opt );
+    center( game->render, game->render->font_name, "LOAD GAME", 160, offs + ( ypos+=spacing ), option == 2 ? game->render->color_background : game->render->color_opt );
+    center( game->render, game->render->font_name, "OPTION", 160, offs + ( ypos+=spacing ), option == 3 ? game->render->color_background : game->render->color_disabled );
+    center( game->render, game->render->font_name, "RESTART", 160, offs + ( ypos+=spacing ), option == 4 ? game->render->color_background : game->render->color_opt );
+    center( game->render, game->render->font_name, "QUIT", 160, offs + ( ypos+=spacing ), option == 5 ? game->render->color_background : game->render->color_opt );
     bool clicked = was_key_pressed( game, APP_KEY_LBUTTON );
     if( was_key_pressed( game, APP_KEY_ESCAPE ) || was_key_pressed( game, APP_KEY_1 ) || ( clicked && option == 0 ) ) {
         game->ingame_menu = false;
@@ -1597,7 +1251,7 @@ void ingame_menu_update( game_t* game ) {
 // boot
 gamestate_t boot_init( game_t* game ) {
     game->state.logo_index = -1;
-    cls( game );
+    cls( game->render );
     return GAMESTATE_NO_CHANGE;
 }
 
@@ -1605,9 +1259,9 @@ gamestate_t boot_init( game_t* game ) {
 gamestate_t boot_update( game_t* game ) {
     (void) game;
     #ifdef __wasm__       
-        cls( game );
+        cls( game->render );
         if( game->blink_visible ) {
-            center( game, game->yarn->assets.font_name, "CLICK TO START", 160, 120 - game->yarn->assets.font_name->height / 2, game->color_name );
+            center( game->render, game->yarn->assets.font_name, "CLICK TO START", 160, 120 - game->yarn->assets.font_name->height / 2, game->render->color_name );
         }
         if( !was_key_pressed( game, APP_KEY_LBUTTON ) ) {
             return GAMESTATE_NO_CHANGE;
@@ -1645,8 +1299,8 @@ gamestate_t title_init( game_t* game ) {
 
 gamestate_t title_update( game_t* game ) {
     if( game->state.logo_index < game->yarn->globals.logo_indices->count ) {
-        cls( game );
-        draw( game, game->yarn->globals.logo_indices->items[ game->state.logo_index ], 0, 0 );
+        cls( game->render );
+        draw( game->render, game->yarn->globals.logo_indices->items[ game->state.logo_index ], 0, 0 );
     }
 
     if( was_key_pressed( game, APP_KEY_LBUTTON ) || was_key_pressed( game, APP_KEY_SPACE ) ) {
@@ -1687,7 +1341,7 @@ gamestate_t location_init( game_t* game ) {
 
 
 gamestate_t location_update( game_t* game ) {
-    cls( game );
+    cls( game->render );
 
     yarn_t* yarn = game->yarn;
 
@@ -1701,18 +1355,18 @@ gamestate_t location_update( game_t* game ) {
 
     int mouse_x = input_get_mouse_x( game->input );
     int mouse_y = input_get_mouse_y( game->input );
-    scale_for_resolution_inverse( game, &mouse_x, &mouse_y );
+    scale_for_resolution_inverse( game->render, &mouse_x, &mouse_y );
 
     // background_location:
     if( yarn->globals.background_location >= 0 ) {
-        draw( game, yarn->globals.background_location, 0, 0 );
+        draw( game->render, yarn->globals.background_location, 0, 0 );
     }
 
     bool menu_hover = mouse_y < 13 && mouse_x > 295;
     if( menu_hover ) {
-        box( game, 308, 0, 10, 6, game->color_opt );
+        box( game->render, 308, 0, 10, 6, game->render->color_opt );
     }
-    menu_icon( game, 309, 1, menu_hover ? game->color_background : game->color_opt );    
+    menu_icon( game->render, 309, 1, menu_hover ? game->render->color_background : game->render->color_opt );    
 
     if( game->queued_dialog >= 0 && ( ( was_key_pressed( game, APP_KEY_LBUTTON ) && !menu_hover ) || was_key_pressed( game, APP_KEY_SPACE ) ) ) {
         game->state.current_location = -1;
@@ -1738,7 +1392,7 @@ gamestate_t location_update( game_t* game ) {
         }
     }
     if( game->state.current_image >= 0 ) {
-        draw( game, game->state.current_image, 64, 10 );
+        draw( game->render, game->state.current_image, 64, 10 );
     }
 
     // txt:
@@ -1749,7 +1403,7 @@ gamestate_t location_update( game_t* game ) {
         }
         txt = cstr_cat( txt, cstr_cat( location->txt->items[ i ].text, "\n" ) );
     }
-    wrap( game, game->font_txt, txt, 5, 146, game->color_txt, 310 );
+    wrap( game->render, game->render->font_txt, txt, 5, 146, game->render->color_txt, 310 );
 
     // opt:
     int opt = -1;
@@ -1764,11 +1418,11 @@ gamestate_t location_update( game_t* game ) {
             if( !test_cond( game, &location->opt->items[ i ].cond ) ) {
                 continue;
             }
-            int ypos = 197 + font_height( game, game->font_opt->height ) * c;
-            pixelfont_bounds_t b = text( game, game->font_opt, location->opt->items[ i ].text, 5, ypos, game->color_opt );
+            int ypos = 197 + font_height( game->render, game->render->font_opt->height ) * c;
+            pixelfont_bounds_t b = text( game->render, game->render->font_opt, location->opt->items[ i ].text, 5, ypos, game->render->color_opt );
             if( mouse_y >= ypos && mouse_y < ypos + b.height ) {
-                box( game, 4, ypos - 1, 315, b.height + 1, game->color_opt );
-                text( game, game->font_opt, location->opt->items[ i ].text, 5, ypos, game->color_background );
+                box( game->render, 4, ypos - 1, 315, b.height + 1, game->render->color_opt );
+                text( game->render, game->render->font_opt, location->opt->items[ i ].text, 5, ypos, game->render->color_background );
                 if( was_key_pressed( game, APP_KEY_LBUTTON ) ) {
                     opt = c;
                 }
@@ -1782,7 +1436,7 @@ gamestate_t location_update( game_t* game ) {
     int c = 0;
     for( int i = 0; i < game->state.items->count; ++i ) {
         string usetxt = game->yarn->item_ids->items[ game->state.items->items[ i ] ];
-        uint8_t color = (uint8_t) game->color_disabled;
+        uint8_t color = (uint8_t) game->render->color_disabled;
         bool enabled = false;
         for( int j = 0; j < location->use->count; ++j ) {
             if( !test_cond( game, &location->use->items[ j ].cond ) ) {
@@ -1791,20 +1445,20 @@ gamestate_t location_update( game_t* game ) {
             for( int k = 0; k < location->use->items[ j ].item_indices->count; ++k ) {
                 if( game->state.items->items[ i ] == location->use->items[ j ].item_indices->items[ k ] ) {
                     if( game->queued_dialog < 0 && game->queued_location < 0 ) {
-                        color = (uint8_t) game->color_use;
+                        color = (uint8_t) game->render->color_use;
                         if( game->state.first_chr_or_use && !game->blink_visible ) {
-                            color = (uint8_t) game->color_background;
+                            color = (uint8_t) game->render->color_background;
                         }
                         enabled = true;
                     }
                 }
             }
         }
-        int ypos = 4 + ( ( 117 - ( game->state.items->count * font_height( game, game->font_use->height ) ) ) / 2 ) + c * font_height( game, game->font_use->height );
-        pixelfont_bounds_t b = center( game, game->font_use, usetxt, 287, ypos, color );
+        int ypos = 4 + ( ( 117 - ( game->state.items->count * font_height( game->render, game->render->font_use->height ) ) ) / 2 ) + c * font_height( game->render, game->render->font_use->height );
+        pixelfont_bounds_t b = center( game->render, game->render->font_use, usetxt, 287, ypos, color );
         if( enabled && mouse_y >= ypos && mouse_y < ypos + b.height && mouse_x > 259 ) {
-            box( game, 260, ypos - 1, 56, b.height + 1, game->color_use );
-            center( game, game->font_use, usetxt, 287, ypos, game->color_background );
+            box( game->render, 260, ypos - 1, 56, b.height + 1, game->render->color_use );
+            center( game->render, game->render->font_use, usetxt, 287, ypos, game->render->color_background );
             if( was_key_pressed( game, APP_KEY_LBUTTON ) ) {
                 use = c;
             }
@@ -1826,20 +1480,20 @@ gamestate_t location_update( game_t* game ) {
         if( !test_cond( game, &location->chr->items[ i ].cond ) ) {
             continue;
         }
-        int ypos = 4 + ( ( 117 - ( chr_count * font_height( game, game->font_chr->height ) ) ) / 2 ) + c * font_height( game, game->font_chr->height );
-        int color = game->color_chr;
+        int ypos = 4 + ( ( 117 - ( chr_count * font_height( game->render, game->render->font_chr->height ) ) ) / 2 ) + c * font_height( game->render, game->render->font_chr->height );
+        int color = game->render->color_chr;
         if( game->queued_dialog >= 0 || game->queued_location >= 0 ) {
-            color = game->color_disabled;
+            color = game->render->color_disabled;
         } else if( game->state.first_chr_or_use && !game->blink_visible ) {
-            color = (uint8_t) game->color_background;
+            color = (uint8_t) game->render->color_background;
         }
 
 
-        pixelfont_bounds_t b = center( game,  game->font_chr, game->yarn->characters->items[ location->chr->items[ i ].chr_indices->items[ 0 ] ].short_name, 32, ypos, color );
+        pixelfont_bounds_t b = center( game->render,  game->render->font_chr, game->yarn->characters->items[ location->chr->items[ i ].chr_indices->items[ 0 ] ].short_name, 32, ypos, color );
         if( game->queued_dialog < 0 && game->queued_location < 0 ) {
             if( mouse_y >= ypos && mouse_y < ypos + b.height && mouse_x < 60 ) {
-                box( game, 4, ypos - 1, 56, b.height + 1, game->color_chr );
-                center( game,  game->font_chr, game->yarn->characters->items[ location->chr->items[ i ].chr_indices->items[ 0 ] ].short_name, 32, ypos, game->color_background );
+                box( game->render, 4, ypos - 1, 56, b.height + 1, game->render->color_chr );
+                center( game->render,  game->render->font_chr, game->yarn->characters->items[ location->chr->items[ i ].chr_indices->items[ 0 ] ].short_name, 32, ypos, game->render->color_background );
                 if( was_key_pressed( game, APP_KEY_LBUTTON ) ) {
                     chr = c;
                 }
@@ -1848,8 +1502,8 @@ gamestate_t location_update( game_t* game ) {
         ++c;
     }
     if( c == 0 ) {
-        int ypos = 4 + ( ( 117 - ( 2 * font_height( game, game->font_chr->height ) ) ) / 2 );
-        center_wrap( game,  game->font_chr, yarn->globals.alone_text, 32, ypos, game->color_disabled, 56 );
+        int ypos = 4 + ( ( 117 - ( 2 * font_height( game->render, game->render->font_chr->height ) ) ) / 2 );
+        center_wrap( game->render,  game->render->font_chr, yarn->globals.alone_text, 32, ypos, game->render->color_disabled, 56 );
     }
 
     // companions
@@ -1863,9 +1517,9 @@ gamestate_t location_update( game_t* game ) {
         }
 
         if( !found ) {
-            int ypos = 4 + ( ( 117 - ( chr_count * font_height( game, game->font_chr->height ) ) ) / 2 ) + c * font_height( game, game->font_chr->height );
-            int color = game->color_disabled;
-            pixelfont_bounds_t b = center( game,  game->font_chr, game->yarn->characters->items[ game->state.chars->items[ i ] ].short_name, 32, ypos, color );
+            int ypos = 4 + ( ( 117 - ( chr_count * font_height( game->render, game->render->font_chr->height ) ) ) / 2 ) + c * font_height( game->render, game->render->font_chr->height );
+            int color = game->render->color_disabled;
+            pixelfont_bounds_t b = center( game->render,  game->render->font_chr, game->yarn->characters->items[ game->state.chars->items[ i ] ].short_name, 32, ypos, color );
             ++c;
         }
     }
@@ -1988,24 +1642,24 @@ gamestate_t dialog_update( game_t* game ) {
         return GAMESTATE_TERMINATE;
     }
 
-    cls( game );
+    cls( game->render );
     yarn_t* yarn = game->yarn;
     yarn_dialog_t* dialog = &yarn->dialogs->items[ game->state.current_dialog ];
 
     int mouse_x = input_get_mouse_x( game->input );
     int mouse_y = input_get_mouse_y( game->input );
-    scale_for_resolution_inverse( game, &mouse_x, &mouse_y );
+    scale_for_resolution_inverse( game->render, &mouse_x, &mouse_y );
 
     // background_dialog:
     if( yarn->globals.background_dialog >= 0 ) {
-        draw( game, yarn->globals.background_dialog, 0, 0 );
+        draw( game->render, yarn->globals.background_dialog, 0, 0 );
     }
 
     bool menu_hover = mouse_y < 8 && mouse_x > 300;
     if( menu_hover ) {
-        box( game, 308, 0, 10, 6, game->color_opt );
+        box( game->render, 308, 0, 10, 6, game->render->color_opt );
     }
-    menu_icon( game, 309, 1, menu_hover ? game->color_background : game->color_opt );    
+    menu_icon( game->render, 309, 1, menu_hover ? game->render->color_background : game->render->color_opt );    
 
     // phrase:
     int phrase_count = 0;
@@ -2020,9 +1674,9 @@ gamestate_t dialog_update( game_t* game ) {
             }
             game->dialog.phrase_len = (int) cstr_len( txt );
             if( dialog->phrase->items[ i ].character_index >= 0 ) {
-                wrap_limit( game, game->font_txt, txt, 5, 136, game->color_txt, 310, game->dialog.limit < 0.0f ? 0 : (int)game->dialog.limit );
+                wrap_limit( game->render, game->render->font_txt, txt, 5, 136, game->render->color_txt, 310, game->dialog.limit < 0.0f ? 0 : (int)game->dialog.limit );
             } else {
-                wrap_limit( game, game->font_opt, txt, 5, 197, game->color_txt, 310, game->dialog.limit < 0.0f ? 0 : (int)game->dialog.limit );
+                wrap_limit( game->render, game->render->font_opt, txt, 5, 197, game->render->color_txt, 310, game->dialog.limit < 0.0f ? 0 : (int)game->dialog.limit );
             }
         }
         ++phrase_count;
@@ -2046,9 +1700,9 @@ gamestate_t dialog_update( game_t* game ) {
 
     if( game->dialog.chr_index >= 0 ) {
         yarn_character_t* character = &game->yarn->characters->items[ game->dialog.chr_index ];
-        center( game, game->font_name, character->name, 160, 6, game->color_name );
+        center( game->render, game->render->font_name, character->name, 160, 6, game->render->color_name );
         if( character->face_index >= 0 ) {
-            draw( game, character->face_index, 104, 18 );
+            draw( game->render, character->face_index, 104, 18 );
         }
     }
     
@@ -2067,12 +1721,12 @@ gamestate_t dialog_update( game_t* game ) {
             if( !test_cond( game, &dialog->say->items[ i ].cond ) ) {
                 continue;
             }
-            int ypos = 197 + font_height( game, game->font_opt->height ) * c;
-            pixelfont_bounds_t b = text( game, game->font_opt, dialog->say->items[ i ].text, 5, ypos, game->color_opt );
+            int ypos = 197 + font_height( game->render, game->render->font_opt->height ) * c;
+            pixelfont_bounds_t b = text( game->render, game->render->font_opt, dialog->say->items[ i ].text, 5, ypos, game->render->color_opt );
             if( game->queued_dialog < 0 && game->queued_location < 0 ) {
                 if( mouse_y >= ypos && mouse_y < ypos + b.height && mouse_x < 277 ) {
-                    box( game, 4, ypos - 1, 315, b.height + 1, game->color_opt );
-                    text( game, game->font_opt, dialog->say->items[ i ].text, 5, ypos, game->color_background );
+                    box( game->render, 4, ypos - 1, 315, b.height + 1, game->render->color_opt );
+                    text( game->render, game->render->font_opt, dialog->say->items[ i ].text, 5, ypos, game->render->color_background );
                     if( was_key_pressed( game, APP_KEY_LBUTTON ) ) {
                         say = c;
                     }
@@ -2087,7 +1741,7 @@ gamestate_t dialog_update( game_t* game ) {
     int c = 0;
     for( int i = 0; i < game->state.items->count; ++i ) {
         string txt = game->yarn->item_ids->items[ game->state.items->items[ i ] ];
-        uint8_t color = (uint8_t) game->color_disabled;
+        uint8_t color = (uint8_t) game->render->color_disabled;
         bool enabled = false;
         for( int j = 0; j < dialog->use->count; ++j ) {
             if( !test_cond( game, &dialog->use->items[ j ].cond ) ) {
@@ -2097,18 +1751,18 @@ gamestate_t dialog_update( game_t* game ) {
                 if( game->state.items->items[ i ] == dialog->use->items[ j ].item_indices->items[ k ] ) {
                     if( game->dialog.enable_options == 2 ) {
                         if( game->queued_dialog < 0 && game->queued_location < 0 ) {
-                            color = (uint8_t) game->color_use;
+                            color = (uint8_t) game->render->color_use;
                             enabled = true;
                         }
                     }
                 }
             }
         }
-        int ypos = 4 + ( ( 117 - ( game->state.items->count * font_height( game, game->font_use->height ) ) ) / 2 ) + c * font_height( game, game->font_use->height );
-        pixelfont_bounds_t b = center( game, game->font_use, txt, 287, ypos, color );
+        int ypos = 4 + ( ( 117 - ( game->state.items->count * font_height( game->render, game->render->font_use->height ) ) ) / 2 ) + c * font_height( game->render, game->render->font_use->height );
+        pixelfont_bounds_t b = center( game->render, game->render->font_use, txt, 287, ypos, color );
         if( enabled && mouse_y >= ypos && mouse_y < ypos + b.height && mouse_x > 259 ) {
-            box( game, 260, ypos - 1, 56, b.height + 1, game->color_use );
-            center( game, game->font_use, txt, 287, ypos, game->color_background );
+            box( game->render, 260, ypos - 1, 56, b.height + 1, game->render->color_use );
+            center( game->render, game->render->font_use, txt, 287, ypos, game->render->color_background );
             if( was_key_pressed( game, APP_KEY_LBUTTON ) ) {
                 use = c;
             }
