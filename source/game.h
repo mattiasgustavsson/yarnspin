@@ -487,10 +487,10 @@ bool audio_qoa_source( game_t* game, int audio_index, audiosys_audio_source_t* s
 }
 
 void enter_menu( game_t* game ) {
-    if( game->render->screen_rgb ) {
-        memcpy( game->render->screenshot_rgb, game->render->screen_rgb, sizeof( uint32_t ) * game->render->screen_width * game->render->screen_height );
-    } else {
+    if( game->render->screen ) {
         memcpy( game->render->screenshot, game->render->screen, sizeof( uint8_t ) * game->render->screen_width * game->render->screen_height );
+    } else {
+        // TODO
     }
     game->ingame_menu = true;
     audiosys_pause( game->audiosys );
@@ -503,11 +503,7 @@ void enter_menu( game_t* game ) {
             }
         }
     } else {
-        for( int y = 0; y < game->render->screen_height; ++y ) {
-            for( int x = 0; x < game->render->screen_width; ++x ) {
-                game->render->screen_rgb[ x + y * game->render->screen_width ] = blend_rgb( game->render->screen_rgb[ x + y * game->render->screen_width ], 0x000000, 127 );
-            }
-        }
+        // TODO
     }
 }
 
@@ -936,7 +932,7 @@ void save_game( game_t* game, int slot ) {
     int thumb_width = 75;
     int thumb_height = 57;
     scale_for_resolution( game->render, &thumb_width, &thumb_height );
-    uint32_t* thumb_rgb = game->render->screen_rgb ? make_thumbnail_rgb( game->render->screenshot_rgb, game->render->screen_width, game->render->screen_height, thumb_width, thumb_height ) : NULL;
+    uint32_t* thumb_rgb = NULL; //TODO: game->render->screen_rgb ? make_thumbnail_rgb( game->render->screenshot_rgb, game->render->screen_width, game->render->screen_height, thumb_width, thumb_height ) : NULL;
     uint8_t* thumb = game->render->screen ? make_thumbnail( game->render->screenshot, game->render->screen_width, game->render->screen_height, thumb_width, thumb_height ) : NULL;
  
     buffer_t* buffer = buffer_create();
@@ -1005,7 +1001,7 @@ void load_savegames( game_t* game ) {
             buffer_read_i32( buffer, &savegame->thumb_width, 1 );
             buffer_read_i32( buffer, &savegame->thumb_height, 1 );
             savegame->thumb = game->render->screen ? (uint8_t*) manage_alloc( malloc( savegame->thumb_width * savegame->thumb_height * sizeof( uint8_t ) ) ) : NULL;
-            savegame->thumb_rgb = game->render->screen_rgb ? (uint32_t*) manage_alloc( malloc( savegame->thumb_width * savegame->thumb_height * sizeof( uint32_t ) ) ) : NULL;
+            savegame->thumb_rgb = NULL; // TODO: game->render->screen_rgb ? (uint32_t*) manage_alloc( malloc( savegame->thumb_width * savegame->thumb_height * sizeof( uint32_t ) ) ) : NULL;
             if( savegame->thumb ) {
                 buffer_read_u8( buffer, savegame->thumb, savegame->thumb_width * savegame->thumb_height );
             }

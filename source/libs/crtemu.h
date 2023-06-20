@@ -210,6 +210,7 @@ struct crtemu_t {
 
     CRTEMU_GLuint vertexbuffer;
     CRTEMU_GLuint backbuffer;
+    CRTEMU_GLuint fbo_backbuffer;
 
     CRTEMU_GLuint accumulatetexture_a;
     CRTEMU_GLuint accumulatetexture_b;
@@ -1315,6 +1316,7 @@ crtemu_t* crtemu_create( crtemu_type_t type, void* memctx ) {
     crtemu->TexParameteri( CRTEMU_GL_TEXTURE_2D, CRTEMU_GL_TEXTURE_MAG_FILTER, CRTEMU_GL_LINEAR );
 
     crtemu->GenTextures( 1, &crtemu->backbuffer );
+    crtemu->GenFramebuffers( 1, &crtemu->fbo_backbuffer );
     #ifndef CRTEMU_WEBGL
         // This enable call is not necessary when using fragment shaders, avoid logged warnings in WebGL
         crtemu->Enable( CRTEMU_GL_TEXTURE_2D );
@@ -1440,9 +1442,43 @@ static void crtemu_internal_blur( crtemu_t* crtemu, CRTEMU_GLuint source, CRTEMU
 
 void crtemu_present( crtemu_t* crtemu, CRTEMU_U64 time_us, CRTEMU_U32 const* pixels_xbgr, int width, int height,
     CRTEMU_U32 mod_xbgr, CRTEMU_U32 border_xbgr ) {
-    
+
     int viewport[ 4 ];
     crtemu->GetIntegerv( CRTEMU_GL_VIEWPORT, viewport );
+    
+    // Copy to backbuffer
+    if( pixels_xbgr ) {
+        crtemu->ActiveTexture( CRTEMU_GL_TEXTURE0 );
+        crtemu->BindTexture( CRTEMU_GL_TEXTURE_2D, crtemu->backbuffer );
+        crtemu->TexImage2D( CRTEMU_GL_TEXTURE_2D, 0, CRTEMU_GL_RGBA, width, height, 0, CRTEMU_GL_RGBA, CRTEMU_GL_UNSIGNED_BYTE, pixels_xbgr );
+        crtemu->BindTexture( CRTEMU_GL_TEXTURE_2D, 0 );
+    } else {
+        if( width != crtemu->last_present_width || height != crtemu->last_present_height ) {
+            crtemu->ActiveTexture( CRTEMU_GL_TEXTURE1 );
+            crtemu->BindTexture( CRTEMU_GL_TEXTURE_2D, crtemu->backbuffer );
+            crtemu->TexImage2D( CRTEMU_GL_TEXTURE_2D, 0, CRTEMU_GL_RGB, width, height, 0, CRTEMU_GL_RGB, CRTEMU_GL_UNSIGNED_BYTE, 0 );
+            crtemu->BindTexture( CRTEMU_GL_TEXTURE_2D, crtemu->backbuffer );           
+            crtemu->BindFramebuffer( CRTEMU_GL_FRAMEBUFFER, crtemu->fbo_backbuffer );
+            crtemu->FramebufferTexture2D( CRTEMU_GL_FRAMEBUFFER, CRTEMU_GL_COLOR_ATTACHMENT0, CRTEMU_GL_TEXTURE_2D, crtemu->backbuffer, 0 );
+        }
+        crtemu->BindFramebuffer( CRTEMU_GL_FRAMEBUFFER, crtemu->fbo_backbuffer );
+        crtemu->Viewport( 0, 0, width, height );
+        crtemu->UseProgram( crtemu->copy_shader );
+        crtemu->Uniform1i( crtemu->GetUniformLocation( crtemu->copy_shader, "tex0" ), 0 );
+        CRTEMU_GLfloat vertices[] = {
+            -1.0f, -1.0f, 0.0f, 0.0f,
+             1.0f, -1.0f, 1.0f, 0.0f,
+             1.0f,  1.0f, 1.0f, 1.0f,
+            -1.0f,  1.0f, 0.0f, 1.0f,
+        };
+        crtemu->BufferData( CRTEMU_GL_ARRAY_BUFFER, 4 * 4 * sizeof( CRTEMU_GLfloat ), vertices, CRTEMU_GL_STATIC_DRAW );
+        crtemu->BindBuffer( CRTEMU_GL_ARRAY_BUFFER, crtemu->vertexbuffer );
+        crtemu->DrawArrays( CRTEMU_GL_TRIANGLE_FAN, 0, 4 );
+        crtemu->ActiveTexture( CRTEMU_GL_TEXTURE0 );
+        crtemu->BindTexture( CRTEMU_GL_TEXTURE_2D, 0 );
+        crtemu->BindFramebuffer( CRTEMU_GL_FRAMEBUFFER, 0 );
+        crtemu->Viewport( viewport[ 0 ], viewport[ 1 ], viewport[ 2 ], viewport[ 3 ] );
+    }
 
     if( width != crtemu->last_present_width || height != crtemu->last_present_height ) {
         crtemu->ActiveTexture( CRTEMU_GL_TEXTURE0 );
@@ -1484,12 +1520,6 @@ void crtemu_present( crtemu_t* crtemu, CRTEMU_U64 time_us, CRTEMU_U32 const* pix
     };
     crtemu->BufferData( CRTEMU_GL_ARRAY_BUFFER, 4 * 4 * sizeof( CRTEMU_GLfloat ), vertices, CRTEMU_GL_STATIC_DRAW );
     crtemu->BindBuffer( CRTEMU_GL_ARRAY_BUFFER, crtemu->vertexbuffer );
-
-    // Copy to backbuffer
-    crtemu->ActiveTexture( CRTEMU_GL_TEXTURE0 );
-    crtemu->BindTexture( CRTEMU_GL_TEXTURE_2D, crtemu->backbuffer );
-    crtemu->TexImage2D( CRTEMU_GL_TEXTURE_2D, 0, CRTEMU_GL_RGBA, width, height, 0, CRTEMU_GL_RGBA, CRTEMU_GL_UNSIGNED_BYTE, pixels_xbgr );
-    crtemu->BindTexture( CRTEMU_GL_TEXTURE_2D, 0 );
 
     crtemu->Viewport( 0, 0, width, height );
 
@@ -1606,8 +1636,10 @@ void crtemu_present( crtemu_t* crtemu, CRTEMU_U64 time_us, CRTEMU_U32 const* pix
     screen_vertices[ 12 ] = x1;
     screen_vertices[ 13 ] = y2;
 
-    crtemu->BufferData( CRTEMU_GL_ARRAY_BUFFER, 4 * 4 * sizeof( CRTEMU_GLfloat ), screen_vertices, CRTEMU_GL_STATIC_DRAW );
     crtemu->BindBuffer( CRTEMU_GL_ARRAY_BUFFER, crtemu->vertexbuffer );
+    crtemu->EnableVertexAttribArray( 0 );
+    crtemu->VertexAttribPointer( 0, 4, CRTEMU_GL_FLOAT, CRTEMU_GL_FALSE, 4 * sizeof( CRTEMU_GLfloat ), 0 );
+    crtemu->BufferData( CRTEMU_GL_ARRAY_BUFFER, 4 * 4 * sizeof( CRTEMU_GLfloat ), screen_vertices, CRTEMU_GL_STATIC_DRAW );
 
     float b = ( ( border_xbgr >> 16 ) & 0xff ) / 255.0f;
     float g = ( ( border_xbgr >> 8  ) & 0xff ) / 255.0f;

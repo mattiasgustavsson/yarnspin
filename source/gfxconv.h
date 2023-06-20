@@ -78,6 +78,190 @@ img_rgba_t img_rgba_saturate( img_rgba_t a ) {
 }
 
 
+bitmapfont_t* generate_bitmap_font( uint8_t* ttf_data, int font_size ) {
+    stbtt_fontinfo font;
+    if( !stbtt_InitFont( &font, ttf_data, stbtt_GetFontOffsetForIndex( ttf_data, 0) ) ) {
+        return NULL;
+    }
+
+    int size = font_size;
+    if( size == 0 ) {
+        for( int i = 1; i < 32; ++i ) {
+            float scale = stbtt_ScaleForPixelHeight( &font, (float) i );
+            int w, h;
+            PIXELFONT_U8* bitmap = stbtt_GetGlyphBitmap( &font, scale, scale, 'A', &w, &h, 0, 0 );
+            int empty = 1;
+            int antialiased = 0;
+            for( int j = 0; j < w * h; ++j ) {
+                if( bitmap[ j ] > 0 ) {
+                    empty = 0;
+                    if( bitmap[ j ] < 255 ) { antialiased = 1; break; }
+                }
+            }
+            stbtt_FreeBitmap( bitmap, 0 );
+            if( !empty && !antialiased ) { size = i; break; }
+        }
+    }
+
+    if( size == 0 ) {
+        size = 12;
+    }
+
+    font_size = size;
+
+    float scale = stbtt_ScaleForPixelHeight( &font, (float) font_size );
+
+    int ascent, descent;
+    stbtt_GetFontVMetrics(&font, &ascent, &descent, 0 );
+    ascent = (int)( scale * ascent );
+    descent = (int)( scale * descent );
+
+    int width = 128;
+    int height = 128;
+    uint8_t* pixels = (uint8_t*) malloc( sizeof( uint8_t ) * width * height );
+    stbtt_packedchar chardata[ 224 ];
+    bool retry = true;
+    while( retry && width <= 8192 && height <= 8192 ) {
+        memset( pixels, 0, sizeof( uint8_t ) * width * height );
+        stbtt_pack_context spc;
+        stbtt_PackBegin( &spc, pixels, width, height, 0, 1, NULL );
+        stbtt_PackSetOversampling( &spc, 1, 1 );
+        stbtt_pack_range range;
+        range.font_size = font_size;
+        range.first_unicode_codepoint_in_range = ' ';
+        int latin1_chars[] = {
+            0x20,0x21,0x22,0x23,0x24,0x25,0x26,0x27,0x28,0x29,0x2A,0x2B,0x2C,0x2D,0x2E,0x2F,0x30,0x31,0x32,0x33,0x34,0x35,0x36,0x37,0x38,0x39,0x3A,0x3B,0x3C,0x3D,0x3E,0x3F,0x40,0x41,0x42,0x43,0x44,0x45,0x46,0x47,0x48,0x49,0x4A,0x4B,0x4C,
+            0x4D,0x4E,0x4F,0x50,0x51,0x52,0x53,0x54,0x55,0x56,0x57,0x58,0x59,0x5A,0x5B,0x5C,0x5D,0x5E,0x5F,0x60,0x61,0x62,0x63,0x64,0x65,0x66,0x67,0x68,0x69,0x6A,0x6B,0x6C,0x6D,0x6E,0x6F,0x70,0x71,0x72,0x73,0x74,0x75,0x76,0x77,0x78,0x79,
+            0x7A,0x7B,0x7C,0x7D,0x7E,0x7F,0x20AC,0x0081,0x201A,0x0192,0x201E,0x2026,0x2020,0x2021,0x02C6,0x2030,0x0160,0x2039,0x0152,0x008D,0x017D,0x008F,0x0090,0x2018,0x2019,0x201C,0x201D,0x2022,0x2013,0x2014,0x02DC,0x2122,0x0161,
+            0x203A,0x0153,0x009D,0x017E,0x0178,0x00A0,0x00A1,0x00A2,0x00A3,0x00A4,0x00A5,0x00A6,0x00A7,0x00A8,0x00A9,0x00AA,0x00AB,0x00AC,0x00AD,0x00AE,0x00AF,0x00B0,0x00B1,0x00B2,0x00B3,0x00B4,0x00B5,0x00B6,0x00B7,0x00B8,0x00B9,0x00BA,
+            0x00BB,0x00BC,0x00BD,0x00BE,0x00BF,0x00C0,0x00C1,0x00C2,0x00C3,0x00C4,0x00C5,0x00C6,0x00C7,0x00C8,0x00C9,0x00CA,0x00CB,0x00CC,0x00CD,0x00CE,0x00CF,0x00D0,0x00D1,0x00D2,0x00D3,0x00D4,0x00D5,0x00D6,0x00D7,0x00D8,0x00D9,0x00DA,
+            0x00DB,0x00DC,0x00DD,0x00DE,0x00DF,0x00E0,0x00E1,0x00E2,0x00E3,0x00E4,0x00E5,0x00E6,0x00E7,0x00E8,0x00E9,0x00EA,0x00EB,0x00EC,0x00ED,0x00EE,0x00EF,0x00F0,0x00F1,0x00F2,0x00F3,0x00F4,0x00F5,0x00F6,0x00F7,0x00F8,0x00F9,0x00FA,
+            0x00FB,0x00FC,0x00FD,0x00FE,0x00FF,
+        };
+        range.array_of_unicode_codepoints = latin1_chars;
+        range.num_chars = 224;
+        range.chardata_for_range = chardata;
+        int res = stbtt_PackFontRanges( &spc, ttf_data, 0, &range, 1 );    
+        
+        stbtt_PackEnd( &spc );
+        if( res ) {
+            retry = false;
+        } else {
+            free( pixels );
+            if( width <= height ) {
+                width *= 2;
+            } else {
+                height *= 2;
+            }
+            pixels = (uint8_t*) malloc( sizeof( uint8_t ) * width * height );
+        }
+    }
+
+    if( retry ) {
+        free( pixels );
+        return NULL;
+    }
+
+    bitmapfont_t* bitmapfont = (bitmapfont_t*) malloc( sizeof( bitmapfont_t ) + sizeof( uint8_t ) * ( width * height - 1 ) );
+    bitmapfont->size_in_bytes = sizeof( bitmapfont_t ) + sizeof( uint8_t ) * ( width * height - 1 );
+    bitmapfont->u8font_height = (uint8_t)font_size + 1;
+    bitmapfont->u8line_spacing = (uint8_t)(ascent - descent + 1);
+    bitmapfont->width = width;
+    bitmapfont->height = height;
+    memcpy( bitmapfont->pixels, pixels, sizeof( uint8_t ) * width * height );
+    free( pixels );
+    bitmapfont->font_height = font_size + 1;
+    bitmapfont->line_spacing = ascent - descent + 1;
+    for( int i = 0; i < 224; ++i ) {
+        float xp = 0.0f;
+        float yp = ascent;
+        stbtt_aligned_quad quad;
+        stbtt_GetPackedQuad( chardata, width, height, i, &xp, &yp, &quad, 0 );
+        bitmapfont->glyphs[ i ].advance = xp;
+        bitmapfont->glyphs[ i ].x1 = quad.x0;
+        bitmapfont->glyphs[ i ].y1 = quad.y0;
+        bitmapfont->glyphs[ i ].x2 = quad.x1;
+        bitmapfont->glyphs[ i ].y2 = quad.y1;
+        bitmapfont->glyphs[ i ].u1 = quad.s0;
+        bitmapfont->glyphs[ i ].v1 = quad.t0;
+        bitmapfont->glyphs[ i ].u2 = quad.s1;
+        bitmapfont->glyphs[ i ].v2 = quad.t1;
+    }
+
+    return bitmapfont;
+}
+
+
+bitmapfont_t* bitmap_font_from_pixel_font( pixelfont_t* pixelfont ) {
+    stbrp_rect rects[ 224 ];
+    int count = 0;
+    for( int i = 0; i < 224; ++i ) {
+        if( pixelfont->offsets[ i + 32 ] ) {
+            PIXELFONT_U8 const* glyph = pixelfont->glyphs + pixelfont->offsets[ i + 32 ];
+            int w = glyph[ 1 ];
+            int h = pixelfont->height;
+            stbrp_rect* rect = &rects[ count++ ];
+            rect->id = i;
+            rect->w = w + 2;
+            rect->h = h + 2;
+        }
+    }
+    stbrp_context context;
+    stbrp_node nodes[ 256 ];
+    int width = 128;
+    int height = 128;
+    bool retry = true;
+    while( retry && width <= 8192 && height <= 8192 ) {
+        stbrp_init_target( &context, width, height, nodes, 256 );
+        if( stbrp_pack_rects( &context, rects, count) ) {
+            retry = false;
+        } else {
+            width *= 2;
+            height *= 2;
+        }
+    }
+
+    if( retry ) {
+        return NULL;
+    }
+
+
+    bitmapfont_t* bitmapfont = (bitmapfont_t*) malloc( sizeof( bitmapfont_t ) + sizeof( uint8_t ) * ( width * height - 1 ) );
+    bitmapfont->size_in_bytes = sizeof( bitmapfont_t ) + sizeof( uint8_t ) * ( width * height - 1 );
+    bitmapfont->u8font_height = (uint8_t)pixelfont->height;
+    bitmapfont->u8line_spacing = (uint8_t)pixelfont->line_spacing;
+    bitmapfont->width = width;
+    bitmapfont->height = height;
+    memset( bitmapfont->glyphs, 0, sizeof( bitmapfont->glyphs ) );
+    memset( bitmapfont->pixels, 0, sizeof( uint8_t ) * width * height );
+    bitmapfont->font_height = pixelfont->height;
+    bitmapfont->line_spacing = pixelfont->line_spacing;
+    for( int i = 0; i < count; ++i ) {
+        stbrp_rect* r = &rects[ i ];
+        PIXELFONT_U8 const* glyph = pixelfont->glyphs + pixelfont->offsets[ r->id + 32 ];
+        int preadvance = (PIXELFONT_I8) *glyph++;
+        int w = *glyph++;
+        int h = pixelfont->height;
+        for( int y = 0; y < h; ++y ) {
+            for( int x = 0; x < w; ++x ) {
+                bitmapfont->pixels[ ( r->x + x + 1 ) + ( r->y + y + 1 ) * width ] = *glyph++;
+            }
+        }
+        bitmapfont->glyphs[ r->id ].advance = (float)( preadvance +  (PIXELFONT_I8) *glyph++ );
+        bitmapfont->glyphs[ r->id ].x1 = 0 - preadvance;
+        bitmapfont->glyphs[ r->id ].y1 = 0;
+        bitmapfont->glyphs[ r->id ].x2 = r->w - 2;
+        bitmapfont->glyphs[ r->id ].y2 = r->h - 2;
+        bitmapfont->glyphs[ r->id ].u1 = ( r->x + 1 ) / (float) width;
+        bitmapfont->glyphs[ r->id ].v1 = ( r->y + 1 ) / (float) height;
+        bitmapfont->glyphs[ r->id ].u2 = ( r->x + 1 + r->w - 2 ) / (float) width;
+        bitmapfont->glyphs[ r->id ].v2 = ( r->y + 1 + r->h - 2 ) / (float) height;
+    }
+    stbi_write_png( "test.png", width, height, 1, bitmapfont->pixels, width );
+    return bitmapfont;
+}
+
+
 pixelfont_t* generate_pixel_font( uint8_t* ttf_data, int font_size ) {
     stbtt_fontinfo font;
     if( !stbtt_InitFont( &font, ttf_data, stbtt_GetFontOffsetForIndex( ttf_data, 0) ) ) {
@@ -1397,7 +1581,7 @@ qoi_data_t* convert_rgb( string image_filename, int width, int height, int bpp, 
 }
 
 
-pixelfont_t* convert_font( string font_filename, int font_size ) {
+pixelfont_t* convert_font( string font_filename, int font_size, bool palette_mode ) {
     // TODO: Save converted font to cache and don't regenerate if it already exists
     file_t* ttf = file_load( font_filename, FILE_MODE_BINARY, 0 );
     if( !ttf ) {
@@ -1405,12 +1589,24 @@ pixelfont_t* convert_font( string font_filename, int font_size ) {
     }
     char const* ext = strrchr( font_filename, '.' );
     if( ext && cstr_compare_nocase( ext, ".fnt" ) == 0 ) {
-        pixelfont_t* font = (pixelfont_t*) malloc( ttf->size );
-        memcpy( font, ttf->data, ttf->size );
+        if( palette_mode ) {
+            pixelfont_t* font = (pixelfont_t*) malloc( ttf->size );
+            memcpy( font, ttf->data, ttf->size );
+            file_destroy( ttf );
+            return font;
+        } else {
+            bitmapfont_t* font = bitmap_font_from_pixel_font( (pixelfont_t*) ttf->data );
+            file_destroy( ttf );
+            return (pixelfont_t*)font;
+        }
+    }
+    if( palette_mode ) {
+        pixelfont_t* font = generate_pixel_font( (uint8_t*) ttf->data, font_size );
         file_destroy( ttf );
         return font;
+    } else {
+        bitmapfont_t* font = generate_bitmap_font( (uint8_t*) ttf->data, font_size );
+        file_destroy( ttf );
+        return (pixelfont_t*)font;
     }
-    pixelfont_t* font = generate_pixel_font( (uint8_t*) ttf->data, font_size );
-    file_destroy( ttf );
-    return font;
 }

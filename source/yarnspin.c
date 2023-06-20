@@ -42,6 +42,14 @@
 #include "libs/thread.h"
 #include "libs/ya_getopt.h"
 
+#ifdef _WIN32
+    #include "libs/glad.h"
+#elif defined( __wasm__ )
+    #include <wajic_gl.h>
+#else
+    #include <GL/glew.h>
+#endif
+
 #define PIXELFONT_COLOR PIXELFONT_U8
 #define PIXELFONT_FUNC_NAME pixelfont_blit
 #include "libs/pixelfont.h"
@@ -64,6 +72,7 @@
     #include "libs/paldither.h"
     #include "libs/palettize.h"
     #include "libs/samplerate.h"
+    #include "libs/stb_rect_pack.h"
     #include "libs/stb_truetype.h"
     #include "libs/stb_vorbis.h"
     #include "libs/sysfont.h"
@@ -150,6 +159,21 @@ typedef struct qoa_data_t {
     uint8_t data[ 1 ];
 } qoa_data_t;
 
+typedef struct bitmapfont_t {
+    uint32_t size_in_bytes;
+    uint8_t u8font_height;
+    uint8_t u8line_spacing;
+    float font_height;
+    float line_spacing;
+    struct {
+        float advance;
+        float x1, y1, x2, y2;
+        float u1, v1, u2, v2;
+    } glyphs[ 224 ];
+    int width;
+    int height;   
+    uint8_t pixels[ 1 ];
+} bitmapfont_t;
 
 // yarnspin files
 #ifndef YARNSPIN_RUNTIME_ONLY
@@ -177,6 +201,15 @@ void sound_callback( APP_S16* sample_pairs, int sample_pairs_count, void* user_d
 // main game loop and setup
 int app_proc( app_t* app, void* user_data ) {
     yarn_t* yarn = (yarn_t*) user_data;
+
+    #ifdef _WIN32
+        if( yarn->globals.colormode != YARN_COLORMODE_PALETTE ) {
+            int version = gladLoaderLoadGL();
+            if( GLAD_VERSION_MAJOR( version ) < 3 ) {
+                return EXIT_FAILURE;
+            }
+        }
+    #endif
 
     // position window centered on main display
     app_displays_t displays = app_displays( app );
@@ -255,7 +288,6 @@ int app_proc( app_t* app, void* user_data ) {
     int screen_height = heights[ yarn->globals.resolution ];
     
     uint8_t* canvas = NULL;
-    uint32_t* canvas_rgb = NULL;
     uint32_t* screen = (uint32_t*)malloc( ( 1440 + (int)( 44 * 4.5f ) ) * ( 1080 + (int)(66 * 4.5 ) ) * sizeof( uint32_t ) );
     memset( screen, 0, ( 1440 + (int)( 44 * 4.5f ) ) * ( 1080 + (int)( 66 * 4.5 ) ) * sizeof( uint32_t ) );
 
@@ -271,11 +303,13 @@ int app_proc( app_t* app, void* user_data ) {
     if( yarn->globals.colormode == YARN_COLORMODE_PALETTE ) {
         canvas = (uint8_t*)malloc( screen_width * screen_height * sizeof( uint8_t ) );
         memset( canvas, 0, screen_width * screen_height * sizeof( uint8_t ) );
-        render_init( &render, yarn, canvas, NULL, screen_width, screen_height );
+        if( !render_init( &render, yarn, canvas, screen_width, screen_height ) ) {
+            return 0;
+        }
     } else {
-        canvas_rgb = (uint32_t*)malloc( screen_width * screen_height * sizeof( uint32_t ) );
-        memset( canvas_rgb, 0, screen_width * screen_height * sizeof( uint32_t ) );
-        render_init( &render, yarn, NULL, canvas_rgb, screen_width, screen_height );
+        if( !render_init( &render, yarn, NULL, screen_width, screen_height ) ) {
+            return 0;
+        }
     }
 
     // run game
@@ -292,6 +326,21 @@ int app_proc( app_t* app, void* user_data ) {
     while( app_yield( app ) != APP_STATE_EXIT_REQUESTED && !game.exit_flag ) {
         frametimer_update( frametimer );
         input_update( &input, screen_width, screen_height, crtemu_lite, crtemu_pc, crtemu_tv );
+        
+        int hborder = 0;
+        int vborder = 0;
+        if( crtemu_tv ) {
+            hborder = 22;
+            vborder = 33;
+            if( screen_width == 480 ) {
+                hborder = 33;
+                vborder = 48;
+            } else if( screen_width == 640 ) {
+                hborder = 44;
+                vborder = 66;
+            }        
+        }
+        render_new_frame( &render, hborder, vborder );
 
         thread_mutex_lock( &g_sound_mutex );
         game_update( &game, frametimer_delta_time( frametimer ) );
@@ -307,8 +356,9 @@ int app_proc( app_t* app, void* user_data ) {
                 pixelfont_blit( render.yarn->assets.font_description, render.screen_width - bounds.width - 1, render.screen_height - bounds.height, dbgstr, (uint8_t)render.color_disabled, render.screen, render.screen_width, render.screen_height,
                     PIXELFONT_ALIGN_LEFT, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, NULL );
             } else {
-                pixelfont_blit_rgb( render.yarn->assets.font_description, render.screen_width - bounds.width - 1, render.screen_height - bounds.height, dbgstr, 0x404040, render.screen_rgb, render.screen_width, render.screen_height,
-                    PIXELFONT_ALIGN_LEFT, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, NULL );
+                // TODO
+                //pixelfont_blit_rgb( render.yarn->assets.font_description, render.screen_width - bounds.width - 1, render.screen_height - bounds.height, dbgstr, 0x404040, render.screen_rgb, render.screen_width, render.screen_height,
+                //    PIXELFONT_ALIGN_LEFT, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, NULL );
             }
 
         }
@@ -333,7 +383,7 @@ int app_proc( app_t* app, void* user_data ) {
         bg = RGBMUL32( fade, bg );
 
         time += 1000000 / 60;
-
+       
         if( display_filter == YARN_DISPLAY_FILTER_LITE && crtemu_lite == NULL ) {
             if( crtemu_tv ) {
                 crtemu_destroy( crtemu_tv );
@@ -360,7 +410,7 @@ int app_proc( app_t* app, void* user_data ) {
                 crtemu_frame( crtemu_pc, frame_pc_pixels, frame_pc_width, frame_pc_height );
             }
         }
-
+        
         if( display_filter == YARN_DISPLAY_FILTER_TV && crtemu_tv == NULL ) {
             if( crtemu_lite ) {
                 crtemu_destroy( crtemu_lite );
@@ -392,7 +442,7 @@ int app_proc( app_t* app, void* user_data ) {
                 crtemu_tv = NULL;
                 memset( screen, 0, ( 1440 + (int)( 22 * 4.5f ) ) * ( 1080 + (int)( 33 * 4.5 ) ) * sizeof( uint32_t ) );
         }
-
+        
         if( crtemu_lite ) {
             if( canvas ) {
                 for( int i = 0; i < screen_width * screen_height; ++i ) {
@@ -400,7 +450,8 @@ int app_proc( app_t* app, void* user_data ) {
                 }
                 crtemu_present( crtemu_lite, time, screen, screen_width, screen_height, fade, 0x000000 );
             } else {
-                crtemu_present( crtemu_lite, time, canvas_rgb, screen_width, screen_height, fade, 0x000000 );
+                render_bind_framebuffer( &render, app_window_width( app ), app_window_height( app ) );
+                crtemu_present( crtemu_lite, time, NULL, screen_width, screen_height, fade, 0x000000 );
             }
             app_present( app, NULL, 1, 1, 0xffffff, 0x000000 );
         } else if( crtemu_pc ) {
@@ -410,7 +461,8 @@ int app_proc( app_t* app, void* user_data ) {
                 }
                 crtemu_present( crtemu_pc, time, screen, screen_width, screen_height, fade, 0x000000 );
             } else {
-                crtemu_present( crtemu_pc, time, canvas_rgb, screen_width, screen_height, fade, 0x000000 );
+                render_bind_framebuffer( &render, app_window_width( app ), app_window_height( app ) );
+                crtemu_present( crtemu_pc, time, NULL, screen_width, screen_height, fade, 0x000000 );
             }
             app_present( app, NULL, 1, 1, 0xffffff, 0x000000 );
         } else if( crtemu_tv ) {
@@ -423,14 +475,11 @@ int app_proc( app_t* app, void* user_data ) {
                         screen[ ( offset_x + x ) + ( offset_y + y ) * ( screen_width + 2 * offset_x ) ] = yarn->assets.palette[ canvas[ x + y * screen_width ] ];
                     }
                 }
+                crtemu_present( crtemu_tv, time, screen, screen_width + 2 * offset_x, screen_height + 2 * offset_y, fade, 0x000000 );
             } else {
-                for( int y = 0; y < screen_height; ++y ) {
-                    for( int x = 0; x < screen_width; ++x ) {
-                        screen[ ( offset_x + x ) + ( offset_y + y ) * ( screen_width + 2 * offset_x ) ] = canvas_rgb[ x + y * screen_width ];
-                    }
-                }
+                render_bind_framebuffer( &render, app_window_width( app ), app_window_height( app ) );
+                crtemu_present( crtemu_tv, time, NULL, screen_width + 2 * offset_x, screen_height + 2 * offset_y, fade, 0x000000 );
             }
-            crtemu_present( crtemu_tv, time, screen, screen_width + 2 * offset_x, screen_height + 2 * offset_y, fade, 0x000000 );
             app_present( app, NULL, 1, 1, 0xffffff, 0x000000 );
         } else {
             if( canvas ) {
@@ -439,7 +488,8 @@ int app_proc( app_t* app, void* user_data ) {
                 }
                 app_present( app, screen, screen_width, screen_height, fade, bg );
             } else {
-                app_present( app, canvas_rgb, screen_width, screen_height, fade, bg );
+                render_present( &render, app_window_width( app ), app_window_height( app ) );
+                app_present( app, NULL, 1, 1, 0xffffff, 0x000000 );
             }
         }
     }
@@ -463,9 +513,7 @@ int app_proc( app_t* app, void* user_data ) {
     if( canvas ) {
         free( canvas );
     }
-    if( canvas_rgb ) {
-        free( canvas_rgb );
-    }
+
     free( screen );
 
     if( frame_tv_pixels ) {
@@ -476,7 +524,13 @@ int app_proc( app_t* app, void* user_data ) {
         stbi_image_free( frame_pc_pixels );
     }
     memmgr_clear( &g_memmgr );
-    return 0;
+
+    #ifdef _WIN32
+        if( yarn->globals.colormode != YARN_COLORMODE_PALETTE ) {
+            gladLoaderUnloadGL();
+        }
+    #endif
+    return EXIT_SUCCESS;
 }
 
 
@@ -857,6 +911,10 @@ uint32_t pixelfont_blend( uint32_t color1, uint32_t color2, uint8_t alpha )	{
 #define YA_GETOPT_IMPLEMENTATION
 #include "libs/ya_getopt.h"
 
+#ifdef _WIN32
+    #define GLAD_GL_IMPLEMENTATION
+    #include "libs/glad.h"
+#endif
 
 #ifndef YARNSPIN_RUNTIME_ONLY
 
@@ -894,6 +952,9 @@ uint32_t pixelfont_blend( uint32_t color1, uint32_t color2, uint8_t alpha )	{
 
     #define SAMPLERATE_IMPLEMENTATION
     #include "libs/samplerate.h"
+
+    #define STB_RECT_PACK_IMPLEMENTATION
+    #include "libs/stb_rect_pack.h"
 
     #define STB_TRUETYPE_IMPLEMENTATION
     #define STBTT_RASTERIZER_VERSION 1

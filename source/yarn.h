@@ -1394,27 +1394,28 @@ buffer_t* yarn_compile( char const* path ) {
     memcpy( yarn.assets.palette, palette->colortable, palette->color_count * sizeof( *palette->colortable ) );
 
     printf( "Processing fonts\n" );
-    yarn.assets.font_description = manage_pixelfont( convert_font( yarn.globals.font_description, yarn.globals.font_description_size ) );
+    bool palette_mode = yarn.globals.colormode == YARN_COLORMODE_PALETTE;
+    yarn.assets.font_description = manage_pixelfont( convert_font( yarn.globals.font_description, yarn.globals.font_description_size, palette_mode ) );
     if( !yarn.assets.font_description ) {
         printf( "Failed to load font: %s\n", yarn.globals.font_description );
         no_error = false;
     }
-    yarn.assets.font_options = manage_pixelfont( convert_font( yarn.globals.font_options, yarn.globals.font_options_size ) );
+    yarn.assets.font_options = manage_pixelfont( convert_font( yarn.globals.font_options, yarn.globals.font_options_size, palette_mode ) );
     if( !yarn.assets.font_options ) {
         printf( "Failed to load font: %s\n", yarn.globals.font_options );
         no_error = false;
     }
-    yarn.assets.font_characters = manage_pixelfont( convert_font( yarn.globals.font_characters, yarn.globals.font_characters_size ) );
+    yarn.assets.font_characters = manage_pixelfont( convert_font( yarn.globals.font_characters, yarn.globals.font_characters_size, palette_mode ) );
     if( !yarn.assets.font_characters ) {
         printf( "Failed to load font: %s\n", yarn.globals.font_characters );
         no_error = false;
     }
-    yarn.assets.font_items = manage_pixelfont( convert_font( yarn.globals.font_items, yarn.globals.font_items_size ) );
+    yarn.assets.font_items = manage_pixelfont( convert_font( yarn.globals.font_items, yarn.globals.font_items_size, palette_mode ) );
     if( !yarn.assets.font_items ) {
         printf( "Failed to load font: %s\n", yarn.globals.font_items );
         no_error = false;
     }
-    yarn.assets.font_name = manage_pixelfont( convert_font( yarn.globals.font_name, yarn.globals.font_name_size ) );
+    yarn.assets.font_name = manage_pixelfont( convert_font( yarn.globals.font_name, yarn.globals.font_name_size, palette_mode ) );
     if( !yarn.assets.font_name ) {
         printf( "Failed to load font: %s\n", yarn.globals.font_name );
         no_error = false;
