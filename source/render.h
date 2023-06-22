@@ -6,6 +6,7 @@ typedef struct render_t {
     int screen_width;
     int screen_height;
     uint8_t* screenshot;
+    uint32_t* screenshot_rgb;
     int color_background;
     int color_disabled;
     int color_txt;
@@ -33,8 +34,7 @@ typedef struct render_t {
     GLuint font_shader;
     GLuint vertexbuffer;
     GLuint white_tex;
-    int vertexbuffer_capacity;
-    GLfloat* vertexbuffer_data;
+    GLuint savegame_tex[10];
 } render_t;
 
 
@@ -59,6 +59,7 @@ bool render_init( render_t* render, yarn_t* yarn, uint8_t* screen, int width, in
     render->screen_width = width;
     render->screen_height = height;
     render->screenshot = render->screen ? (uint8_t*) manage_alloc( malloc( width * height * sizeof( uint8_t ) ) ) : NULL;
+    render->screenshot_rgb = !render->screen ? (uint32_t*) manage_alloc( malloc( width * height * sizeof( uint32_t ) ) ) : NULL;
 
     int darkest_index = 0;
     int darkest_luma = 65536;
@@ -137,7 +138,7 @@ bool render_init( render_t* render, yarn_t* yarn, uint8_t* screen, int width, in
                 height = desc.height;
             } else {
                 int w, h, c;
-                stbi_uc* pixels = stbi_load_from_memory( qoi->data, qoi->size, &w, &h, &c, 4 );
+                pixels = (uint32_t*)stbi_load_from_memory( qoi->data, qoi->size, &w, &h, &c, 4 );
                 width = w;
                 height = h;
             }
@@ -216,9 +217,9 @@ bool render_init( render_t* render, yarn_t* yarn, uint8_t* screen, int width, in
 
 
         glGenFramebuffers( 1, &render->framebuffer );
-        //glBindFramebuffer( GL_FRAMEBUFFER, render->framebuffer );
-        //glFramebufferTexture2D( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, render->frametexture, 0 );
-        //glBindFramebuffer( GL_FRAMEBUFFER, 0 );
+        glBindFramebuffer( GL_FRAMEBUFFER, render->framebuffer );
+        glFramebufferTexture2D( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, render->frametexture, 0 );
+        glBindFramebuffer( GL_FRAMEBUFFER, 0 );
 
         char const* vs_source =
         #ifdef __wasm__
@@ -395,10 +396,19 @@ bool render_init( render_t* render, yarn_t* yarn, uint8_t* screen, int width, in
         glBindTexture( GL_TEXTURE_2D, render->white_tex );
         uint32_t pixel = 0xffffffff;
         glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, &pixel );
-    }
+        glBindTexture( GL_TEXTURE_2D, 0 );
 
-    render->vertexbuffer_capacity = 65536;
-    render->vertexbuffer_data = (GLfloat*) manage_alloc( malloc( sizeof( GLfloat ) * render->vertexbuffer_capacity ) );
+        for( int i = 0; i < 10; ++i ) {
+            glGenTextures( 1, &render->savegame_tex[ i ] );
+            glActiveTexture( GL_TEXTURE0 );
+            glBindTexture( GL_TEXTURE_2D, render->savegame_tex[ i ] );
+            glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+            glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+            glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+            glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+            glBindTexture( GL_TEXTURE_2D, 0 );
+        }
+    }
 
     return true;
 }
@@ -408,16 +418,7 @@ void font_blit_rgb( render_t* render, bitmapfont_t const* font, int x, int y, ch
     int width, int height, pixelfont_align_t align, int wrap_width, int hspacing,
     int vspacing,  int limit, pixelfont_bounds_t* bounds ) {
 
-
-    int new_capacity = render->vertexbuffer_capacity;
-    while( strlen( text ) * 6 * 4 > new_capacity ) {
-        new_capacity *= 2;
-    }
-    if( new_capacity > render->vertexbuffer_capacity ) {
-        render->vertexbuffer_capacity = new_capacity;
-        render->vertexbuffer_data = (GLfloat*) manage_alloc( malloc( sizeof( GLfloat ) * render->vertexbuffer_capacity ) );
-    }
-
+    static GLfloat vertices[ 6 * 4 * 256 ];
     int numverts = 0;
 
     float xp = x;
@@ -491,8 +492,27 @@ void font_blit_rgb( render_t* render, bitmapfont_t const* font, int x, int y, ch
                     2.0f * x1 - 1.0f, 2.0f * y2 - 1.0f, u1, v2,
                 };
 
-                memcpy( &render->vertexbuffer_data[ numverts * 6 * 4 ], verts, 6 * 4 * sizeof( GLfloat ) ) ;
+                memcpy( vertices + numverts * 6 * 4, verts, 6 * 4 * sizeof( GLfloat ) ) ;
                 numverts++;
+                if( numverts >= 256 ) {
+                    glBindBuffer( GL_ARRAY_BUFFER, render->vertexbuffer );
+                    glEnableVertexAttribArray( 0 );
+                    glVertexAttribPointer( 0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof( GLfloat ), 0 );
+                    glBufferData( GL_ARRAY_BUFFER, 6 * 4 * sizeof( GLfloat ) * numverts, vertices, GL_STATIC_DRAW );
+
+                    float a = ( ( color >> 24 ) & 0xff ) / 255.0f;
+                    float r = ( ( color >> 16 ) & 0xff ) / 255.0f;
+                    float g = ( ( color >> 8  ) & 0xff ) / 255.0f;
+                    float b = ( ( color       ) & 0xff ) / 255.0f;
+                    glUseProgram( render->font_shader );
+                    glActiveTexture( GL_TEXTURE0 );
+                    glBindTexture( GL_TEXTURE_2D, (GLuint) font->size_in_bytes );
+                    glUniform1i( glGetUniformLocation( render->font_shader, "tex0" ), 0 );
+                    glUniform4f( glGetUniformLocation( render->font_shader, "col" ), r, g, b, a );
+                    glDrawArrays( GL_TRIANGLES, 0, 6 * numverts );
+                    glBindTexture( GL_TEXTURE_2D, 0 );
+                    numverts = 0;
+                }
             }
 
             x += advance;
@@ -515,7 +535,7 @@ void font_blit_rgb( render_t* render, bitmapfont_t const* font, int x, int y, ch
     glBindBuffer( GL_ARRAY_BUFFER, render->vertexbuffer );
     glEnableVertexAttribArray( 0 );
     glVertexAttribPointer( 0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof( GLfloat ), 0 );
-    glBufferData( GL_ARRAY_BUFFER, 6 * 4 * sizeof( GLfloat ) * numverts, render->vertexbuffer_data, GL_STATIC_DRAW );
+    glBufferData( GL_ARRAY_BUFFER, 6 * 4 * sizeof( GLfloat ) * numverts, vertices, GL_STATIC_DRAW );
 
     float a = ( ( color >> 24 ) & 0xff ) / 255.0f;
     float r = ( ( color >> 16 ) & 0xff ) / 255.0f;
@@ -540,7 +560,7 @@ void cls( render_t* render ) {
     if( render->screen ) {
         memset( render->screen, render->color_background, (size_t) render->screen_width * render->screen_height );
     } else {
-        glClearColor( 0.0f, 0.0f, 0.0f, 0.0f );
+        glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );
         glClear( GL_COLOR_BUFFER_BIT );
     }
 }
@@ -574,10 +594,14 @@ void render_bind_framebuffer( render_t* render, int width, int height ) {
 
 
 void render_present( render_t* render, int width, int height ) {
+    
     if( render->screen ) {
         return;
     }
+
+    glFlush();
     glBindFramebuffer( GL_FRAMEBUFFER, 0 );
+
     glViewport(0, 0, width, height);
     glClearColor( 0.0f, 0.0f, 0.0f, 0.0f );
     glClear( GL_COLOR_BUFFER_BIT );
@@ -650,8 +674,7 @@ void render_present( render_t* render, int width, int height ) {
         glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
     }
     glDrawArrays( GL_TRIANGLE_FAN, 0, 4 );
-    glBindTexture( GL_TEXTURE_2D, 0 );
-
+    glBindTexture( GL_TEXTURE_2D, 0 );    
 }
 
 
@@ -726,9 +749,39 @@ void draw_raw( render_t* render, int x, int y, uint8_t* pixels, int w, int h ) {
 }
 
 
-void draw_raw_rgb( render_t* render, int x, int y, uint32_t* pixels, int w, int h ) {
+void draw_raw_rgb( render_t* render, int x, int y, GLuint tex, int w, int h ) {
     scale_for_resolution( render, &x, &y );
-    // TODO:
+
+    float width = render->screen_width;
+    float height = render->screen_height;
+    float x1 = x / width;
+    float y1 = y / height;
+    float x2 = x1 + w / width;
+    float y2 = y1 + h / height;
+
+    GLfloat vertices[] = {
+        2.0f * x1 - 1.0f, 2.0f * y1 - 1.0f, 0.0f, 0.0f,
+        2.0f * x2 - 1.0f, 2.0f * y1 - 1.0f, 1.0f, 0.0f,
+        2.0f * x2 - 1.0f, 2.0f * y2 - 1.0f, 1.0f, 1.0f,
+        2.0f * x1 - 1.0f, 2.0f * y2 - 1.0f, 0.0f, 1.0f,
+    };
+    glBindBuffer( GL_ARRAY_BUFFER, render->vertexbuffer );
+    glEnableVertexAttribArray( 0 );
+    glVertexAttribPointer( 0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof( GLfloat ), 0 );
+    glBufferData( GL_ARRAY_BUFFER, 4 * 4 * sizeof( GLfloat ), vertices, GL_STATIC_DRAW );
+
+    uint32_t color = 0xffffffff;
+    float a = ( ( color >> 24 ) & 0xff ) / 255.0f;
+    float r = ( ( color >> 16 ) & 0xff ) / 255.0f;
+    float g = ( ( color >> 8  ) & 0xff ) / 255.0f;
+    float b = ( ( color       ) & 0xff ) / 255.0f;
+    glUseProgram( render->shader );
+    glActiveTexture( GL_TEXTURE0 );
+    glBindTexture( GL_TEXTURE_2D, tex );
+    glUniform1i( glGetUniformLocation( render->shader, "tex0" ), 0 );
+    glUniform4f( glGetUniformLocation( render->shader, "col" ), r, g, b, a );
+    glDrawArrays( GL_TRIANGLE_FAN, 0, 4 );
+    glBindTexture( GL_TEXTURE_2D, 0 );
 }
 
 void box( render_t* render, int x, int y, int w, int h, int c ) {

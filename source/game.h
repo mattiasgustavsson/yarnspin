@@ -490,7 +490,11 @@ void enter_menu( game_t* game ) {
     if( game->render->screen ) {
         memcpy( game->render->screenshot, game->render->screen, sizeof( uint8_t ) * game->render->screen_width * game->render->screen_height );
     } else {
-        // TODO
+        glFlush();
+
+        GLint viewport[ 4 ];
+        glGetIntegerv( GL_VIEWPORT, viewport );
+        glReadPixels( viewport[ 0 ], viewport[ 1 ], viewport[ 2 ], viewport[ 3 ], GL_RGBA, GL_UNSIGNED_BYTE, game->render->screenshot_rgb );
     }
     game->ingame_menu = true;
     audiosys_pause( game->audiosys );
@@ -524,6 +528,7 @@ void game_update( game_t* game, float delta_time ) {
 		}
 	}
 
+    bool menu_requested = false;
     if( game->ingame_menu ) {
         ingame_menu_update( game );
         if( !game->ingame_menu && game->new_state != GAMESTATE_TERMINATE) {
@@ -532,8 +537,7 @@ void game_update( game_t* game, float delta_time ) {
         return;
     } else if( game->current_state != GAMESTATE_BOOT ) {
         if( was_key_pressed( game, APP_KEY_ESCAPE ) ) {
-            enter_menu( game );
-            return;
+            menu_requested = true;
         }
     }
 
@@ -609,6 +613,10 @@ void game_update( game_t* game, float delta_time ) {
         case GAMESTATE_TERMINATE:
             new_state = terminate_update( game );
             break;
+    }
+    if( menu_requested ) {
+        enter_menu( game );
+        return;
     }
     if( game->restart_requested ) {
         game_restart( game );
@@ -932,7 +940,7 @@ void save_game( game_t* game, int slot ) {
     int thumb_width = 75;
     int thumb_height = 57;
     scale_for_resolution( game->render, &thumb_width, &thumb_height );
-    uint32_t* thumb_rgb = NULL; //TODO: game->render->screen_rgb ? make_thumbnail_rgb( game->render->screenshot_rgb, game->render->screen_width, game->render->screen_height, thumb_width, thumb_height ) : NULL;
+    uint32_t* thumb_rgb = game->render->screenshot_rgb ? make_thumbnail_rgb( game->render->screenshot_rgb, game->render->screen_width, game->render->screen_height, thumb_width, thumb_height ) : NULL;
     uint8_t* thumb = game->render->screen ? make_thumbnail( game->render->screenshot, game->render->screen_width, game->render->screen_height, thumb_width, thumb_height ) : NULL;
  
     buffer_t* buffer = buffer_create();
@@ -1001,13 +1009,18 @@ void load_savegames( game_t* game ) {
             buffer_read_i32( buffer, &savegame->thumb_width, 1 );
             buffer_read_i32( buffer, &savegame->thumb_height, 1 );
             savegame->thumb = game->render->screen ? (uint8_t*) manage_alloc( malloc( savegame->thumb_width * savegame->thumb_height * sizeof( uint8_t ) ) ) : NULL;
-            savegame->thumb_rgb = NULL; // TODO: game->render->screen_rgb ? (uint32_t*) manage_alloc( malloc( savegame->thumb_width * savegame->thumb_height * sizeof( uint32_t ) ) ) : NULL;
+            savegame->thumb_rgb = !game->render->screen ? (uint32_t*) manage_alloc( malloc( savegame->thumb_width * savegame->thumb_height * sizeof( uint32_t ) ) ) : NULL;
             if( savegame->thumb ) {
                 buffer_read_u8( buffer, savegame->thumb, savegame->thumb_width * savegame->thumb_height );
             }
             if( savegame->thumb_rgb ) {
                 buffer_read_u32( buffer, savegame->thumb_rgb, savegame->thumb_width * savegame->thumb_height );
             }
+            glActiveTexture( GL_TEXTURE0 );
+            glBindTexture( GL_TEXTURE_2D, game->render->savegame_tex[ i ] );
+            glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, savegame->thumb_width, savegame->thumb_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, savegame->thumb_rgb );
+            glBindTexture( GL_TEXTURE_2D, 0 );
+
             buffer_read_char( buffer, savegame->date, 12 );
             buffer_read_char( buffer, savegame->time, 6 );
 
@@ -1050,7 +1063,7 @@ void savegame_menu_update( game_t* game ) {
                 draw_raw( game->render, 32 + x * 96, 20 + y * 72, savegame->thumb, savegame->thumb_width, savegame->thumb_height );
             }
             if( savegame->thumb_rgb ) {
-                draw_raw_rgb( game->render, 32 + x * 96, 20 + y * 72, savegame->thumb_rgb, savegame->thumb_width, savegame->thumb_height );
+                draw_raw_rgb( game->render, 32 + x * 96, 20 + y * 72, game->render->savegame_tex[ x + y * 3 ], savegame->thumb_width, savegame->thumb_height );
             }
 
             char datetime[ 20 ] = "";
@@ -1134,7 +1147,7 @@ void loadgame_menu_update( game_t* game ) {
                 draw_raw( game->render, 32 + x * 96, 20 + y * 72, savegame->thumb, savegame->thumb_width, savegame->thumb_height );
             }
             if( savegame->thumb_rgb ) {
-                draw_raw_rgb( game->render, 32 + x * 96, 20 + y * 72, savegame->thumb_rgb, savegame->thumb_width, savegame->thumb_height );
+                draw_raw_rgb( game->render, 32 + x * 96, 20 + y * 72, game->render->savegame_tex[ x + y * 3 ], savegame->thumb_width, savegame->thumb_height );
             }
 
             char datetime[ 20 ] = "";
