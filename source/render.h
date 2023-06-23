@@ -749,7 +749,7 @@ void draw_raw( render_t* render, int x, int y, uint8_t* pixels, int w, int h ) {
 }
 
 
-void draw_raw_rgb( render_t* render, int x, int y, GLuint tex, int w, int h ) {
+void draw_savegame_bitmap( render_t* render, int x, int y, int savegame_index, int w, int h ) {
     scale_for_resolution( render, &x, &y );
 
     float width = render->screen_width;
@@ -777,12 +777,13 @@ void draw_raw_rgb( render_t* render, int x, int y, GLuint tex, int w, int h ) {
     float b = ( ( color       ) & 0xff ) / 255.0f;
     glUseProgram( render->shader );
     glActiveTexture( GL_TEXTURE0 );
-    glBindTexture( GL_TEXTURE_2D, tex );
+    glBindTexture( GL_TEXTURE_2D, render->savegame_tex[ savegame_index ] );
     glUniform1i( glGetUniformLocation( render->shader, "tex0" ), 0 );
     glUniform4f( glGetUniformLocation( render->shader, "col" ), r, g, b, a );
     glDrawArrays( GL_TRIANGLE_FAN, 0, 4 );
     glBindTexture( GL_TEXTURE_2D, 0 );
 }
+
 
 void box( render_t* render, int x, int y, int w, int h, int c ) {
     scale_for_resolution( render, &x, &y );
@@ -943,3 +944,63 @@ int font_height( render_t* render, int height ) {
 }
 
 
+uint32_t* make_thumbnail_rgb( uint32_t* screenshot_rgb, int screen_width, int screen_height, int thumb_width, int thumb_height ) {
+    uint32_t* thumb = (uint32_t*) malloc( thumb_width * thumb_height * sizeof( uint32_t ) * 2 );
+    memset( thumb, 0, thumb_width * thumb_height * sizeof( uint32_t ) * 2 );
+
+    stbir_resize_uint8( (unsigned char*) screenshot_rgb, screen_width, screen_height, screen_width * 4, 
+        (unsigned char*)( thumb + thumb_width * thumb_height ), thumb_width, thumb_height, thumb_width * 4, 4 );
+    
+    float filter[ 9 ] = {
+        -1.0f, -1.0f, -1.0f,
+        -1.0f,  9.0f, -1.0f,
+        -1.0f, -1.0f, -1.0f,
+    };
+    for( int y = 1; y < thumb_height - 1; ++y ) {
+        for( int x = 1; x < thumb_width - 1; ++x ) {
+            float r = 0.0f;
+            float g = 0.0f;
+            float b = 0.0f;
+            for( int fx = -1; fx <= 1; ++fx ) {
+                for( int fy = -1; fy <= 1; ++fy ) {
+                    uint32_t c = thumb[ thumb_width * thumb_height + x + fx + ( y + fy ) * thumb_width ];
+                    r += ( filter[ ( 1 + fx ) + ( 1 + fy ) * 3 ] ) * ( ( c & 0xff ) / 255.0f );
+                    g += ( filter[ ( 1 + fx ) + ( 1 + fy ) * 3 ] ) * ( ( ( c >> 8 ) & 0xff ) / 255.0f );
+                    b += ( filter[ ( 1 + fx ) + ( 1 + fy ) * 3 ] ) * ( ( ( c >> 16 ) & 0xff ) / 255.0f );
+                }
+            }
+            uint32_t c = thumb[ thumb_width * thumb_height + x + y * thumb_width ];
+            r = r * 0.25f + 0.75f * ( ( c & 0xff ) / 255.0f );
+            g = g * 0.25f + 0.75f * ( ( ( c >> 8 ) & 0xff ) / 255.0f );
+            b = b * 0.25f + 0.75f * ( ( ( c >> 16 ) & 0xff ) / 255.0f );
+            r = r < 0.0f ? 0.0f : r > 1.0f ? 1.0f : r;
+            g = g < 0.0f ? 0.0f : g > 1.0f ? 1.0f : g;
+            b = b < 0.0f ? 0.0f : b > 1.0f ? 1.0f : b;
+            uint32_t col = ( ( uint32_t)( r * 255.0f ) ) | ( ( ( uint32_t)( g * 255.0f ) ) << 8 ) | ( ( ( uint32_t)( b * 255.0f ) ) << 16 );
+            thumb[ x + y * thumb_width ] = col | 0xff000000;
+        }
+    }
+    return thumb;
+}
+
+
+uint8_t* make_thumbnail( uint8_t* screenshot, int screen_width, int screen_height, int thumb_width, int thumb_height ) {
+    uint8_t* thumb = (uint8_t*) malloc( thumb_width * thumb_height * sizeof( uint8_t ) );
+    memset( thumb, 0, thumb_width * thumb_height * sizeof( uint8_t ) );
+    for( int y = 0; y < thumb_height; ++y ) {
+        for( int x = 0; x < thumb_width; ++x ) {
+            int fx = ( x * ( screen_width / (float) thumb_width ) );
+            int fy = ( y * ( screen_height / (float) thumb_height ) );
+            thumb[ x + y * thumb_width ] = screenshot[ fx + fy * screen_width ];
+        }
+    }
+    return thumb;
+}
+
+
+void generate_savegame_texture( render_t* render, uint32_t* thumb_rgb, int thumb_width, int thumb_height, int savegame_index ) {
+    glActiveTexture( GL_TEXTURE0 );
+    glBindTexture( GL_TEXTURE_2D, render->savegame_tex[ savegame_index ] );
+    glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, thumb_width, thumb_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, thumb_rgb );
+    glBindTexture( GL_TEXTURE_2D, 0 );
+}

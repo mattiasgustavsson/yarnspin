@@ -104,14 +104,15 @@ void state_data_write( state_data_t* data, buffer_t* buffer ) {
 }
 
 
-void state_data_read( state_data_t* data, buffer_t* buffer ) {
-    buffer_read_i32( buffer, &data->current_location, 1 );
-    buffer_read_i32( buffer, &data->current_dialog, 1 );
-    buffer_read_i32( buffer, &data->current_image, 1 );
-    buffer_read_i32( buffer, &data->current_music, 1 );
-    buffer_read_i32( buffer, &data->current_ambience, 1 );
-    buffer_read_i32( buffer, &data->logo_index, 1 );
-    buffer_read_bool( buffer, &data->first_chr_or_use, 1 );
+bool state_data_read( state_data_t* data, buffer_t* buffer ) {
+    bool failed = false;
+    failed = failed || 0 == buffer_read_i32( buffer, &data->current_location, 1 );
+    failed = failed || 0 == buffer_read_i32( buffer, &data->current_dialog, 1 );
+    failed = failed || 0 == buffer_read_i32( buffer, &data->current_image, 1 );
+    failed = failed || 0 == buffer_read_i32( buffer, &data->current_music, 1 );
+    failed = failed || 0 == buffer_read_i32( buffer, &data->current_ambience, 1 );
+    failed = failed || 0 == buffer_read_i32( buffer, &data->logo_index, 1 );
+    failed = failed || 0 == buffer_read_bool( buffer, &data->first_chr_or_use, 1 );
 
     data->flags = managed_array( bool );
     data->items = managed_array( int );
@@ -119,37 +120,55 @@ void state_data_read( state_data_t* data, buffer_t* buffer ) {
     data->section_stack = managed_array( stack_entry_t );
 
     int flags_count = 0;
-    buffer_read_i32( buffer, &flags_count, 1 );
-    for( int i = 0; i < flags_count; ++i ) {
-        bool flag = false;
-        buffer_read_bool( buffer, &flag, 1 );
-        array_add( data->flags, &flag );
+    failed = failed || 0 == buffer_read_i32( buffer, &flags_count, 1 );
+    failed = failed || ( flags_count < 0 || flags_count > 65536 );
+    if( !failed ) {
+        for( int i = 0; i < flags_count; ++i ) {
+            bool flag = false;
+            failed = failed || 0 == buffer_read_bool( buffer, &flag, 1 );
+            if( failed ) break;
+            array_add( data->flags, &flag );
+        }
     }
 
     int items_count = 0;
-    buffer_read_i32( buffer, &items_count, 1 );
-    for( int i = 0; i < items_count; ++i ) {
-        int item = false;
-        buffer_read_i32( buffer, &item, 1 );
-        array_add( data->items, &item );
+    failed = failed || 0 == buffer_read_i32( buffer, &items_count, 1 );
+    failed = failed || ( items_count < 0 || items_count > 65536 );
+    if( !failed ) {
+        for( int i = 0; i < items_count; ++i ) {
+            int item = false;
+            failed = failed || 0 == buffer_read_i32( buffer, &item, 1 );
+            if( failed ) break;
+            array_add( data->items, &item );
+        }
     }
 
     int chars_count = 0;
-    buffer_read_i32( buffer, &chars_count, 1 );
-    for( int i = 0; i < chars_count; ++i ) {
-        int item = false;
-        buffer_read_i32( buffer, &item, 1 );
-        array_add( data->chars, &item );
+    failed = failed || 0 == buffer_read_i32( buffer, &chars_count, 1 );
+    failed = failed || ( chars_count < 0 || chars_count > 65536 );
+    if( !failed ) {
+        for( int i = 0; i < chars_count; ++i ) {
+            int item = false;
+            failed = failed || 0 == buffer_read_i32( buffer, &item, 1 );
+            if( failed ) break;
+            array_add( data->chars, &item );
+        }
     }
 
     int stack_count = 0;
-    buffer_read_i32( buffer, &stack_count, 1 );
-    for( int i = 0; i < stack_count; ++i ) {
-        stack_entry_t stack;
-        buffer_read_bool( buffer, &stack.is_location, 1 );
-        buffer_read_i32( buffer, &stack.index, 1 );
-        array_add( data->section_stack, &stack );
+    failed = failed || 0 == buffer_read_i32( buffer, &stack_count, 1 );
+    failed = failed || ( stack_count < 0 || stack_count > 65536 );
+    if( !failed ) {
+        for( int i = 0; i < stack_count; ++i ) {
+            stack_entry_t stack;
+            failed = failed || 0 == buffer_read_bool( buffer, &stack.is_location, 1 );
+            failed = failed || 0 == buffer_read_i32( buffer, &stack.index, 1 );
+            if( failed ) break;
+            array_add( data->section_stack, &stack );
+        }
     }
+
+    return !failed;
 }
 
 
@@ -158,7 +177,6 @@ typedef struct savegame_t {
     int thumb_width;
     int thumb_height;
     uint8_t* thumb;
-    uint32_t* thumb_rgb;
     char date[ 12 ];
     char time[ 6 ];
     state_data_t state;
@@ -874,59 +892,6 @@ void do_actions( game_t* game, array_param(yarn_act_t)* act_param ) {
 }
 
 
-uint32_t* make_thumbnail_rgb( uint32_t* screenshot_rgb, int screen_width, int screen_height, int thumb_width, int thumb_height ) {
-    uint32_t* thumb = (uint32_t*) malloc( thumb_width * thumb_height * sizeof( uint32_t ) * 2 );
-    memset( thumb, 0, thumb_width * thumb_height * sizeof( uint32_t ) * 2 );
-
-    stbir_resize_uint8( (unsigned char*) screenshot_rgb, screen_width, screen_height, screen_width * 4, 
-        (unsigned char*)( thumb + thumb_width * thumb_height ), thumb_width, thumb_height, thumb_width * 4, 4 );
-    
-    float filter[ 9 ] = {
-        -1.0f, -1.0f, -1.0f,
-        -1.0f,  9.0f, -1.0f,
-        -1.0f, -1.0f, -1.0f,
-    };
-    for( int y = 1; y < thumb_height - 1; ++y ) {
-        for( int x = 1; x < thumb_width - 1; ++x ) {
-            float r = 0.0f;
-            float g = 0.0f;
-            float b = 0.0f;
-            for( int fx = -1; fx <= 1; ++fx ) {
-                for( int fy = -1; fy <= 1; ++fy ) {
-                    uint32_t c = thumb[ thumb_width * thumb_height + x + fx + ( y + fy ) * thumb_width ];
-                    r += ( filter[ ( 1 + fx ) + ( 1 + fy ) * 3 ] ) * ( ( c & 0xff ) / 255.0f );
-                    g += ( filter[ ( 1 + fx ) + ( 1 + fy ) * 3 ] ) * ( ( ( c >> 8 ) & 0xff ) / 255.0f );
-                    b += ( filter[ ( 1 + fx ) + ( 1 + fy ) * 3 ] ) * ( ( ( c >> 16 ) & 0xff ) / 255.0f );
-                }
-            }
-            uint32_t c = thumb[ thumb_width * thumb_height + x + y * thumb_width ];
-            r = r * 0.25f + 0.75f * ( ( c & 0xff ) / 255.0f );
-            g = g * 0.25f + 0.75f * ( ( ( c >> 8 ) & 0xff ) / 255.0f );
-            b = b * 0.25f + 0.75f * ( ( ( c >> 16 ) & 0xff ) / 255.0f );
-            r = r < 0.0f ? 0.0f : r > 1.0f ? 1.0f : r;
-            g = g < 0.0f ? 0.0f : g > 1.0f ? 1.0f : g;
-            b = b < 0.0f ? 0.0f : b > 1.0f ? 1.0f : b;
-            uint32_t col = ( ( uint32_t)( r * 255.0f ) ) | ( ( ( uint32_t)( g * 255.0f ) ) << 8 ) | ( ( ( uint32_t)( b * 255.0f ) ) << 16 );
-            thumb[ x + y * thumb_width ] = col | 0xff000000;
-        }
-    }
-    return thumb;
-}
-
-
-uint8_t* make_thumbnail( uint8_t* screenshot, int screen_width, int screen_height, int thumb_width, int thumb_height ) {
-    uint8_t* thumb = (uint8_t*) malloc( thumb_width * thumb_height * sizeof( uint8_t ) );
-    memset( thumb, 0, thumb_width * thumb_height * sizeof( uint8_t ) );
-    for( int y = 0; y < thumb_height; ++y ) {
-        for( int x = 0; x < thumb_width; ++x ) {
-            int fx = ( x * ( screen_width / (float) thumb_width ) );
-            int fy = ( y * ( screen_height / (float) thumb_height ) );
-            thumb[ x + y * thumb_width ] = screenshot[ fx + fy * screen_width ];
-        }
-    }
-    return thumb;
-}
-
 
 static char const* savegame_names[] = { "savegame.001", "savegame.002", "savegame.003", "savegame.004", "savegame.005", 
     "savegame.006", "savegame.007", "savegame.008", "savegame.009",  };
@@ -949,12 +914,13 @@ void save_game( game_t* game, int slot ) {
     buffer_write_u32( buffer, &version, 1 );
     buffer_write_i32( buffer, &thumb_width, 1 );
     buffer_write_i32( buffer, &thumb_height, 1 );
+    
     if( thumb ) {
         buffer_write_u8( buffer, thumb, thumb_width * thumb_height );
-    }
-    if( thumb_rgb ) {
+    } else if( thumb_rgb ) {
         buffer_write_u32( buffer, thumb_rgb, thumb_width * thumb_height );
     }
+
     datetime_t dt = get_datetime();
     char str[ 16 ];
     char const* months[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
@@ -989,7 +955,7 @@ void load_game( game_t* game, int slot ) {
         return;
     }
     savegame_t* savegame = &game->savegames[ slot - 1 ];
-    if( savegame->thumb || savegame->thumb_rgb ) {
+    if( savegame->thumb_width && savegame->thumb_height ) {
         game_load_state( game, &savegame->state );   
         game->ingame_menu = false;
         game->loadgame_menu = false;
@@ -998,6 +964,10 @@ void load_game( game_t* game, int slot ) {
 
 
 void load_savegames( game_t* game ) {
+    int thumb_width = 75;
+    int thumb_height = 57;
+    scale_for_resolution( game->render, &thumb_width, &thumb_height );
+
     memset( game->savegames, 0, sizeof( game->savegames ) );
     for( int i = 0; i < 9; ++i ) {
         savegame_t* savegame = &game->savegames[ i ];
@@ -1008,23 +978,57 @@ void load_savegames( game_t* game ) {
             buffer_read_u32( buffer, &savegame->version, 1 );
             buffer_read_i32( buffer, &savegame->thumb_width, 1 );
             buffer_read_i32( buffer, &savegame->thumb_height, 1 );
+            if( savegame->thumb_width != thumb_width || savegame->thumb_height != thumb_height ) {
+                savegame->thumb_width= 0;
+                savegame->thumb_height = 0;
+                buffer_destroy( buffer );
+                free( data );
+                continue;
+            }
             savegame->thumb = game->render->screen ? (uint8_t*) manage_alloc( malloc( savegame->thumb_width * savegame->thumb_height * sizeof( uint8_t ) ) ) : NULL;
-            savegame->thumb_rgb = !game->render->screen ? (uint32_t*) manage_alloc( malloc( savegame->thumb_width * savegame->thumb_height * sizeof( uint32_t ) ) ) : NULL;
             if( savegame->thumb ) {
-                buffer_read_u8( buffer, savegame->thumb, savegame->thumb_width * savegame->thumb_height );
-            }
-            if( savegame->thumb_rgb ) {
-                buffer_read_u32( buffer, savegame->thumb_rgb, savegame->thumb_width * savegame->thumb_height );
-            }
-            glActiveTexture( GL_TEXTURE0 );
-            glBindTexture( GL_TEXTURE_2D, game->render->savegame_tex[ i ] );
-            glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, savegame->thumb_width, savegame->thumb_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, savegame->thumb_rgb );
-            glBindTexture( GL_TEXTURE_2D, 0 );
+                int count = buffer_read_u8( buffer, savegame->thumb, savegame->thumb_width * savegame->thumb_height );
+                if( count < savegame->thumb_width * savegame->thumb_height ) {
+                    savegame->thumb_width= 0;
+                    savegame->thumb_height = 0;
+                    free( savegame->thumb );
+                    savegame->thumb = NULL;
+                    buffer_destroy( buffer );
+                    free( data );
+                    continue;
+                }
+            } else {
+                uint32_t* thumb_rgb = (uint32_t*) malloc( savegame->thumb_width * savegame->thumb_height * sizeof( uint32_t )  );
+                int count = buffer_read_u32( buffer, thumb_rgb, savegame->thumb_width * savegame->thumb_height );
+                if( count < savegame->thumb_width * savegame->thumb_height ) {
+                    savegame->thumb_width= 0;
+                    savegame->thumb_height = 0;
+                    free( thumb_rgb );
+                    buffer_destroy( buffer );
+                    free( data );
+                    continue;
+                }
+                generate_savegame_texture( game->render, thumb_rgb, savegame->thumb_width, savegame->thumb_height, i );
+                free( thumb_rgb );
+           }
 
-            buffer_read_char( buffer, savegame->date, 12 );
-            buffer_read_char( buffer, savegame->time, 6 );
+            if( buffer_read_char( buffer, savegame->date, 12 ) != 12 ) {
+                savegame->thumb_width= 0;
+                savegame->thumb_height = 0;
+                buffer_destroy( buffer );
+                free( data );
+            }
+            if( buffer_read_char( buffer, savegame->time, 6 ) != 6 ) {
+                savegame->thumb_width= 0;
+                savegame->thumb_height = 0;
+                buffer_destroy( buffer );
+                free( data );
+            }
 
-            state_data_read( &savegame->state, buffer );
+            if( !state_data_read( &savegame->state, buffer ) ) {
+                savegame->thumb_width= 0;
+                savegame->thumb_height = 0;
+            }
 
             buffer_destroy( buffer );
             free( data );
@@ -1046,7 +1050,7 @@ void savegame_menu_update( game_t* game ) {
     for( int y = 0; y < 3; ++y ) {
         for( int x = 0; x < 3; ++x ) {
             savegame_t* savegame = &game->savegames[ x + y * 3 ];
-            bool valid_slot = savegame->thumb || savegame->thumb_rgb;
+            bool valid_slot = savegame->thumb_width && savegame->thumb_height;
             int xp = 31 + x * 96;
             int yp = 19 + y * 72;
             bool hover = mouse_x >= xp && mouse_x < xp + 78 && mouse_y >= yp && mouse_y < yp + 60;
@@ -1059,18 +1063,19 @@ void savegame_menu_update( game_t* game ) {
             *str = '1' + x + y * 3;
             text( game->render, game->render->font_opt, str, xp - 8, yp + 3, game->render->color_opt );
 
-            if( savegame->thumb ) {
-                draw_raw( game->render, 32 + x * 96, 20 + y * 72, savegame->thumb, savegame->thumb_width, savegame->thumb_height );
-            }
-            if( savegame->thumb_rgb ) {
-                draw_raw_rgb( game->render, 32 + x * 96, 20 + y * 72, game->render->savegame_tex[ x + y * 3 ], savegame->thumb_width, savegame->thumb_height );
-            }
+            if( valid_slot ) {
+                if( savegame->thumb ) {
+                    draw_raw( game->render, 32 + x * 96, 20 + y * 72, savegame->thumb, savegame->thumb_width, savegame->thumb_height );
+                } else if( savegame->thumb_width && savegame->thumb_height ){
+                    draw_savegame_bitmap( game->render, 32 + x * 96, 20 + y * 72, x + y * 3, savegame->thumb_width, savegame->thumb_height );
+                }
 
-            char datetime[ 20 ] = "";
-            strcat( datetime, savegame->date );
-            strcat( datetime, "  " );
-            strcat( datetime, savegame->time );
-            center( game->render, game->render->font_txt, datetime, xp + 39, yp + 60, game->render->color_txt );
+                char datetime[ 20 ] = "";
+                strcat( datetime, savegame->date );
+                strcat( datetime, "  " );
+                strcat( datetime, savegame->time );
+                center( game->render, game->render->font_txt, datetime, xp + 39, yp + 60, game->render->color_txt );
+            }
        }
     }
 
@@ -1130,7 +1135,7 @@ void loadgame_menu_update( game_t* game ) {
     for( int y = 0; y < 3; ++y ) {
         for( int x = 0; x < 3; ++x ) {
             savegame_t* savegame = &game->savegames[ x + y * 3 ];
-            bool valid_slot = savegame->thumb || savegame->thumb_rgb;
+            bool valid_slot = savegame->thumb_width && savegame->thumb_height;
             int xp = 31 + x * 96;
             int yp = 19 + y * 72;
             bool hover = mouse_x >= xp && mouse_x < xp + 78 && mouse_y >= yp && mouse_y < yp + 60;
@@ -1143,18 +1148,19 @@ void loadgame_menu_update( game_t* game ) {
             *str = '1' + x + y * 3;
             text( game->render, game->render->font_opt, str, xp - 8, yp + 3, game->render->color_opt );
 
-            if( savegame->thumb ) {
-                draw_raw( game->render, 32 + x * 96, 20 + y * 72, savegame->thumb, savegame->thumb_width, savegame->thumb_height );
-            }
-            if( savegame->thumb_rgb ) {
-                draw_raw_rgb( game->render, 32 + x * 96, 20 + y * 72, game->render->savegame_tex[ x + y * 3 ], savegame->thumb_width, savegame->thumb_height );
-            }
+            if( valid_slot ) {
+                if( savegame->thumb ) {
+                    draw_raw( game->render, 32 + x * 96, 20 + y * 72, savegame->thumb, savegame->thumb_width, savegame->thumb_height );
+                } else if( savegame->thumb_width && savegame->thumb_height ){
+                    draw_savegame_bitmap( game->render, 32 + x * 96, 20 + y * 72, x + y * 3, savegame->thumb_width, savegame->thumb_height );
+                }
 
-            char datetime[ 20 ] = "";
-            strcat( datetime, savegame->date );
-            strcat( datetime, "  " );
-            strcat( datetime, savegame->time );
-            center( game->render, game->render->font_txt, datetime, xp + 39, yp + 60, game->render->color_txt );
+                char datetime[ 20 ] = "";
+                strcat( datetime, savegame->date );
+                strcat( datetime, "  " );
+                strcat( datetime, savegame->time );
+                center( game->render, game->render->font_txt, datetime, xp + 39, yp + 60, game->render->color_txt );
+            }
        }
     }
 
