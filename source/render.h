@@ -851,7 +851,40 @@ void menu_icon( render_t* render, int x, int y, int c ) {
             s -= 2;
         }
     } else {
-        // TODO:
+        float width = render->screen_width;
+        float height = render->screen_height;
+        float x1 = ( x - 1 ) / width;
+        float y1 = y / height;
+        float x2 = x1 + ( s + 1 ) / width;
+        float y2 = y1;
+        float x3 = x1 + ( ( s + 1 ) / 2.0f ) / width;
+        float y3 = y1 + h / height;
+        float x4 = x1 + ( 1 + ( s + 1 ) / 2.0f ) / width;
+        float y4 = y1 + h / height;
+
+        GLfloat vertices[] = {
+            2.0f * x1 - 1.0f, 2.0f * y1 - 1.0f, 0.0f, 0.0f,
+            2.0f * x3 - 1.0f, 2.0f * y3 - 1.0f, 1.0f, 0.0f,
+            2.0f * x4 - 1.0f, 2.0f * y4 - 1.0f, 1.0f, 1.0f,
+            2.0f * x2 - 1.0f, 2.0f * y2 - 1.0f, 1.0f, 1.0f,
+        };
+        glBindBuffer( GL_ARRAY_BUFFER, render->vertexbuffer );
+        glEnableVertexAttribArray( 0 );
+        glVertexAttribPointer( 0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof( GLfloat ), 0 );
+        glBufferData( GL_ARRAY_BUFFER, 4 * 4 * sizeof( GLfloat ), vertices, GL_STATIC_DRAW );
+
+        uint32_t color = render->yarn->assets.palette[ c ];
+        float a = ( ( color >> 24 ) & 0xff ) / 255.0f;
+        float r = ( ( color >> 16 ) & 0xff ) / 255.0f;
+        float g = ( ( color >> 8  ) & 0xff ) / 255.0f;
+        float b = ( ( color       ) & 0xff ) / 255.0f;
+        glUseProgram( render->shader );
+        glActiveTexture( GL_TEXTURE0 );
+        glBindTexture( GL_TEXTURE_2D, render->white_tex );
+        glUniform1i( glGetUniformLocation( render->shader, "tex0" ), 0 );
+        glUniform4f( glGetUniformLocation( render->shader, "col" ), r, g, b, a );
+        glDrawArrays( GL_TRIANGLE_FAN, 0, 4 );
+        glBindTexture( GL_TEXTURE_2D, 0 );
     }
 }
 
