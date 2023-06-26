@@ -38,18 +38,6 @@ typedef struct render_t {
 } render_t;
 
 
-uint32_t blend_rgb( uint32_t color1, uint32_t color2, uint8_t alpha ) {
-    uint64_t c1 = (uint64_t) color1;
-    uint64_t c2 = (uint64_t) color2;
-    uint64_t a = (uint64_t)( alpha );
-    // bit magic to alpha blend R G B with single mul
-    c1 = ( c1 | ( c1 << 24 ) ) & 0x00ff00ff00ffull;
-    c2 = ( c2 | ( c2 << 24 ) ) & 0x00ff00ff00ffull;
-    uint64_t o = ( ( ( ( c2 - c1 ) * a ) >> 8 ) + c1 ) & 0x00ff00ff00ffull;
-    return (uint32_t) ( o | ( o >> 24 ) );
-}
-
-
 bool render_init( render_t* render, yarn_t* yarn, uint8_t* screen, int width, int height ) {
     memset( render, 0, sizeof( *render ) );
 
@@ -138,7 +126,15 @@ bool render_init( render_t* render, yarn_t* yarn, uint8_t* screen, int width, in
                 height = desc.height;
             } else {
                 int w, h, c;
-                pixels = (uint32_t*)stbi_load_from_memory( qoi->data, qoi->size, &w, &h, &c, 4 );
+                uint32_t* px = (uint32_t*)stbi_load_from_memory( qoi->data, qoi->size, &w, &h, &c, 4 );
+                h /= 2;
+                pixels = (uint32_t*)malloc( w * h * sizeof( uint32_t ) );
+                for( int j = 0; j < w * h; ++j ) {
+                    uint32_t c = px[ j ] & 0x00ffffff;
+                    uint32_t a = ( px[ w * h + j ] & 0xff ) << 24;
+                    pixels[ j ] = c | a;
+                }
+                free( px );
                 width = w;
                 height = h;
             }
@@ -205,8 +201,6 @@ bool render_init( render_t* render, yarn_t* yarn, uint8_t* screen, int width, in
         glActiveTexture( GL_TEXTURE0 );
         glBindTexture( GL_TEXTURE_2D, render->frametexture );
 
-        //glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, render->screen_width, render->screen_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL );
-
         glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
         glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
 
@@ -230,11 +224,10 @@ bool render_init( render_t* render, yarn_t* yarn, uint8_t* screen, int width, in
             "attribute vec4 pos;"
             "varying vec2 uv;"
             ""
-            "void main( void )"
-            "    {"
+            "void main( void ) {"
             "    gl_Position = vec4( pos.xy, 0.0, 1.0 );"
             "    uv = pos.zw;"
-            "    }"
+            "}"
             ;
 
         char const* fs_source =
@@ -248,10 +241,9 @@ bool render_init( render_t* render, yarn_t* yarn, uint8_t* screen, int width, in
             "uniform sampler2D tex0;"
             "uniform vec4 col;"
             ""
-            "void main(void)"
-            "    {"
+            "void main(void) {"
             "    gl_FragColor = texture2D( tex0, uv ) * col;"
-            "    }"
+            "}"
             ;
 
         char const* fs_font_source =
@@ -265,10 +257,10 @@ bool render_init( render_t* render, yarn_t* yarn, uint8_t* screen, int width, in
             "uniform sampler2D tex0;"
             "uniform vec4 col;"
             ""
-            "void main(void)"
-            "    {"
-            "    gl_FragColor = vec4( 1.0, 1.0, 1.0, texture2D( tex0, uv ).r ) * col;"
-            "    }"
+            "void main(void) {"
+            "    float a = texture2D( tex0, uv ).r;"
+            "    gl_FragColor = vec4( a, a, a, a ) * col;"
+            "}"
             ;
 
         char error_message[ 1024 ];
@@ -577,7 +569,7 @@ void render_new_frame( render_t* render, int hborder, int vborder ) {
         glFramebufferTexture2D( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, render->frametexture, 0 );
         glViewport( hborder, vborder, render->screen_width, render->screen_height);
         glEnable( GL_BLEND );
-        glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
+        glBlendFuncSeparate( GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO );
     }
 }
 

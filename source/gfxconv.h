@@ -1560,6 +1560,16 @@ qoi_data_t* convert_rgb( string image_filename, int width, int height, int bpp, 
         stbi_write_png( intermediate_processed_filename, outw, outh, 4, (stbi_uc*)img, 4 * outw );
 
         if( !jpeg ) {
+            for( int i = 0; i < outw * outh; ++i ) {
+                uint32_t a = ((uint32_t*)img)[ i ] >> 24;
+                uint32_t b = ( ((uint32_t*)img)[ i ] >> 16 ) & 0xff;
+                uint32_t g = ( ((uint32_t*)img)[ i ] >> 8 ) & 0xff;
+                uint32_t r = ( ((uint32_t*)img)[ i ] >> 0 ) & 0xff;
+                r = ( a * r ) / 255;
+                g = ( a * g ) / 255;
+                b = ( a * b ) / 255;
+                ((uint32_t*)img)[ i ] = ( a << 24 ) | ( b << 16 ) | ( g << 8 ) | r;
+            }
             qoi_desc desc;
             desc.width = outw;
             desc.height = outh;
@@ -1567,7 +1577,20 @@ qoi_data_t* convert_rgb( string image_filename, int width, int height, int bpp, 
             desc.colorspace = 0;
             qoi_write( processed_filename, img, &desc );
         } else {
-            stbi_write_jpg( processed_filename, outw, outh, 4, img, 80 );
+            uint32_t* px = (uint32_t*)malloc( outw * outh * 2 * sizeof( uint32_t ) );
+            for( int i = 0; i < outw * outh; ++i ) {
+                uint32_t a = ((uint32_t*)img)[ i ] >> 24;
+                uint32_t b = ( ((uint32_t*)img)[ i ] >> 16 ) & 0xff;
+                uint32_t g = ( ((uint32_t*)img)[ i ] >> 8 ) & 0xff;
+                uint32_t r = ( ((uint32_t*)img)[ i ] >> 0 ) & 0xff;
+                r = ( a * r ) / 255;
+                g = ( a * g ) / 255;
+                b = ( a * b ) / 255;
+                px[ i ] = ( b << 16 ) | ( g << 8 ) | r;
+                px[ outw * outh + i ] = 0xff000000 | ( a << 16 ) | ( a << 8 ) | a;
+            }
+            stbi_write_jpg( processed_filename, outw, outh * 2, 4, px, 80 );
+            free( px );
         }
     }
 
