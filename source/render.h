@@ -14,7 +14,6 @@ typedef struct render_t {
     int color_chr;
     int color_use;
     int color_name;
-    int color_facebg;
     pixelfont_t* font_txt;
     pixelfont_t* font_opt;
     pixelfont_t* font_chr;
@@ -49,43 +48,6 @@ bool render_init( render_t* render, yarn_t* yarn, uint8_t* screen, int width, in
     render->screenshot = render->screen ? (uint8_t*) manage_alloc( malloc( width * height * sizeof( uint8_t ) ) ) : NULL;
     render->screenshot_rgb = !render->screen ? (uint32_t*) manage_alloc( malloc( width * height * sizeof( uint32_t ) ) ) : NULL;
 
-    int darkest_index = 0;
-    int darkest_luma = 65536;
-    int brightest_index = 0;
-    int brightest_luma = 0;
-    int facebg_index = 0;
-    int facebg_luma = 65536;
-    int disabled_index = 0;
-    int disabled_luma = 65536;
-
-    int facebg_lumaref = 54 * 0x28 + 182 * 0x28 + 19 * 0x28;
-    int disabled_lumaref = 54 * 0x70 + 182 * 0x70 + 19 * 0x70;
-    for( int i = 0; i < yarn->assets.palette_count; ++i ) {
-        int c = (int)( yarn->assets.palette[ i ] & 0x00ffffff );
-        int r = c & 0xff;
-        int g = ( c >> 8 ) & 0xff;
-        int b = ( c >> 16 ) & 0xff;
-        int l = 54 * r + 182 * g + 19 * b;
-        if( l <= darkest_luma ) { darkest_luma = l; darkest_index = i; }
-        if( l >= brightest_luma ) { brightest_luma = l; brightest_index = i; }
-        int coldiff = ( abs( r - g ) + abs( g - b ) + abs( r - b ) ) * 64;
-        if( abs( l - facebg_lumaref ) + coldiff <= facebg_luma ) { facebg_luma = abs( l - facebg_lumaref ) + coldiff; facebg_index = i; }
-        if( abs( l - disabled_lumaref ) + coldiff <= disabled_luma ) { disabled_luma = abs( l - disabled_lumaref ) + coldiff; disabled_index = i; }
-    }
-
-    if( disabled_index == darkest_index ) {
-        disabled_luma = 65536;
-        for( int i = 0; i < yarn->assets.palette_count; ++i ) {
-            if( i == darkest_index ) continue;
-            int c = (int)( yarn->assets.palette[ i ] & 0x00ffffff );
-            int r = c & 0xff;
-            int g = ( c >> 8 ) & 0xff;
-            int b = ( c >> 16 ) & 0xff;
-            int l = 54 * r + 182 * g + 19 * b;
-            if( l <= disabled_luma ) { disabled_luma = l; disabled_index = i; }
-        }
-    }
-
     render->font_txt = yarn->assets.font_description;
     render->font_opt = yarn->assets.font_options;
     render->font_chr = yarn->assets.font_characters;
@@ -98,16 +60,49 @@ bool render_init( render_t* render, yarn_t* yarn, uint8_t* screen, int width, in
     render->color_chr = yarn->globals.color_chr;
     render->color_use = yarn->globals.color_use;
     render->color_name = yarn->globals.color_name;
-    render->color_facebg = yarn->globals.color_facebg;
 
-    if( render->color_background < 0 ) render->color_background = (uint8_t)darkest_index;
-    if( render->color_disabled < 0 ) render->color_disabled = (uint8_t)disabled_index;
-    if( render->color_txt < 0 ) render->color_txt = (uint8_t)brightest_index;
-    if( render->color_opt < 0 ) render->color_opt = (uint8_t)brightest_index;
-    if( render->color_chr < 0 ) render->color_chr = (uint8_t)brightest_index;
-    if( render->color_use < 0 ) render->color_use = (uint8_t)brightest_index;
-    if( render->color_name < 0 ) render->color_name = (uint8_t)brightest_index;
-    if( render->color_facebg < 0 ) render->color_facebg = (uint8_t)facebg_index;
+    if( render->yarn->globals.colormode == YARN_COLORMODE_PALETTE ) {
+        int darkest_index = 0;
+        int darkest_luma = 65536;
+        int brightest_index = 0;
+        int brightest_luma = 0;
+        int disabled_index = 0;
+        int disabled_luma = 65536;
+
+        int disabled_lumaref = 54 * 0x70 + 182 * 0x70 + 19 * 0x70;
+        for( int i = 0; i < yarn->assets.palette_count; ++i ) {
+            int c = (int)( yarn->assets.palette[ i ] & 0x00ffffff );
+            int r = c & 0xff;
+            int g = ( c >> 8 ) & 0xff;
+            int b = ( c >> 16 ) & 0xff;
+            int l = 54 * r + 182 * g + 19 * b;
+            if( l <= darkest_luma ) { darkest_luma = l; darkest_index = i; }
+            if( l >= brightest_luma ) { brightest_luma = l; brightest_index = i; }
+            int coldiff = ( abs( r - g ) + abs( g - b ) + abs( r - b ) ) * 64;
+            if( abs( l - disabled_lumaref ) + coldiff <= disabled_luma ) { disabled_luma = abs( l - disabled_lumaref ) + coldiff; disabled_index = i; }
+        }
+
+        if( disabled_index == darkest_index ) {
+            disabled_luma = 65536;
+            for( int i = 0; i < yarn->assets.palette_count; ++i ) {
+                if( i == darkest_index ) continue;
+                int c = (int)( yarn->assets.palette[ i ] & 0x00ffffff );
+                int r = c & 0xff;
+                int g = ( c >> 8 ) & 0xff;
+                int b = ( c >> 16 ) & 0xff;
+                int l = 54 * r + 182 * g + 19 * b;
+                if( l <= disabled_luma ) { disabled_luma = l; disabled_index = i; }
+            }
+        }
+
+        if( render->color_background < 0 ) render->color_background = (uint8_t)darkest_index;
+        if( render->color_disabled < 0 ) render->color_disabled = (uint8_t)disabled_index;
+        if( render->color_txt < 0 ) render->color_txt = (uint8_t)brightest_index;
+        if( render->color_opt < 0 ) render->color_opt = (uint8_t)brightest_index;
+        if( render->color_chr < 0 ) render->color_chr = (uint8_t)brightest_index;
+        if( render->color_use < 0 ) render->color_use = (uint8_t)brightest_index;
+        if( render->color_name < 0 ) render->color_name = (uint8_t)brightest_index;
+    }
 
     if( render->yarn->globals.colormode != YARN_COLORMODE_PALETTE ) {
         render->textures = (GLuint*)manage_alloc( malloc( sizeof( GLuint ) * render->yarn->assets.bitmaps->count ) );
@@ -487,22 +482,24 @@ void font_blit_rgb( render_t* render, bitmapfont_t const* font, int x, int y, ch
                 memcpy( vertices + numverts * 6 * 4, verts, 6 * 4 * sizeof( GLfloat ) ) ;
                 numverts++;
                 if( numverts >= 256 ) {
-                    glBindBuffer( GL_ARRAY_BUFFER, render->vertexbuffer );
-                    glEnableVertexAttribArray( 0 );
-                    glVertexAttribPointer( 0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof( GLfloat ), 0 );
-                    glBufferData( GL_ARRAY_BUFFER, 6 * 4 * sizeof( GLfloat ) * numverts, vertices, GL_STATIC_DRAW );
+                    if( render ) {
+                        glBindBuffer( GL_ARRAY_BUFFER, render->vertexbuffer );
+                        glEnableVertexAttribArray( 0 );
+                        glVertexAttribPointer( 0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof( GLfloat ), 0 );
+                        glBufferData( GL_ARRAY_BUFFER, 6 * 4 * sizeof( GLfloat ) * numverts, vertices, GL_STATIC_DRAW );
 
-                    float a = ( ( color >> 24 ) & 0xff ) / 255.0f;
-                    float r = ( ( color >> 16 ) & 0xff ) / 255.0f;
-                    float g = ( ( color >> 8  ) & 0xff ) / 255.0f;
-                    float b = ( ( color       ) & 0xff ) / 255.0f;
-                    glUseProgram( render->font_shader );
-                    glActiveTexture( GL_TEXTURE0 );
-                    glBindTexture( GL_TEXTURE_2D, (GLuint) font->size_in_bytes );
-                    glUniform1i( glGetUniformLocation( render->font_shader, "tex0" ), 0 );
-                    glUniform4f( glGetUniformLocation( render->font_shader, "col" ), r, g, b, a );
-                    glDrawArrays( GL_TRIANGLES, 0, 6 * numverts );
-                    glBindTexture( GL_TEXTURE_2D, 0 );
+                        float a = ( ( color >> 24 ) & 0xff ) / 255.0f;
+                        float r = ( ( color >> 16 ) & 0xff ) / 255.0f;
+                        float g = ( ( color >> 8  ) & 0xff ) / 255.0f;
+                        float b = ( ( color       ) & 0xff ) / 255.0f;
+                        glUseProgram( render->font_shader );
+                        glActiveTexture( GL_TEXTURE0 );
+                        glBindTexture( GL_TEXTURE_2D, (GLuint) font->size_in_bytes );
+                        glUniform1i( glGetUniformLocation( render->font_shader, "tex0" ), 0 );
+                        glUniform4f( glGetUniformLocation( render->font_shader, "col" ), r, g, b, a );
+                        glDrawArrays( GL_TRIANGLES, 0, 6 * numverts );
+                        glBindTexture( GL_TEXTURE_2D, 0 );
+                    }
                     numverts = 0;
                 }
             }
@@ -524,22 +521,24 @@ void font_blit_rgb( render_t* render, bitmapfont_t const* font, int x, int y, ch
         if( *str && skip_space && *str <= ' ' ) ++str;
     }
 
-    glBindBuffer( GL_ARRAY_BUFFER, render->vertexbuffer );
-    glEnableVertexAttribArray( 0 );
-    glVertexAttribPointer( 0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof( GLfloat ), 0 );
-    glBufferData( GL_ARRAY_BUFFER, 6 * 4 * sizeof( GLfloat ) * numverts, vertices, GL_STATIC_DRAW );
+    if( render ) {
+        glBindBuffer( GL_ARRAY_BUFFER, render->vertexbuffer );
+        glEnableVertexAttribArray( 0 );
+        glVertexAttribPointer( 0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof( GLfloat ), 0 );
+        glBufferData( GL_ARRAY_BUFFER, 6 * 4 * sizeof( GLfloat ) * numverts, vertices, GL_STATIC_DRAW );
 
-    float a = ( ( color >> 24 ) & 0xff ) / 255.0f;
-    float r = ( ( color >> 16 ) & 0xff ) / 255.0f;
-    float g = ( ( color >> 8  ) & 0xff ) / 255.0f;
-    float b = ( ( color       ) & 0xff ) / 255.0f;
-    glUseProgram( render->font_shader );
-    glActiveTexture( GL_TEXTURE0 );
-    glBindTexture( GL_TEXTURE_2D, (GLuint) font->size_in_bytes );
-    glUniform1i( glGetUniformLocation( render->font_shader, "tex0" ), 0 );
-    glUniform4f( glGetUniformLocation( render->font_shader, "col" ), r, g, b, a );
-    glDrawArrays( GL_TRIANGLES, 0, 6 * numverts );
-    glBindTexture( GL_TEXTURE_2D, 0 );
+        float a = ( ( color >> 24 ) & 0xff ) / 255.0f;
+        float r = ( ( color >> 16 ) & 0xff ) / 255.0f;
+        float g = ( ( color >> 8  ) & 0xff ) / 255.0f;
+        float b = ( ( color       ) & 0xff ) / 255.0f;
+        glUseProgram( render->font_shader );
+        glActiveTexture( GL_TEXTURE0 );
+        glBindTexture( GL_TEXTURE_2D, (GLuint) font->size_in_bytes );
+        glUniform1i( glGetUniformLocation( render->font_shader, "tex0" ), 0 );
+        glUniform4f( glGetUniformLocation( render->font_shader, "col" ), r, g, b, a );
+        glDrawArrays( GL_TRIANGLES, 0, 6 * numverts );
+        glBindTexture( GL_TEXTURE_2D, 0 );
+    }
 
     if( bounds ) {
         bounds->width = wrap_width > 0 ? wrap_width : ( max_x - xp );
@@ -552,7 +551,12 @@ void cls( render_t* render ) {
     if( render->screen ) {
         memset( render->screen, render->color_background, (size_t) render->screen_width * render->screen_height );
     } else {
-        glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );
+        uint32_t color = render->color_background;
+        float a = ( ( color >> 24 ) & 0xff ) / 255.0f;
+        float r = ( ( color >> 16 ) & 0xff ) / 255.0f;
+        float g = ( ( color >> 8  ) & 0xff ) / 255.0f;
+        float b = ( ( color       ) & 0xff ) / 255.0f;
+        glClearColor( r, g, b, a );
         glClear( GL_COLOR_BUFFER_BIT );
     }
 }
@@ -809,7 +813,7 @@ void box( render_t* render, int x, int y, int w, int h, int c ) {
         glVertexAttribPointer( 0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof( GLfloat ), 0 );
         glBufferData( GL_ARRAY_BUFFER, 4 * 4 * sizeof( GLfloat ), vertices, GL_STATIC_DRAW );
 
-        uint32_t color = render->yarn->assets.palette[ c ];
+        uint32_t color = c;
         float a = ( ( color >> 24 ) & 0xff ) / 255.0f;
         float r = ( ( color >> 16 ) & 0xff ) / 255.0f;
         float g = ( ( color >> 8  ) & 0xff ) / 255.0f;
@@ -865,7 +869,7 @@ void menu_icon( render_t* render, int x, int y, int c ) {
         glVertexAttribPointer( 0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof( GLfloat ), 0 );
         glBufferData( GL_ARRAY_BUFFER, 4 * 4 * sizeof( GLfloat ), vertices, GL_STATIC_DRAW );
 
-        uint32_t color = render->yarn->assets.palette[ c ];
+        uint32_t color = c;
         float a = ( ( color >> 24 ) & 0xff ) / 255.0f;
         float r = ( ( color >> 16 ) & 0xff ) / 255.0f;
         float g = ( ( color >> 8  ) & 0xff ) / 255.0f;
@@ -889,7 +893,7 @@ pixelfont_bounds_t center( render_t* render, pixelfont_t* font, string str, int 
         pixelfont_blit( font, x, y, str, (uint8_t)color, render->screen, render->screen_width, render->screen_height,
             PIXELFONT_ALIGN_CENTER, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, &bounds );
     } else {
-        font_blit_rgb( render, (bitmapfont_t*)font, x, y, str, render->yarn->assets.palette[ color ], render->screen_width, render->screen_height,
+        font_blit_rgb( render, (bitmapfont_t*)font, x, y, str, color, render->screen_width, render->screen_height,
             PIXELFONT_ALIGN_CENTER, 0, 0, 0, -1, &bounds );
     }
     scale_for_resolution_inverse( render, &bounds.width, &bounds.height );
@@ -907,7 +911,7 @@ pixelfont_bounds_t center_wrap( render_t* render, pixelfont_t* font, string str,
             PIXELFONT_ALIGN_CENTER, wrap_width, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF,
             &bounds );
     } else {
-        font_blit_rgb( render, (bitmapfont_t*)font, x, y, str, render->yarn->assets.palette[ color ], render->screen_width, render->screen_height,
+        font_blit_rgb( render, (bitmapfont_t*)font, x, y, str, color, render->screen_width, render->screen_height,
             PIXELFONT_ALIGN_CENTER, wrap_width, 0, 0, -1, 
             &bounds );
     }
@@ -923,7 +927,7 @@ pixelfont_bounds_t text( render_t* render, pixelfont_t* font, string str, int x,
         pixelfont_blit( font, x, y, str, (uint8_t)color, render->screen, render->screen_width, render->screen_height,
             PIXELFONT_ALIGN_LEFT, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, &bounds );
     } else {
-        font_blit_rgb( render, (bitmapfont_t*)font, x, y, str, render->yarn->assets.palette[ color ], render->screen_width, render->screen_height,
+        font_blit_rgb( render, (bitmapfont_t*)font, x, y, str, color, render->screen_width, render->screen_height,
             PIXELFONT_ALIGN_LEFT, 0, 0, 0, -1, &bounds );
     }
     scale_for_resolution_inverse( render, &bounds.width, &bounds.height );
@@ -942,7 +946,7 @@ void wrap( render_t* render, pixelfont_t* font, string str, int x, int y, int co
             PIXELFONT_ALIGN_LEFT, wrap_width, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF,
             NULL );
     } else {
-        font_blit_rgb( render, (bitmapfont_t*)font, x, y, str, render->yarn->assets.palette[ color ], render->screen_width, render->screen_height,
+        font_blit_rgb( render, (bitmapfont_t*)font, x, y, str, color, render->screen_width, render->screen_height,
             PIXELFONT_ALIGN_LEFT, wrap_width, 0, 0, -1, 
             NULL );
     }
@@ -957,7 +961,7 @@ void wrap_limit( render_t* render, pixelfont_t* font, string str, int x, int y, 
             PIXELFONT_ALIGN_LEFT, wrap_width, 0, 0, limit, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF,
             PIXELFONT_UNDERLINE_OFF, NULL );
     } else {
-        font_blit_rgb( render, (bitmapfont_t*)font, x, y, str, render->yarn->assets.palette[ color ], render->screen_width, render->screen_height,
+        font_blit_rgb( render, (bitmapfont_t*)font, x, y, str, color, render->screen_width, render->screen_height,
             PIXELFONT_ALIGN_LEFT, wrap_width, 0, 0, limit, NULL );
     }
 }

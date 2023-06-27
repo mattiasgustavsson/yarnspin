@@ -349,16 +349,18 @@ int app_proc( app_t* app, void* user_data ) {
 
         if( game.yarn->is_debug ) {
             char const* dbgstr = "debug";
-            pixelfont_bounds_t bounds;
-            pixelfont_blit( render.yarn->assets.font_description, 0, 0, dbgstr, 0, NULL, render.screen_width, render.screen_height,
-                    PIXELFONT_ALIGN_LEFT, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, &bounds );            
             if( render.screen ) {
+                pixelfont_bounds_t bounds;
+                pixelfont_blit( render.yarn->assets.font_description, 0, 0, dbgstr, 0, NULL, render.screen_width, render.screen_height,
+                        PIXELFONT_ALIGN_LEFT, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, &bounds );            
                 pixelfont_blit( render.yarn->assets.font_description, render.screen_width - bounds.width - 1, render.screen_height - bounds.height, dbgstr, (uint8_t)render.color_disabled, render.screen, render.screen_width, render.screen_height,
                     PIXELFONT_ALIGN_LEFT, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, NULL );
             } else {
-                // TODO
-                //pixelfont_blit_rgb( render.yarn->assets.font_description, render.screen_width - bounds.width - 1, render.screen_height - bounds.height, dbgstr, 0x404040, render.screen_rgb, render.screen_width, render.screen_height,
-                //    PIXELFONT_ALIGN_LEFT, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, NULL );
+                pixelfont_bounds_t bounds;
+                font_blit_rgb( NULL, (bitmapfont_t*)render.yarn->assets.font_description, 0, 0, dbgstr, 0xff707070, render.screen_width, render.screen_height,
+                    PIXELFONT_ALIGN_LEFT, 0, 0, 0, -1, &bounds );
+                font_blit_rgb( &render, (bitmapfont_t*)render.yarn->assets.font_description, render.screen_width - bounds.width - 1, render.screen_height - bounds.height, dbgstr, 0xff707070, render.screen_width, render.screen_height,
+                    PIXELFONT_ALIGN_LEFT, 0, 0, 0, -1, NULL );
             }
 
         }
@@ -375,7 +377,7 @@ int app_proc( app_t* app, void* user_data ) {
 
         APP_U32 transition = (APP_U32)( ( 255 * abs( game.transition_counter ) / 10 ) );
         APP_U32 fade = transition << 16 | transition << 8 | transition;
-        uint32_t bg = yarn->assets.palette[ render.color_background ];
+        uint32_t bg = canvas ? yarn->assets.palette[ render.color_background ] : render.color_background;
         #define RGBMUL32( a, b) \
             ( ( ( ( ( ( (a) >> 16U ) & 0xffU ) * ( ( (b) >> 16U ) & 0xffU ) ) >> 8U ) << 16U ) | \
                 ( ( ( ( ( (a) >> 8U  ) & 0xffU ) * ( ( (b) >> 8U  ) & 0xffU ) ) >> 8U ) << 8U  ) | \

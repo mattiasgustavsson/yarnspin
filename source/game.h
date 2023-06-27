@@ -525,7 +525,7 @@ void enter_menu( game_t* game ) {
             }
         }
     } else {
-        // TODO
+        box( game->render, 0, 0, game->render->screen_width, game->render->screen_height, 0x80000000 );
     }
 }
 

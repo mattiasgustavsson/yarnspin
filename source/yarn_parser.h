@@ -55,7 +55,7 @@ bool is_global_keyword( string keyword ) {
         "palette", "resolution", "colormode", "display_filters", "logo", "logo_music", "alone_text",
         "font_description", "font_options", "font_characters", "font_items", "font_name",
         "background_location", "background_dialog",
-        "color_background", "color_disabled", "color_txt", "color_opt", "color_chr", "color_use", "color_name", "color_facebg",
+        "color_background", "color_disabled", "color_txt", "color_opt", "color_chr", "color_use", "color_name",
         "debug_start", "debug_set_flags", "debug_get_items", "debug_attach_chars",
     };
     for( int i = 0; i < ARRAY_COUNT( global_keywords ); ++i ) {

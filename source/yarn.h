@@ -807,7 +807,6 @@ typedef struct yarn_globals_t {
     int color_chr;
     int color_use;
     int color_name;
-    int color_facebg;
 
     bool explicit_flags;
     array(string_id)* flags;
@@ -853,7 +852,6 @@ yarn_globals_t* empty_globals( void ) {
     globals.color_chr = -1;
     globals.color_use = -1;
     globals.color_name = -1;
-    globals.color_facebg = -1;
     globals.explicit_flags = false;
     globals.flags = managed_array(string_id);
     globals.explicit_items = false;
@@ -907,7 +905,6 @@ void save_globals( buffer_t* out, yarn_globals_t* globals ) {
     buffer_write_i32( out, &globals->color_chr, 1 );
     buffer_write_i32( out, &globals->color_use, 1 );
     buffer_write_i32( out, &globals->color_name, 1 );
-    buffer_write_i32( out, &globals->color_facebg, 1 );
 
     buffer_write_bool( out, &globals->explicit_flags, 1 );
     buffer_write_i32( out, &globals->flags->count, 1 );
@@ -973,7 +970,6 @@ void load_globals( buffer_t* in, yarn_globals_t* globals ) {
     globals->color_chr = read_int( in );
     globals->color_use = read_int( in );
     globals->color_name = read_int( in );
-    globals->color_facebg = read_int( in );
 
     globals->explicit_flags = read_bool( in );
     globals->flags = managed_array(string_id);
@@ -1383,18 +1379,24 @@ buffer_t* yarn_compile( char const* path ) {
         return NULL;
     }
 
+    bool palette_mode = yarn.globals.colormode == YARN_COLORMODE_PALETTE;
     bool no_error = true;
-    printf( "Processing palette\n" );
-    paldither_palette_t* palette = manage_paldither( convert_palette( yarn.globals.palette, NULL ) );
-    if( !palette ) {
-        printf( "Failed to load palette file '%s'\n", yarn.globals.palette );
-        no_error = false;
+
+    paldither_palette_t* palette = NULL;
+    if( palette_mode ) {
+        printf( "Processing palette\n" );
+        palette = manage_paldither( convert_palette( yarn.globals.palette, NULL ) );
+        if( !palette ) {
+            printf( "Failed to load palette file '%s'\n", yarn.globals.palette );
+            no_error = false;
+        }
+        yarn.assets.palette_count = palette->color_count;
+        memcpy( yarn.assets.palette, palette->colortable, palette->color_count * sizeof( *palette->colortable ) );
+    } else {
+        yarn.assets.palette_count = 0;
     }
-    yarn.assets.palette_count = palette->color_count;
-    memcpy( yarn.assets.palette, palette->colortable, palette->color_count * sizeof( *palette->colortable ) );
 
     printf( "Processing fonts\n" );
-    bool palette_mode = yarn.globals.colormode == YARN_COLORMODE_PALETTE;
     yarn.assets.font_description = manage_pixelfont( convert_font( yarn.globals.font_description, yarn.globals.font_description_size, palette_mode ) );
     if( !yarn.assets.font_description ) {
         printf( "Failed to load font: %s\n", yarn.globals.font_description );
@@ -1430,7 +1432,7 @@ buffer_t* yarn_compile( char const* path ) {
         string_id screen_name = yarn.screen_names->items[ i ];
         int width = (int)( 320 * resolution_scale );
         int height = (int)( 240 * resolution_scale );
-        if( yarn.globals.colormode == YARN_COLORMODE_PALETTE ) {
+        if( palette_mode ) {
             palrle_data_t* bitmap = manage_palrle( convert_bitmap( screen_name, width, height, yarn.globals.palette, palette, resolution_scale ) );
             array_add( yarn.assets.bitmaps, &bitmap );
             if( !bitmap ) {
@@ -1451,7 +1453,7 @@ buffer_t* yarn_compile( char const* path ) {
         int width = (int)( 192 * resolution_scale );
         int height = (int)( 128 * resolution_scale );
         string_id image_name = yarn.image_names->items[ i ];
-        if( yarn.globals.colormode == YARN_COLORMODE_PALETTE ) {
+        if( palette_mode ) {
             palrle_data_t* bitmap = manage_palrle( convert_bitmap( image_name, width, height, yarn.globals.palette, palette, resolution_scale ) );
             array_add( yarn.assets.bitmaps, &bitmap );
             if( !bitmap ) {
@@ -1474,7 +1476,7 @@ buffer_t* yarn_compile( char const* path ) {
         string_id face_name = yarn.face_names->items[ i ];
         int width = (int)( 112 * resolution_scale );
         int height = (int)( 112 * resolution_scale );
-        if( yarn.globals.colormode == YARN_COLORMODE_PALETTE ) {
+        if( palette_mode ) {
             palrle_data_t* bitmap = manage_palrle( convert_bitmap( face_name, width, height, yarn.globals.palette, palette, resolution_scale ) );
             array_add( yarn.assets.bitmaps, &bitmap );
             if( !bitmap ) {

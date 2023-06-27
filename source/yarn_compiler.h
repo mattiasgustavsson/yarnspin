@@ -1084,9 +1084,66 @@ bool compile_character( parser_section_t* section, yarn_t* yarn ) {
 }
 
 
+bool compile_color( parser_global_t* global, bool rgbmode, int* out_color ) {
+    if( global->data->count != 1 || cstr_len( cstr_trim( global->data->items[ 0 ] ) ) <= 0 ) {
+        printf( "%s(%d): invalid color declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
+        return false;
+    }
+    cstr_t str = cstr_trim( global->data->items[ 0 ] );
+    if( rgbmode ) {
+        int len = (int)cstr_len( str );
+        if( *str != '#' || len != 7 ) {
+            printf( "%s(%d): color declarations in RGB mode must be of the form #RRGGBB, invalid declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
+            return false;
+        }
+        ++str;
+        --len;
+        for( int i = 0; i < len; ++i ) {
+            if( ( str[ i ] < '0' || str[ i ] > '9' ) && ( str[ i ] < 'A' || str[ i ] > 'F' ) && ( str[ i ] < 'a' || str[ i ] > 'f' ) ) {
+                printf( "%s(%d): color declarations in RGB mode must be of the form #RRGGBB, invalid declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
+                return false;
+            }
+        }
+        uint32_t color = strtoul( str, NULL, 16 );
+        *out_color = color | 0xff000000;
+        return true;
+    } else {
+        int len = (int)cstr_len( str );
+        for( int i = 0; i < len; ++i ) {
+            if( ( str[ i ] < '0' || str[ i ] > '9' ) ) {
+                printf( "%s(%d): invalid color declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
+                return false;
+            }
+        }
+        int color = atoi( str );
+        if( color < 0 || color >= 256 ) {
+            printf( "%s(%d): invalid color declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
+            return false;
+        }
+        *out_color = color;
+        return true;
+    }
+}
+
+
+
 bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn )    {
     array(parser_global_t)* globals = ARRAY_CAST( globals_param);
     bool no_error = true;
+
+    bool rgbmode = true;
+    for( int i = 0; i < globals->count; ++i ) {
+        parser_global_t* global = &globals->items[ i ];
+        if( CMP( global->keyword, "colormode" ) ) {
+            if( global->data->count == 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) {
+                string_id id = cstr_trim( global->data->items[ 0 ] );
+                if( CMP( id, "palette" ) ) {
+                    rgbmode = false;
+                    break;
+                }
+            }
+        }
+    }
 
     bool found_logo = false;
     bool found_logo_music = false;
@@ -1094,17 +1151,15 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
     yarn->globals.explicit_items = false;
     yarn->globals.background_location = -1;
     yarn->globals.background_dialog = -1;
-    yarn->globals.color_background = -1;
-    yarn->globals.color_disabled = -1;
-    yarn->globals.color_txt = -1;
-    yarn->globals.color_opt = -1;
-    yarn->globals.color_chr = -1;
-    yarn->globals.color_use = -1;
-    yarn->globals.color_name = -1;
-    yarn->globals.color_facebg = -1;
+    yarn->globals.color_background = rgbmode ? 0xff000000 : -1;
+    yarn->globals.color_disabled = rgbmode ? 0xff707070 : -1;
+    yarn->globals.color_txt = rgbmode ? 0xffffffff : -1;
+    yarn->globals.color_opt = rgbmode ? 0xffffffff : -1;
+    yarn->globals.color_chr = rgbmode ? 0xffffffff : -1;
+    yarn->globals.color_use = rgbmode ? 0xffffffff : -1;
+    yarn->globals.color_name = rgbmode ? 0xffffffff : -1;
     yarn->start_location = -1;
     yarn->start_dialog = -1;
-
 
     for( int i = 0; i < globals->count; ++i ) {
         parser_global_t* global = &globals->items[ i ];
@@ -1407,62 +1462,20 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
                 no_error = false;
             }
         } else if( CMP( global->keyword, "color_background" ) ) {
-            if( global->data->count == 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) {
-                yarn->globals.color_background = atoi( cstr_trim( global->data->items[ 0 ] ) );
-            } else {
-                printf( "%s(%d): invalid color declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
-                no_error = false;
-            }
+            no_error &= compile_color( global, rgbmode, &yarn->globals.color_background );
         } else if( CMP( global->keyword, "color_disabled" ) ) {
-            if( global->data->count == 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) {
-                yarn->globals.color_disabled = atoi( cstr_trim( global->data->items[ 0 ] ) );
-            } else {
-                printf( "%s(%d): invalid color declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
-                no_error = false;
-            }
+            no_error &= compile_color( global, rgbmode, &yarn->globals.color_disabled );
         }
          else if( CMP( global->keyword, "color_txt" ) ) {
-            if( global->data->count == 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) {
-                yarn->globals.color_txt = atoi( cstr_trim( global->data->items[ 0 ] ) );
-            } else {
-                printf( "%s(%d): invalid color declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
-                no_error = false;
-            }
+            no_error &= compile_color( global, rgbmode, &yarn->globals.color_txt );
         } else if( CMP( global->keyword, "color_opt" ) ) {
-            if( global->data->count == 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) {
-                yarn->globals.color_opt = atoi( cstr_trim( global->data->items[ 0 ] ) );
-            } else {
-                printf( "%s(%d): invalid color declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
-                no_error = false;
-            }
+            no_error &= compile_color( global, rgbmode, &yarn->globals.color_opt );
         } else if( CMP( global->keyword, "color_chr" ) ) {
-            if( global->data->count == 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) {
-                yarn->globals.color_chr = atoi( cstr_trim( global->data->items[ 0 ] ) );
-            } else {
-                printf( "%s(%d): invalid color declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
-                no_error = false;
-            }
+            no_error &= compile_color( global, rgbmode, &yarn->globals.color_chr );
         } else if( CMP( global->keyword, "color_use" ) ) {
-            if( global->data->count == 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) {
-                yarn->globals.color_use = atoi( cstr_trim( global->data->items[ 0 ] ) );
-            } else {
-                printf( "%s(%d): invalid color declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
-                no_error = false;
-            }
+            no_error &= compile_color( global, rgbmode, &yarn->globals.color_use );
         } else if( CMP( global->keyword, "color_name" ) ) {
-            if( global->data->count == 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) {
-                yarn->globals.color_name = atoi( cstr_trim( global->data->items[ 0 ] ) );
-            } else {
-                printf( "%s(%d): invalid color declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
-                no_error = false;
-            }
-        } else if( CMP( global->keyword, "color_facebg" ) ) {
-            if( global->data->count == 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) {
-                yarn->globals.color_facebg = atoi( cstr_trim( global->data->items[ 0 ] ) );
-            } else {
-                printf( "%s(%d): invalid color declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
-                no_error = false;
-            }
+            no_error &= compile_color( global, rgbmode, &yarn->globals.color_name );
         } else if( CMP( global->keyword, "?" ) ) {
             printf( "%s(%d): conditionals not allowed for global declarations\n", global->filename, global->line_number );
             no_error = false;
@@ -1497,9 +1510,15 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
         no_error = false;
     }
 
-    if( cstr_len( yarn->globals.palette ) <= 0 ) {
+    if( cstr_len( yarn->globals.palette ) <= 0 && yarn->globals.colormode == YARN_COLORMODE_PALETTE ) {
         yarn->globals.palette = "palettes/yarnspin_default.png";
     }
+
+    if( cstr_len( yarn->globals.palette ) > 0 && yarn->globals.colormode != YARN_COLORMODE_PALETTE ) {
+        printf( "A palette may only be specified when running in palette color mode\n" );
+        no_error = false;
+    }
+
     return no_error;
 }
 
