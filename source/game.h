@@ -1057,17 +1057,18 @@ void savegame_menu_update( game_t* game ) {
             if( hover ) {
                 hover_index = x + y * 3 + 1;
             }
-            box( game->render, 31 + x * 96, 19 + y * 72, 78, 60, hover ? game->render->color_opt : game->render->color_disabled );
-            box( game->render, 32 + x * 96, 20 + y * 72, 75, 57, game->render->color_background );
+            if( !valid_slot ) {
+                frame( game->render, 32 + x * 96, 20 + y * 72, 75, 57, game->render->color_background, hover ? game->render->color_opt : game->render->color_disabled );
+            }
             char str[ 2 ] = { 0, 0 };
             *str = '1' + x + y * 3;
             text( game->render, game->render->font_opt, str, xp - 8, yp + 3, game->render->color_opt );
 
             if( valid_slot ) {
                 if( savegame->thumb ) {
-                    draw_raw( game->render, 32 + x * 96, 20 + y * 72, savegame->thumb, savegame->thumb_width, savegame->thumb_height );
+                    draw_savegame_thumb( game->render, 32 + x * 96, 20 + y * 72, savegame->thumb, savegame->thumb_width, savegame->thumb_height, game->render->color_background, hover ? game->render->color_opt : game->render->color_disabled );
                 } else if( savegame->thumb_width && savegame->thumb_height ){
-                    draw_savegame_bitmap( game->render, 32 + x * 96, 20 + y * 72, x + y * 3, savegame->thumb_width, savegame->thumb_height );
+                    draw_savegame_bitmap( game->render, 32 + x * 96, 20 + y * 72, x + y * 3, savegame->thumb_width, savegame->thumb_height, game->render->color_background, hover ? game->render->color_opt : game->render->color_disabled );
                 }
 
                 char datetime[ 20 ] = "";
@@ -1142,17 +1143,18 @@ void loadgame_menu_update( game_t* game ) {
             if( hover ) {
                 hover_index = x + y * 3 + 1;
             }
-            box( game->render, 31 + x * 96, 19 + y * 72, 78, 60, hover && valid_slot ? game->render->color_opt : game->render->color_disabled );
-            box( game->render, 32 + x * 96, 20 + y * 72, 75, 57, game->render->color_background );
+            if( !valid_slot ) {
+                frame( game->render, 32 + x * 96, 20 + y * 72, 75, 57, game->render->color_background, hover ? game->render->color_opt : game->render->color_disabled );
+            }
             char str[ 2 ] = { 0, 0 };
             *str = '1' + x + y * 3;
             text( game->render, game->render->font_opt, str, xp - 8, yp + 3, game->render->color_opt );
 
             if( valid_slot ) {
                 if( savegame->thumb ) {
-                    draw_raw( game->render, 32 + x * 96, 20 + y * 72, savegame->thumb, savegame->thumb_width, savegame->thumb_height );
+                    draw_savegame_thumb( game->render, 32 + x * 96, 20 + y * 72, savegame->thumb, savegame->thumb_width, savegame->thumb_height, game->render->color_background, hover ? game->render->color_opt : game->render->color_disabled );
                 } else if( savegame->thumb_width && savegame->thumb_height ){
-                    draw_savegame_bitmap( game->render, 32 + x * 96, 20 + y * 72, x + y * 3, savegame->thumb_width, savegame->thumb_height );
+                    draw_savegame_bitmap( game->render, 32 + x * 96, 20 + y * 72, x + y * 3, savegame->thumb_width, savegame->thumb_height, game->render->color_background, hover ? game->render->color_opt : game->render->color_disabled );
                 }
 
                 char datetime[ 20 ] = "";
@@ -1220,10 +1222,7 @@ void ingame_menu_update( game_t* game ) {
     int mouse_y = input_get_mouse_y( game->input );
     scale_for_resolution_inverse( game->render, &mouse_x, &mouse_y );
 
-    box( game->render, 104, 46, 123, 163, game->render->color_background );
-    box( game->render, 99, 39, 124, 164, game->render->color_background );
-    box( game->render, 100, 40, 121, 161, game->render->color_opt );
-    box( game->render, 102, 42, 118, 158, game->render->color_background );
+    frame( game->render, 99, 39, 124, 164, game->render->color_background, game->render->color_opt );
 
     int spacing = 20;
     int ypos = 40 + ( 160 - ( 6 * spacing ) ) / 2 - spacing;
