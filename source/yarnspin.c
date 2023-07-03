@@ -84,9 +84,6 @@ int g_cache_version = 0;
 // Is sound disabled on commandline?
 bool g_disable_sound = false;
 
-// Command line windowed mode override
-bool g_windowed_mode = false;
-
 // forward declares for helper functions placed at the end of this file
 
 #ifndef YARNSPIN_RUNTIME_ONLY
@@ -244,10 +241,9 @@ int app_proc( app_t* app, void* user_data ) {
         app_window_size( app, w, h );
     }
 
-    #ifndef __wasm__
-        bool fullscreen = true && ( !g_windowed_mode );
-    #else
-        bool fullscreen = false;
+    bool fullscreen = yarn->globals.screenmode == YARN_SCREENMODE_FULLSCREEN;
+    #ifdef __wasm__
+        fullscreen = false;
     #endif
 
     app_interpolation( app, yarn->globals.resolution >= YARN_RESOLUTION_FULL || ( yarn->globals.resolution == YARN_RESOLUTION_HIGH && yarn->globals.colormode == YARN_COLORMODE_RGB ) ? APP_INTERPOLATION_LINEAR : APP_INTERPOLATION_NONE );
@@ -568,19 +564,21 @@ int main( int argc, char** argv ) {
     bool opt_compile = false;
     bool opt_nosound = false;
     bool opt_window = false;
+    bool opt_fullscreen = false;
 
     static struct option long_options[] = {
-        { "images", no_argument, NULL, 'i' },
-        { "run",    no_argument, NULL, 'r' },
-        { "debug",  no_argument, NULL, 'd' },
-        { "compile",no_argument, NULL, 'c' },
-        { "nosound",no_argument, NULL, 'n' },
-        { "window", no_argument, NULL, 'w' },
-        { NULL,      0,           NULL, 0 }
+        { "images",     no_argument, NULL, 'i' },
+        { "run",        no_argument, NULL, 'r' },
+        { "debug",      no_argument, NULL, 'd' },
+        { "compile",    no_argument, NULL, 'c' },
+        { "nosound",    no_argument, NULL, 'n' },
+        { "window",     no_argument, NULL, 'w' },
+        { "fullscreen", no_argument, NULL, 'f' },
+        { NULL,         0,           NULL, 0 }
     };
 
     int opt = 0;
-    while( ( opt = ya_getopt_long( argc, argv, "irdcnw", long_options, NULL ) ) != -1 ) {
+    while( ( opt = ya_getopt_long( argc, argv, "irdcnwf", long_options, NULL ) ) != -1 ) {
         switch( opt ) {
             case 'i': {
                 opt_images = true;
@@ -599,6 +597,9 @@ int main( int argc, char** argv ) {
             } break;
             case 'w': {
                 opt_window = true;
+            } break;
+            case 'f': {
+                opt_fullscreen = true;
             } break;
         }
     }
@@ -812,7 +813,11 @@ int main( int argc, char** argv ) {
     }
 
     if( opt_window ) {
-        g_windowed_mode = true;
+        yarn.globals.screenmode = YARN_SCREENMODE_WINDOW;
+    }
+
+    if( opt_fullscreen ) {
+        yarn.globals.screenmode = YARN_SCREENMODE_FULLSCREEN;
     }
 
     return app_run( app_proc, &yarn, NULL, NULL, NULL );

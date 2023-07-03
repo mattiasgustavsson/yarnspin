@@ -52,7 +52,7 @@ bool is_global_keyword( string keyword ) {
 
     char const* global_keywords[] = {
         "title", "author", "start", "items", "flags",
-        "palette", "resolution", "colormode", "display_filters", "logo", "logo_music", "alone_text", "nothing_text",
+        "palette", "resolution", "colormode", "screenmode", "display_filters", "logo", "logo_music", "alone_text", "nothing_text",
         "font_description", "font_options", "font_characters", "font_items", "font_name",
         "background_location", "background_dialog",
         "color_background", "color_disabled", "color_txt", "color_opt", "color_chr", "color_use", "color_name",

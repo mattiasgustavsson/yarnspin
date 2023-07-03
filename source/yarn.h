@@ -768,6 +768,12 @@ typedef enum yarn_colormode_t {
 } yarn_colormode_t;
 
 
+typedef enum yarn_screenmode_t {
+    YARN_SCREENMODE_FULLSCREEN,
+    YARN_SCREENMODE_WINDOW,
+} yarn_screenmode_t;
+
+
 typedef enum yarn_display_filter_t {
     YARN_DISPLAY_FILTER_NONE,
     YARN_DISPLAY_FILTER_TV,
@@ -796,6 +802,7 @@ typedef struct yarn_globals_t {
     int font_name_size;
     yarn_resolution_t resolution;
     yarn_colormode_t colormode;
+    yarn_screenmode_t screenmode;
     array(yarn_display_filter_t)* display_filters;
     array(int)* logo_indices;
     int logo_music;
@@ -842,6 +849,7 @@ yarn_globals_t* empty_globals( void ) {
     globals.font_name_size = 0;
     globals.resolution = YARN_RESOLUTION_RETRO;
     globals.colormode = YARN_COLORMODE_PALETTE;
+    globals.screenmode = YARN_SCREENMODE_FULLSCREEN;
     globals.display_filters = managed_array(int);
     globals.logo_indices = managed_array(int);
     globals.logo_music = -1;
@@ -887,6 +895,8 @@ void save_globals( buffer_t* out, yarn_globals_t* globals ) {
     buffer_write_i32( out, &resolution, 1 );
     int colormode = (int) globals->colormode;
     buffer_write_i32( out, &colormode, 1 );
+    int screenmode = (int) globals->screenmode;
+    buffer_write_i32( out, &screenmode, 1 );
 
     buffer_write_i32( out, &globals->display_filters->count, 1 );
     for( int i = 0; i < globals->display_filters->count; ++i ) {
@@ -948,6 +958,7 @@ void load_globals( buffer_t* in, yarn_globals_t* globals ) {
     globals->font_name_size = read_int( in );
     globals->resolution = (yarn_resolution_t) read_int( in );
     globals->colormode = (yarn_colormode_t) read_int( in );
+    globals->screenmode = (yarn_screenmode_t) read_int( in );
 
     globals->display_filters = managed_array(int);
     int display_filters_count = read_int( in );

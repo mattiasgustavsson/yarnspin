@@ -1414,6 +1414,21 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
                 printf( "%s(%d): invalid colormode declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
                 no_error = false;
             }
+        } else if( CMP( global->keyword, "screenmode" ) ) {
+            if( global->data->count == 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) {
+                string_id id = cstr_trim( global->data->items[ 0 ] );
+                if( CMP( id, "fullscreen" ) ) {
+                    yarn->globals.screenmode = YARN_SCREENMODE_FULLSCREEN;
+                } else if( CMP( id, "window" ) ) {
+                    yarn->globals.screenmode = YARN_SCREENMODE_WINDOW;
+                } else {
+                    printf( "%s(%d): invalid screenmode declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
+                    no_error = false;
+                }
+            } else {
+                printf( "%s(%d): invalid screenmode declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
+                no_error = false;
+            }
         } else if( CMP( global->keyword, "display_filters" ) ) {
             for( int j = 0; j < global->data->count; ++j ) {
                 string_id id = cstr_trim( global->data->items[ j ] );
