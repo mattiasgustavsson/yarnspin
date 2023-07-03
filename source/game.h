@@ -1480,6 +1480,12 @@ gamestate_t location_update( game_t* game ) {
         ++c;
     }
 
+    if( c == 0 ) {
+        int ypos = 4 + ( ( 117 - ( 2 * font_height( game->render, game->render->font_use->height ) ) ) / 2 );
+        center_wrap( game->render,  game->render->font_use, yarn->globals.nothing_text, 287, ypos, game->render->color_disabled, 56 );
+    }
+
+
     // chr:
     int chr_count = 0;
     for( int i = 0; i < location->chr->count; ++i ) {

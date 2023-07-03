@@ -783,6 +783,7 @@ typedef struct yarn_globals_t {
     string debug_start;
     string palette;
     string alone_text;
+    string nothing_text;
     string font_description;
     int font_description_size;
     string font_options;
@@ -828,6 +829,7 @@ yarn_globals_t* empty_globals( void ) {
     globals.debug_start = NULL;
     globals.palette = NULL;
     globals.alone_text = cstr( "You are alone." );
+    globals.nothing_text = cstr( "You have nothing." );
     globals.font_description = cstr( "fonts/Berkelium64.ttf" );
     globals.font_description_size = 0;
     globals.font_options = cstr( "fonts/Sierra-SCI-Menu-Font.ttf" );
@@ -870,6 +872,7 @@ void save_globals( buffer_t* out, yarn_globals_t* globals ) {
     buffer_write_string( out, &globals->debug_start, 1 );
     buffer_write_string( out, &globals->palette, 1 );
     buffer_write_string( out, &globals->alone_text, 1 );
+    buffer_write_string( out, &globals->nothing_text, 1 );
     buffer_write_string( out, &globals->font_description, 1 );
     buffer_write_i32( out, &globals->font_description_size, 1 );
     buffer_write_string( out, &globals->font_options, 1 );
@@ -932,6 +935,7 @@ void load_globals( buffer_t* in, yarn_globals_t* globals ) {
     globals->debug_start = read_string( in );
     globals->palette = read_string( in );
     globals->alone_text = read_string( in );
+    globals->nothing_text = read_string( in );
     globals->font_description = read_string( in );
     globals->font_description_size = read_int( in );
     globals->font_options = read_string( in );
