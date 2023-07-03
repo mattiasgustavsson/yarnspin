@@ -1605,31 +1605,48 @@ qoi_data_t* convert_rgb( string image_filename, int width, int height, int bpp, 
 
 
 pixelfont_t* convert_font( string font_filename, int font_size, bool palette_mode ) {
-    // TODO: Save converted font to cache and don't regenerate if it already exists
-    file_t* ttf = file_load( font_filename, FILE_MODE_BINARY, 0 );
-    if( !ttf ) {
+    string processed_filename_no_ext = cstr_format( ".cache/processed/fonts/%d/%s_%s", font_size, 
+        cstr( cbasename( font_filename ) ), cstr_mid( cextname( font_filename ), 1, 0 ) ) ;
+
+    string processed_filename = cstr_cat( processed_filename_no_ext, palette_mode ? ".fnt" : ".bmf" );
+
+    if( !file_exists( processed_filename ) || g_cache_version != YARNSPIN_VERSION ||
+        file_more_recent( font_filename, processed_filename ) ) {
+
+        file_t* font_file = file_load( font_filename, FILE_MODE_BINARY, 0 );
+        if( !font_file ) {
+            return NULL;
+        }
+        if( cstr_compare_nocase( cextname( font_filename ), ".fnt" ) == 0 ) {
+            if( palette_mode ) {
+                create_path( processed_filename, 0 );
+                file_save( font_file, processed_filename, FILE_MODE_BINARY );
+            } else {
+                bitmapfont_t* font = bitmap_font_from_pixel_font( (pixelfont_t*) font_file->data );
+                create_path( processed_filename, 0 );
+                file_save_data( font, font->size_in_bytes, processed_filename, FILE_MODE_BINARY );
+                free( font );
+            }
+        } else if( palette_mode ) {
+            pixelfont_t* font = generate_pixel_font( (uint8_t*) font_file->data, font_size );
+            create_path( processed_filename, 0 );
+            file_save_data( font, font->size_in_bytes, processed_filename, FILE_MODE_BINARY );
+            free( font );
+        } else {
+            bitmapfont_t* font = generate_bitmap_font( (uint8_t*) font_file->data, font_size );
+            create_path( processed_filename, 0 );
+            file_save_data( font, font->size_in_bytes, processed_filename, FILE_MODE_BINARY );
+            free( font );
+        }
+        file_destroy( font_file );
+    }
+
+    file_t* font_file = file_load( processed_filename, FILE_MODE_BINARY, 0 );
+    if( !font_file ) {
         return NULL;
     }
-    char const* ext = strrchr( font_filename, '.' );
-    if( ext && cstr_compare_nocase( ext, ".fnt" ) == 0 ) {
-        if( palette_mode ) {
-            pixelfont_t* font = (pixelfont_t*) malloc( ttf->size );
-            memcpy( font, ttf->data, ttf->size );
-            file_destroy( ttf );
-            return font;
-        } else {
-            bitmapfont_t* font = bitmap_font_from_pixel_font( (pixelfont_t*) ttf->data );
-            file_destroy( ttf );
-            return (pixelfont_t*)font;
-        }
-    }
-    if( palette_mode ) {
-        pixelfont_t* font = generate_pixel_font( (uint8_t*) ttf->data, font_size );
-        file_destroy( ttf );
-        return font;
-    } else {
-        bitmapfont_t* font = generate_bitmap_font( (uint8_t*) ttf->data, font_size );
-        file_destroy( ttf );
-        return (pixelfont_t*)font;
-    }
+    pixelfont_t* font = (pixelfont_t*) malloc( font_file->size );
+    memcpy( font, font_file->data, font_file->size );
+    file_destroy( font_file );
+    return font;
 }
