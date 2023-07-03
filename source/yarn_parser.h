@@ -51,7 +51,7 @@ bool is_multi_item_keyword( string keyword ) {
 bool is_global_keyword( string keyword ) {
 
     char const* global_keywords[] = {
-        "title", "author", "start", "items", "flags",
+        "title", "author", "version", "start", "items", "flags",
         "palette", "resolution", "colormode", "screenmode", "display_filters", "logo", "logo_music", "alone_text", "nothing_text",
         "font_description", "font_options", "font_characters", "font_items", "font_name",
         "background_location", "background_dialog",

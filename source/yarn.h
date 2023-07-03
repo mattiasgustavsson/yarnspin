@@ -785,6 +785,7 @@ typedef enum yarn_display_filter_t {
 typedef struct yarn_globals_t {
     string title;
     string author;
+    string version;
     string start;
     string debug_start;
     string palette;
@@ -832,6 +833,7 @@ yarn_globals_t* empty_globals( void ) {
     static yarn_globals_t globals;
     globals.title = NULL;
     globals.author = NULL;
+    globals.version = NULL;
     globals.start = NULL;
     globals.debug_start = NULL;
     globals.palette = NULL;
@@ -876,6 +878,7 @@ yarn_globals_t* empty_globals( void ) {
 void save_globals( buffer_t* out, yarn_globals_t* globals ) {
     buffer_write_string( out, &globals->title, 1 );
     buffer_write_string( out, &globals->author, 1 );
+    buffer_write_string( out, &globals->version, 1 );
     buffer_write_string( out, &globals->start, 1 );
     buffer_write_string( out, &globals->debug_start, 1 );
     buffer_write_string( out, &globals->palette, 1 );
@@ -941,6 +944,7 @@ void save_globals( buffer_t* out, yarn_globals_t* globals ) {
 void load_globals( buffer_t* in, yarn_globals_t* globals ) {
     globals->title = read_string( in );
     globals->author = read_string( in );
+    globals->version = read_string( in );
     globals->start = read_string( in );
     globals->debug_start = read_string( in );
     globals->palette = read_string( in );

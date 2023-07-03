@@ -1177,6 +1177,13 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
                 printf( "%s(%d): invalid author declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
                 no_error = false;
             }
+        } else if( CMP( global->keyword, "version" ) ) {
+            if( global->data->count == 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) {
+                yarn->globals.version = cstr_trim( global->data->items[ 0 ] );
+            } else {
+                printf( "%s(%d): invalid version declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
+                no_error = false;
+            }
         } else if( CMP( global->keyword, "start" ) ) {
             if( global->data->count == 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) {
                 yarn->globals.start = cstr_trim( global->data->items[ 0 ] );
@@ -1529,6 +1536,11 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
 
     if( cstr_len( yarn->globals.author ) <= 0 ) {
         printf( "No author defined. Add a global declaration of the form 'author: Jane Doe' to one of your script files\n" );
+        no_error = false;
+    }
+
+    if( cstr_len( yarn->globals.version ) <= 0 ) {
+        printf( "No version defined. Add a global declaration of the form 'version: 1.0' to one of your script files\n" );
         no_error = false;
     }
 

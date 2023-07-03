@@ -910,8 +910,9 @@ void save_game( game_t* game, int slot ) {
  
     buffer_t* buffer = buffer_create();
 
-    uint32_t version = 0; // TODO: version field in script
-    buffer_write_u32( buffer, &version, 1 );
+    int version_len = (int) strlen( game->yarn->globals.version );
+    buffer_write_u32( buffer, &version_len, 1 );
+    buffer_write_char( buffer, game->yarn->globals.version, version_len );
     buffer_write_i32( buffer, &thumb_width, 1 );
     buffer_write_i32( buffer, &thumb_height, 1 );
     
@@ -975,7 +976,27 @@ void load_savegames( game_t* game ) {
         void* data = load_data( game->yarn->globals.title, savegame_names[ i ], &size );
         if( data ) {
             buffer_t* buffer = buffer_map( data, size );
-            buffer_read_u32( buffer, &savegame->version, 1 );
+            int version_len = 0;
+            buffer_read_u32( buffer, &version_len, 1 );
+            if( version_len >= 256 ) {
+                savegame->thumb_width= 0;
+                savegame->thumb_height = 0;
+                buffer_destroy( buffer );
+                free( data );
+                continue;
+            }
+            char* version = (char*) malloc( version_len + 1 );
+            buffer_read_char( buffer, version, version_len );
+            version[version_len] = 0;
+            if( cstr_compare( cstr_trim( game->yarn->globals.version ), cstr_trim( version ) ) != 0 ) {
+                free( version );
+                savegame->thumb_width= 0;
+                savegame->thumb_height = 0;
+                buffer_destroy( buffer );
+                free( data );
+                continue;
+            }
+            free( version );
             buffer_read_i32( buffer, &savegame->thumb_width, 1 );
             buffer_read_i32( buffer, &savegame->thumb_height, 1 );
             if( savegame->thumb_width != thumb_width || savegame->thumb_height != thumb_height ) {
