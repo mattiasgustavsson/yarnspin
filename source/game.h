@@ -945,7 +945,7 @@ void save_game( game_t* game, int slot ) {
     buffer_t* buffer = buffer_create();
 
     int version_len = (int) strlen( game->yarn->globals.version );
-    buffer_write_u32( buffer, &version_len, 1 );
+    buffer_write_i32( buffer, &version_len, 1 );
     buffer_write_char( buffer, game->yarn->globals.version, version_len );
     buffer_write_i32( buffer, &thumb_width, 1 );
     buffer_write_i32( buffer, &thumb_height, 1 );
@@ -1011,7 +1011,7 @@ void load_savegames( game_t* game ) {
         if( data ) {
             buffer_t* buffer = buffer_map( data, size );
             int version_len = 0;
-            buffer_read_u32( buffer, &version_len, 1 );
+            buffer_read_i32( buffer, &version_len, 1 );
             if( version_len >= 256 ) {
                 savegame->thumb_width= 0;
                 savegame->thumb_height = 0;
