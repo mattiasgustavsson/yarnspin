@@ -18,6 +18,7 @@ typedef struct parser_declaration_t {
 
 typedef enum section_type_t {
     SECTION_TYPE_UNKNOWN,
+    SECTION_TYPE_SCREEN,
     SECTION_TYPE_LOCATION,
     SECTION_TYPE_DIALOG,
     SECTION_TYPE_CHARACTER,
@@ -35,7 +36,7 @@ typedef struct parser_section_t {
 
 bool is_multi_item_keyword( string keyword ) {
     char const* multi_item_keywords[] = { 
-        "display_filters", "logo", "flags", "items",
+        "display_filters", "flags", "items",
         "font_description", "font_options", "font_characters", "font_items", "font_name",
         "debug_set_flags", "debug_get_items", "debug_attach_chars", "mus", "amb", "snd", 
     };
@@ -52,7 +53,7 @@ bool is_global_keyword( string keyword ) {
 
     char const* global_keywords[] = {
         "title", "author", "version", "start", "items", "flags",
-        "palette", "resolution", "colormode", "screenmode", "display_filters", "logo", "logo_music", "alone_text", "nothing_text",
+        "palette", "resolution", "colormode", "screenmode", "display_filters", "alone_text", "nothing_text",
         "font_description", "font_options", "font_characters", "font_items", "font_name",
         "background_location", "background_dialog",
         "color_background", "color_disabled", "color_txt", "color_opt", "color_chr", "color_use", "color_name",
@@ -69,7 +70,8 @@ bool is_global_keyword( string keyword ) {
 
 bool is_section_keyword( string keyword ) {
     char const* section_keywords[] = {
-        "mus", "amb", "snd",  "img", "txt", "opt", "act", "use", "chr",
+        "mus", "amb", "snd",  "scr",
+        "img", "txt", "opt", "act", "use", "chr",
         "say", "name", "short", "face",
     };
     for( int i = 0; i < ARRAY_COUNT( section_keywords ); ++i ) {
@@ -169,6 +171,13 @@ bool parse_globals( array_param( lexer_declaration_t )* lexer_globals, array_par
 
 
 section_type_t find_section_type( string identifier ) {
+    char const* screen_types[] = { "scr" };
+    for( int i = 0; i < ARRAY_COUNT( screen_types ); ++i ) {
+        if( cstr_compare_nocase( identifier, screen_types[ i ] ) == 0 ) {
+            return SECTION_TYPE_SCREEN;
+        }
+    }
+
     char const* location_types[] = { "txt", "opt", "img", "chr" };
     for( int i = 0; i < ARRAY_COUNT( location_types ); ++i ) {
         if( cstr_compare_nocase( identifier, location_types[ i ] ) == 0 ) {
@@ -197,6 +206,7 @@ section_type_t find_section_type( string identifier ) {
 char const* find_section_type_name( section_type_t type ) {
     switch( type ) {
         case SECTION_TYPE_UNKNOWN: return "unknown";
+        case SECTION_TYPE_SCREEN: return "screen";
         case SECTION_TYPE_LOCATION: return "location";
         case SECTION_TYPE_DIALOG: return "dialog";
         case SECTION_TYPE_CHARACTER: return "character";

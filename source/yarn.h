@@ -129,6 +129,7 @@ void load_cond( buffer_t* in, yarn_cond_t* cond ) {
 
 typedef enum yarn_action_type_t {
     ACTION_TYPE_NONE,
+    ACTION_TYPE_GOTO_SCREEN,
     ACTION_TYPE_GOTO_LOCATION,
     ACTION_TYPE_GOTO_DIALOG,
     ACTION_TYPE_EXIT,
@@ -149,6 +150,7 @@ typedef enum yarn_action_type_t {
 typedef struct yarn_act_t {
     yarn_cond_t cond;
     yarn_action_type_t type;
+    int param_screen_index;
     int param_location_index;
     int param_dialog_index;
     int param_flag_index;
@@ -161,6 +163,7 @@ yarn_act_t* empty_act( void ) {
     static yarn_act_t act;
     act.cond = *empty_cond();
     act.type = ACTION_TYPE_NONE;
+    act.param_screen_index = -1;
     act.param_location_index = -1;
     act.param_dialog_index = -1;
     act.param_flag_index = -1;
@@ -174,6 +177,7 @@ void save_act( buffer_t* out, yarn_act_t* act ) {
     save_cond( out, &act->cond );
     int type = (int)act->type;
     buffer_write_i32( out, &type, 1 );
+    buffer_write_i32( out, &act->param_screen_index, 1 );
     buffer_write_i32( out, &act->param_location_index, 1 );
     buffer_write_i32( out, &act->param_dialog_index, 1 );
     buffer_write_i32( out, &act->param_flag_index, 1 );
@@ -185,6 +189,7 @@ void save_act( buffer_t* out, yarn_act_t* act ) {
 void load_act( buffer_t* in, yarn_act_t* act ) {
     load_cond( in, &act->cond );
     act->type = (yarn_action_type_t) read_int( in );
+    act->param_screen_index = read_int( in );
     act->param_location_index = read_int( in );
     act->param_dialog_index = read_int( in );
     act->param_flag_index = read_int( in );
@@ -290,6 +295,21 @@ yarn_img_t* empty_img( void ) {
     return &img;
 }
 
+
+typedef struct yarn_scr_t {
+    yarn_cond_t cond;
+    int scr_index;
+} yarn_scr_t;
+
+
+yarn_scr_t* empty_scr( void ) {
+    static yarn_scr_t scr;
+    scr.cond = *empty_cond();
+    scr.scr_index = -1;
+    return &scr;
+}
+
+
 typedef enum yarn_audio_type_t {
     YARN_AUDIO_TYPE_MUSIC,
     YARN_AUDIO_TYPE_AMBIENCE,
@@ -370,6 +390,75 @@ void load_audio( buffer_t* in, yarn_audio_t* audio ) {
     audio->delay_max = read_float( in );    
     audio->volume_min = read_float( in );    
     audio->volume_max = read_float( in );    
+}
+
+
+typedef struct yarn_screen_t {
+    string_id id;
+    array(yarn_scr_t)* scr;
+    array(yarn_audio_t)* audio;
+    array(yarn_act_t)* act;
+} yarn_screen_t;
+
+
+yarn_screen_t* empty_screen( void ) {
+    static yarn_screen_t screen;
+    screen.id = NULL;
+    screen.scr = managed_array(yarn_scr_t);
+    screen.audio = managed_array(yarn_audio_t);
+    screen.act = managed_array(yarn_act_t);
+    return &screen;
+}
+
+
+void save_screen( buffer_t* out, yarn_screen_t* screen ) {
+    buffer_write_string( out, &screen->id, 1 );
+
+    buffer_write_i32( out, &screen->scr->count, 1 );
+    for( int i = 0; i < screen->scr->count; ++i ) {
+        save_cond( out, &screen->scr->items[ i ].cond );
+        buffer_write_i32( out, &screen->scr->items[ i ].scr_index, 1 );
+    }
+
+    buffer_write_i32( out, &screen->audio->count, 1 );
+    for( int i = 0; i < screen->audio->count; ++i ) {
+        save_audio( out, &screen->audio->items[ i ] );
+    }
+
+    buffer_write_i32( out, &screen->act->count, 1 );
+    for( int i = 0; i < screen->act->count; ++i ) {
+        save_act( out, &screen->act->items[ i ] );
+    }
+}
+
+
+void load_screen( buffer_t* in, yarn_screen_t* screen ) {
+    screen->id = read_string( in );
+
+    screen->scr = managed_array(yarn_scr_t);
+    int scrs_count = read_int( in );
+    for( int i = 0; i < scrs_count; ++i ) {
+        yarn_scr_t scr;
+        load_cond( in, &scr.cond );
+        scr.scr_index = read_int( in );
+        array_add( screen->scr, &scr );
+    }
+
+    screen->audio = managed_array(yarn_audio_t);
+    int audio_count = read_int( in );
+    for( int i = 0; i < audio_count; ++i ) {
+        yarn_audio_t audio;
+        load_audio( in, &audio );
+        array_add( screen->audio, &audio );
+    }
+
+    screen->act = managed_array(yarn_act_t);
+    int acts_count = read_int( in );
+    for( int i = 0; i < acts_count; ++i ) {
+        yarn_act_t act;
+        load_act( in, &act );
+        array_add( screen->act, &act );
+    }
 }
 
 
@@ -805,8 +894,6 @@ typedef struct yarn_globals_t {
     yarn_colormode_t colormode;
     yarn_screenmode_t screenmode;
     array(yarn_display_filter_t)* display_filters;
-    array(int)* logo_indices;
-    int logo_music;
     int background_location;
     int background_dialog;
     int color_background;
@@ -853,8 +940,6 @@ yarn_globals_t* empty_globals( void ) {
     globals.colormode = YARN_COLORMODE_PALETTE;
     globals.screenmode = YARN_SCREENMODE_FULLSCREEN;
     globals.display_filters = managed_array(int);
-    globals.logo_indices = managed_array(int);
-    globals.logo_music = -1;
     globals.background_location = -1;
     globals.background_dialog = -1;
     globals.color_background = -1;
@@ -906,11 +991,6 @@ void save_globals( buffer_t* out, yarn_globals_t* globals ) {
         int value = (int) globals->display_filters->items[ i ];
         buffer_write_i32( out, &value, 1 );
     }
-
-    buffer_write_i32( out, &globals->logo_indices->count, 1 );
-    buffer_write_i32( out, globals->logo_indices->items, globals->logo_indices->count );
-
-    buffer_write_i32( out, &globals->logo_music, 1 );
 
     buffer_write_i32( out, &globals->background_location, 1 );
     buffer_write_i32( out, &globals->background_dialog, 1 );
@@ -970,15 +1050,6 @@ void load_globals( buffer_t* in, yarn_globals_t* globals ) {
         yarn_display_filter_t value = (yarn_display_filter_t) read_int( in );
         array_add( globals->display_filters, &value );
     }
-
-    globals->logo_indices = managed_array(int);
-    int logo_indices_count = read_int( in );
-    for( int i = 0; i < logo_indices_count; ++i ) {
-        int value = read_int( in );
-        array_add( globals->logo_indices, &value );
-    }
-
-    globals->logo_music = read_int( in );
 
     globals->background_location = read_int( in );
     globals->background_dialog = read_int( in );
@@ -1180,8 +1251,10 @@ void load_assets( buffer_t* in, yarn_assets_t* assets, yarn_colormode_t colormod
 typedef struct yarn_t {
     bool is_debug;
     yarn_globals_t globals;
+    int start_screen;
     int start_location;
     int start_dialog;
+    int debug_start_screen;
     int debug_start_location;
     int debug_start_dialog;
 
@@ -1189,9 +1262,10 @@ typedef struct yarn_t {
     array(string_id)* item_ids;
     array(string_id)* image_names;
     array(string_id)* audio_names;
-    array(string_id)* screen_names;
+    array(string_id)* scr_names;
     array(string_id)* face_names;
 
+    array(yarn_screen_t)* screens;
     array(yarn_location_t)* locations;
     array(yarn_dialog_t)* dialogs;
     array(yarn_character_t)* characters;
@@ -1204,8 +1278,10 @@ yarn_t* empty_yarn( void ) {
     static yarn_t yarn;
     yarn.is_debug = false;
     yarn.globals = *empty_globals();
+    yarn.start_screen = -1;
     yarn.start_location = -1;
     yarn.start_dialog = -1;
+    yarn.debug_start_screen = -1;
     yarn.debug_start_location = -1;
     yarn.debug_start_dialog = -1;
 
@@ -1213,9 +1289,10 @@ yarn_t* empty_yarn( void ) {
     yarn.item_ids = managed_array(string_id);
     yarn.image_names = managed_array(string_id);
     yarn.audio_names = managed_array(string_id);
-    yarn.screen_names = managed_array(string_id);
+    yarn.scr_names = managed_array(string_id);
     yarn.face_names = managed_array(string_id);
 
+    yarn.screens = managed_array(yarn_screen_t);
     yarn.locations = managed_array(yarn_location_t);
     yarn.dialogs = managed_array(yarn_dialog_t);
     yarn.characters = managed_array(yarn_character_t);
@@ -1228,9 +1305,11 @@ yarn_t* empty_yarn( void ) {
 void yarn_save( buffer_t* out, yarn_t* yarn ) {
     save_globals( out, &yarn->globals );
 
+    buffer_write_i32( out, &yarn->start_screen, 1 );
     buffer_write_i32( out, &yarn->start_location, 1 );
     buffer_write_i32( out, &yarn->start_dialog, 1 );
 
+    buffer_write_i32( out, &yarn->debug_start_screen, 1 );
     buffer_write_i32( out, &yarn->debug_start_location, 1 );
     buffer_write_i32( out, &yarn->debug_start_dialog, 1 );
 
@@ -1243,11 +1322,16 @@ void yarn_save( buffer_t* out, yarn_t* yarn ) {
     buffer_write_i32( out, &yarn->image_names->count, 1 );
     buffer_write_string( out, yarn->image_names->items, yarn->image_names->count );
 
-    buffer_write_i32( out, &yarn->screen_names->count, 1 );
-    buffer_write_string( out, yarn->screen_names->items, yarn->screen_names->count );
+    buffer_write_i32( out, &yarn->scr_names->count, 1 );
+    buffer_write_string( out, yarn->scr_names->items, yarn->scr_names->count );
 
     buffer_write_i32( out, &yarn->face_names->count, 1 );
     buffer_write_string( out, yarn->face_names->items, yarn->face_names->count );
+
+    buffer_write_i32( out, &yarn->screens->count, 1 );
+    for( int i = 0; i < yarn->screens->count; ++i ) {
+        save_screen( out, &yarn->screens->items[ i ] );
+    }
 
     buffer_write_i32( out, &yarn->locations->count, 1 );
     for( int i = 0; i < yarn->locations->count; ++i ) {
@@ -1272,8 +1356,11 @@ void yarn_load( buffer_t* in, yarn_t* yarn, bool is_debug ) {
     yarn->is_debug = is_debug;
     load_globals( in, &yarn->globals );
 
+    yarn->start_screen = read_int( in );
     yarn->start_location = read_int( in );
     yarn->start_dialog = read_int( in );
+
+    yarn->debug_start_screen = read_int( in );
     yarn->debug_start_location = read_int( in );
     yarn->debug_start_dialog = read_int( in );
 
@@ -1283,10 +1370,18 @@ void yarn_load( buffer_t* in, yarn_t* yarn, bool is_debug ) {
     read_string_array( in, yarn->item_ids );
     yarn->image_names = managed_array(string_id);
     read_string_array( in, yarn->image_names );
-    yarn->screen_names = managed_array(string_id);
-    read_string_array( in, yarn->screen_names  );
+    yarn->scr_names = managed_array(string_id);
+    read_string_array( in, yarn->scr_names  );
     yarn->face_names = managed_array(string_id);
     read_string_array( in, yarn->face_names );
+
+    yarn->screens = managed_array(yarn_screen_t);
+    int screens_count = read_int( in );
+    for( int i = 0; i < screens_count; ++i ) {
+        yarn_screen_t screen;
+        load_screen( in, &screen );
+        array_add( yarn->screens, &screen );
+    }
 
     yarn->locations = managed_array(yarn_location_t);
     int locations_count = read_int( in );
@@ -1447,23 +1542,23 @@ buffer_t* yarn_compile( char const* path ) {
     bool jpeg = yarn.globals.colormode == YARN_COLORMODE_RGB && yarn.globals.resolution == YARN_RESOLUTION_FULL;
 
     printf( "Processing images\n" );
-    for( int i = 0; i < yarn.screen_names->count; ++i ) {
-        string_id screen_name = yarn.screen_names->items[ i ];
+    for( int i = 0; i < yarn.scr_names->count; ++i ) {
+        string_id scr_name = yarn.scr_names->items[ i ];
         int width = (int)( 320 * resolution_scale );
         int height = (int)( 240 * resolution_scale );
         if( palette_mode ) {
-            palrle_data_t* bitmap = manage_palrle( convert_bitmap( screen_name, width, height, yarn.globals.palette, palette, resolution_scale ) );
+            palrle_data_t* bitmap = manage_palrle( convert_bitmap( scr_name, width, height, yarn.globals.palette, palette, resolution_scale ) );
             array_add( yarn.assets.bitmaps, &bitmap );
             if( !bitmap ) {
-                printf( "Failed to load image: %s\n", screen_name );
+                printf( "Failed to load image: %s\n", scr_name );
                 no_error = false;
             }
         } else {
             int bpp = yarn.globals.colormode == YARN_COLORMODE_RGB9 ? 9 : 24;
-            qoi_data_t* qoi = (qoi_data_t*)manage_alloc( convert_rgb( screen_name, width, height, bpp, resolution_scale, jpeg ) );
+            qoi_data_t* qoi = (qoi_data_t*)manage_alloc( convert_rgb( scr_name, width, height, bpp, resolution_scale, jpeg ) );
             array_add( yarn.assets.bitmaps, (palrle_data_t*)&qoi );
             if( !qoi ) {
-                printf( "Failed to load image: %s\n", screen_name );
+                printf( "Failed to load image: %s\n", scr_name );
                 no_error = false;
             }
         }

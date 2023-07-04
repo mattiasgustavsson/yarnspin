@@ -3,7 +3,7 @@
 typedef enum gamestate_t {
     GAMESTATE_NO_CHANGE,
     GAMESTATE_BOOT,
-    GAMESTATE_TITLE,
+    GAMESTATE_SCREEN,
     GAMESTATE_LOCATION,
     GAMESTATE_DIALOG,
     GAMESTATE_EXIT,
@@ -11,19 +11,25 @@ typedef enum gamestate_t {
 } gamestate_t;
 
 
+typedef enum stack_entry_type_t {
+    STACK_ENTRY_SCREEN,
+    STACK_ENTRY_LOCATION,
+    STACK_ENTRY_DIALOG,
+} stack_entry_type_t;
+
 typedef struct stack_entry_t {
-    bool is_location;
+    stack_entry_type_t type;
     int index;
 } stack_entry_t;
 
 
 typedef struct state_data_t {
+    int current_screen;
     int current_location;
     int current_dialog;
     int current_image;
     int current_music;
     int current_ambience;
-    int logo_index;
     bool first_chr_or_use;
     array(bool)* flags;
     array(int)* items;
@@ -33,12 +39,12 @@ typedef struct state_data_t {
 
 
 void state_data_reset( state_data_t* data ) {
+    data->current_screen = -1;
     data->current_location = -1;
     data->current_dialog = -1;
     data->current_image = -1;
     data->current_music = -1;
     data->current_ambience = -1;
-    data->logo_index = 0;
     data->first_chr_or_use = true;
     array_clear( data->flags );
     array_clear( data->items  );
@@ -48,12 +54,12 @@ void state_data_reset( state_data_t* data ) {
 
 
 void state_data_copy( state_data_t* dest, state_data_t* src ) {
+    dest->current_screen = src->current_screen;    
     dest->current_location = src->current_location;    
     dest->current_dialog = src->current_dialog;    
     dest->current_image = src->current_image;    
     //dest->current_music = src->current_music;    
     //dest->current_ambience = src->current_ambience;    
-    dest->logo_index = src->logo_index;    
     dest->first_chr_or_use = src->first_chr_or_use;
 
     array_clear( dest->flags );
@@ -79,12 +85,12 @@ void state_data_copy( state_data_t* dest, state_data_t* src ) {
 
 
 void state_data_write( state_data_t* data, buffer_t* buffer ) {
+    buffer_write_i32( buffer, &data->current_screen, 1 );
     buffer_write_i32( buffer, &data->current_location, 1 );
     buffer_write_i32( buffer, &data->current_dialog, 1 );
     buffer_write_i32( buffer, &data->current_image, 1 );
     buffer_write_i32( buffer, &data->current_music, 1 );
     buffer_write_i32( buffer, &data->current_ambience, 1 );
-    buffer_write_i32( buffer, &data->logo_index, 1 );
     buffer_write_bool( buffer, &data->first_chr_or_use, 1 );
 
     buffer_write_i32( buffer, &data->flags->count, 1 );
@@ -98,7 +104,8 @@ void state_data_write( state_data_t* data, buffer_t* buffer ) {
 
     buffer_write_i32( buffer, &data->section_stack->count, 1 );
     for( int i = 0; i < data->section_stack->count; ++i ) {
-        buffer_write_bool( buffer, &data->section_stack->items[ i ].is_location, 1 );
+        int type = (int) data->section_stack->items[ i ].type;
+        buffer_write_i32( buffer, &type, 1 );
         buffer_write_i32( buffer, &data->section_stack->items[ i ].index, 1  );
     }
 }
@@ -106,12 +113,12 @@ void state_data_write( state_data_t* data, buffer_t* buffer ) {
 
 bool state_data_read( state_data_t* data, buffer_t* buffer ) {
     bool failed = false;
+    failed = failed || 0 == buffer_read_i32( buffer, &data->current_screen, 1 );
     failed = failed || 0 == buffer_read_i32( buffer, &data->current_location, 1 );
     failed = failed || 0 == buffer_read_i32( buffer, &data->current_dialog, 1 );
     failed = failed || 0 == buffer_read_i32( buffer, &data->current_image, 1 );
     failed = failed || 0 == buffer_read_i32( buffer, &data->current_music, 1 );
     failed = failed || 0 == buffer_read_i32( buffer, &data->current_ambience, 1 );
-    failed = failed || 0 == buffer_read_i32( buffer, &data->logo_index, 1 );
     failed = failed || 0 == buffer_read_bool( buffer, &data->first_chr_or_use, 1 );
 
     data->flags = managed_array( bool );
@@ -161,7 +168,9 @@ bool state_data_read( state_data_t* data, buffer_t* buffer ) {
     if( !failed ) {
         for( int i = 0; i < stack_count; ++i ) {
             stack_entry_t stack;
-            failed = failed || 0 == buffer_read_bool( buffer, &stack.is_location, 1 );
+            int type = 0;
+            failed = failed || 0 == buffer_read_i32( buffer, &type, 1 );
+            stack.type = (stack_entry_type_t)type; 
             failed = failed || 0 == buffer_read_i32( buffer, &stack.index, 1 );
             if( failed ) break;
             array_add( data->section_stack, &stack );
@@ -206,6 +215,7 @@ typedef struct game_t {
     int mouse_x;
     int mouse_y;
     yarn_t* yarn;
+    int queued_screen;
     int queued_location;
     int queued_dialog;
     struct {
@@ -233,15 +243,23 @@ void game_restart( game_t* game ) {
     audiosys_stop_all( game->audiosys );
     state_data_reset( &game->state );
 
+    game->state.current_screen = game->yarn->start_screen;
     game->state.current_location = game->yarn->start_location;
     game->state.current_dialog = game->yarn->start_dialog;
+    if( game->yarn->is_debug && game->yarn->debug_start_screen >= 0 ) {
+        game->state.current_screen = game->yarn->debug_start_screen;
+        game->state.current_location = -1;
+        game->state.current_dialog = -1;
+    }
     if( game->yarn->is_debug && game->yarn->debug_start_location >= 0 ) {
+        game->state.current_screen = -1;
         game->state.current_location = game->yarn->debug_start_location;
         game->state.current_dialog = -1;
     }
     if( game->yarn->is_debug && game->yarn->debug_start_dialog  >= 0 ) {
-        game->state.current_dialog = game->yarn->debug_start_dialog;
+        game->state.current_screen = -1;
         game->state.current_location = -1;
+        game->state.current_dialog = game->yarn->debug_start_dialog;
     }
     for( int i = 0; i < game->yarn->flag_ids->count; ++i ) {
         bool value = false;
@@ -282,6 +300,7 @@ void game_restart( game_t* game ) {
     game->new_state = GAMESTATE_BOOT;
     game->disable_transition = false;
     game->transition_counter = 10;
+    game->queued_screen = -1;
     game->queued_location = -1;
     game->queued_dialog = -1;
     game->restart_requested = false;    
@@ -294,7 +313,9 @@ void game_load_state( game_t* game, state_data_t* data ) {
 
     state_data_copy( &game->state, data );
 
-    if( game->state.current_location >= 0 ) {
+    if( game->state.current_screen >= 0 ) {
+        game->new_state = GAMESTATE_SCREEN;
+    } else if( game->state.current_location >= 0 ) {
         game->new_state = GAMESTATE_LOCATION;
     } else if( game->state.current_dialog >= 0 ) {
         game->new_state = GAMESTATE_DIALOG;
@@ -358,8 +379,8 @@ bool was_key_pressed( game_t* game, int key ) {
 
 gamestate_t boot_init( game_t* game );
 gamestate_t boot_update( game_t* game );
-gamestate_t title_init( game_t* game );
-gamestate_t title_update( game_t* game );
+gamestate_t screen_init( game_t* game );
+gamestate_t screen_update( game_t* game );
 gamestate_t location_init( game_t* game );
 gamestate_t location_update( game_t* game );
 gamestate_t dialog_init( game_t* game );
@@ -574,8 +595,8 @@ void game_update( game_t* game, float delta_time ) {
             case GAMESTATE_BOOT:
                 new_state = boot_init( game );
                 break;
-            case GAMESTATE_TITLE:
-                new_state = title_init( game );
+            case GAMESTATE_SCREEN:
+                new_state = screen_init( game );
                 break;
             case GAMESTATE_LOCATION:
                 new_state = location_init( game );
@@ -616,8 +637,8 @@ void game_update( game_t* game, float delta_time ) {
         case GAMESTATE_BOOT:
             new_state = boot_update( game );
             break;
-        case GAMESTATE_TITLE:
-            new_state = title_update( game );
+        case GAMESTATE_SCREEN:
+            new_state = screen_update( game );
             break;
         case GAMESTATE_LOCATION:
             new_state = location_update( game );
@@ -802,11 +823,18 @@ void do_actions( game_t* game, array_param(yarn_act_t)* act_param ) {
             continue;
         }
         switch( action->type ) {
+            case ACTION_TYPE_GOTO_SCREEN: {
+                game->queued_screen = action->param_screen_index;
+                game->queued_dialog = -1;
+                game->queued_location = -1;
+            } break;
             case ACTION_TYPE_GOTO_LOCATION: {
+                game->queued_screen = -1;
                 game->queued_dialog = -1;
                 game->queued_location = action->param_location_index;
             } break;
             case ACTION_TYPE_GOTO_DIALOG: {
+                game->queued_screen = -1;
                 game->queued_location = -1;
                 game->queued_dialog = action->param_dialog_index;
             } break;
@@ -817,10 +845,16 @@ void do_actions( game_t* game, array_param(yarn_act_t)* act_param ) {
                 if( game->state.section_stack->count > 1 ) {
                     --game->state.section_stack->count;
                     stack_entry_t entry = game->state.section_stack->items[ --game->state.section_stack->count ];
-                    if( entry.is_location ) {
+                    if( entry.type == STACK_ENTRY_SCREEN ) {
+                        game->queued_screen = entry.index;
+                        game->queued_dialog = -1;
+                        game->queued_location = -1;
+                    } else if( entry.type == STACK_ENTRY_LOCATION ) {
+                        game->queued_screen = -1;
                         game->queued_dialog = -1;
                         game->queued_location = entry.index;
                     } else {
+                        game->queued_screen = -1;
                         game->queued_location = -1;
                         game->queued_dialog = entry.index;
                     }
@@ -1285,7 +1319,6 @@ void ingame_menu_update( game_t* game ) {
 
 // boot
 gamestate_t boot_init( game_t* game ) {
-    game->state.logo_index = -1;
     cls( game->render );
     return GAMESTATE_NO_CHANGE;
 }
@@ -1303,17 +1336,8 @@ gamestate_t boot_update( game_t* game ) {
         }
     #endif
 
-    if( game->yarn->screen_names->count > 0 && !( game->yarn->is_debug && ( game->yarn->debug_start_dialog >= 0 || game->yarn->debug_start_location >= 0  ) ) ) {
-        if( game->yarn->globals.logo_music >= 0 ) {
-            audiosys_audio_source_t src;
-            if( audio_qoa_source( game, game->yarn->globals.logo_music, &src ) ) {
-                audiosys_music_play( game->audiosys, src, 0.0f );
-                game->state.current_music = game->yarn->globals.logo_music;
-            } else {
-                game->state.current_music = -1;
-            }
-        }
-        return GAMESTATE_TITLE;
+    if( game->state.current_screen >= 0 ) {
+        return GAMESTATE_SCREEN;
     } else if( game->state.current_location >= 0 ) {
         return GAMESTATE_LOCATION;
     } else if( game->state.current_dialog >= 0 ) {
@@ -1325,30 +1349,100 @@ gamestate_t boot_update( game_t* game ) {
 }
 
 
-// title
-gamestate_t title_init( game_t* game ) {
-    ++game->state.logo_index;
+// screen
+gamestate_t screen_init( game_t* game ) {
+    stack_entry_t entry;
+    entry.type = STACK_ENTRY_SCREEN;
+    entry.index = game->state.current_screen;
+    array_add( game->state.section_stack, &entry );
+
+    game->queued_screen = -1;
+    game->queued_location = -1;
+    game->queued_dialog = -1;
+
+    yarn_t* yarn = game->yarn;
+    yarn_screen_t* screen = &yarn->screens->items[ game->state.current_screen ];
+
+    // mus: amb: snd:
+    do_audio( game, screen->audio );
+
+    // act:
+    do_actions( game, screen->act );
     return GAMESTATE_NO_CHANGE;
 }
 
 
-gamestate_t title_update( game_t* game ) {
-    if( game->state.logo_index < game->yarn->globals.logo_indices->count ) {
-        cls( game->render );
-        draw( game->render, game->yarn->globals.logo_indices->items[ game->state.logo_index ], 0, 0 );
+gamestate_t screen_update( game_t* game ) {
+    cls( game->render );
+
+    yarn_t* yarn = game->yarn;
+
+    if( game->state.current_screen < 0 && game->state.current_dialog >= 0 ) {
+        return GAMESTATE_DIALOG;
     }
 
-    if( was_key_pressed( game, APP_KEY_LBUTTON ) || was_key_pressed( game, APP_KEY_SPACE ) ) {
-        if( game->state.logo_index < game->yarn->globals.logo_indices->count - 1 ) {
-            return GAMESTATE_TITLE;
+    if( game->state.current_screen < 0 && game->state.current_location >= 0 ) {
+        return GAMESTATE_LOCATION;
+    }
+
+    if( game->state.current_screen < 0  ) return GAMESTATE_TERMINATE;
+
+    yarn_screen_t* screen = &yarn->screens->items[ game->state.current_screen ];
+
+    int mouse_x = input_get_mouse_x( game->input );
+    int mouse_y = input_get_mouse_y( game->input );
+    scale_for_resolution_inverse( game->render, &mouse_x, &mouse_y );
+
+    bool menu_hover = mouse_y < 13 && mouse_x > 295;
+    if( menu_hover ) {
+        box( game->render, 308, 0, 10, 6, game->render->color_opt );
+    }
+    menu_icon( game->render, 309, 1, menu_hover ? game->render->color_background : game->render->color_opt );    
+
+    if( game->queued_dialog >= 0 && ( ( was_key_pressed( game, APP_KEY_LBUTTON ) && !menu_hover ) || was_key_pressed( game, APP_KEY_SPACE ) ) ) {
+        game->state.current_screen = -1;
+        if( game->state.current_dialog >= 0 ) {
+            game->state.current_dialog = game->queued_dialog;
+            game->disable_transition = true;
+            return GAMESTATE_DIALOG;
         } else {
-            if( game->state.current_location >= 0 ) {
-                return GAMESTATE_LOCATION;
-            } else if( game->state.current_dialog >= 0 ) {
-                return GAMESTATE_DIALOG;
-            }
+            game->state.current_dialog = game->queued_dialog;
+            return GAMESTATE_DIALOG;
+        }
+    } else if( game->queued_location >= 0 && ( ( was_key_pressed( game, APP_KEY_LBUTTON ) && !menu_hover ) || was_key_pressed( game, APP_KEY_SPACE ) ) ) {
+        game->state.current_screen = -1;
+        if( game->state.current_location >= 0 ) {
+            game->state.current_location = game->queued_location;
+            game->disable_transition = true;
+            return GAMESTATE_LOCATION;
+        } else {
+            game->state.current_location = game->queued_location;
+            return GAMESTATE_LOCATION;
+        }
+    } else if( game->queued_screen >= 0 && ( was_key_pressed( game, APP_KEY_LBUTTON ) || was_key_pressed( game, APP_KEY_SPACE ) ) ) {
+        game->state.current_screen = game->queued_screen;
+        game->state.current_location = -1;
+        game->state.current_dialog = -1;
+        return GAMESTATE_SCREEN;
+    }
+
+
+    // scr:
+    for( int i = 0; i < screen->scr->count; ++i ) {
+        if( test_cond( game, &screen->scr->items[ i ].cond ) )  {
+            game->state.current_image = screen->scr->items[ i ].scr_index;
         }
     }
+    if( game->state.current_image >= 0 ) {
+        draw( game->render, game->state.current_image, 0, 0 );
+    }
+
+    if( menu_hover && was_key_pressed( game, APP_KEY_LBUTTON ) ) {
+        enter_menu( game );
+        return GAMESTATE_NO_CHANGE;
+    }
+
+
     return GAMESTATE_NO_CHANGE;
 }
 
@@ -1356,10 +1450,11 @@ gamestate_t title_update( game_t* game ) {
 // location
 gamestate_t location_init( game_t* game ) {
     stack_entry_t entry;
-    entry.is_location = true;
+    entry.type = STACK_ENTRY_LOCATION;
     entry.index = game->state.current_location;
     array_add( game->state.section_stack, &entry );
 
+    game->queued_screen = -1;
     game->queued_location = -1;
     game->queued_dialog = -1;
 
@@ -1413,9 +1508,20 @@ gamestate_t location_update( game_t* game ) {
             game->state.current_dialog = game->queued_dialog;
             return GAMESTATE_DIALOG;
         }
+    } else if( game->queued_screen >= 0 && ( ( was_key_pressed( game, APP_KEY_LBUTTON ) && !menu_hover ) || was_key_pressed( game, APP_KEY_SPACE ) ) ) {
+        game->state.current_location = -1;
+        if( game->state.current_screen >= 0 ) {
+            game->state.current_screen = game->queued_screen;
+            game->disable_transition = true;
+            return GAMESTATE_SCREEN;
+        } else {
+            game->state.current_screen = game->queued_screen;
+            return GAMESTATE_SCREEN;
+        }
     } else if( game->queued_location >= 0 && ( was_key_pressed( game, APP_KEY_LBUTTON ) || was_key_pressed( game, APP_KEY_SPACE ) ) ) {
         game->state.current_location = game->queued_location;
         game->state.current_dialog = -1;
+        game->state.current_screen = -1;
         return GAMESTATE_LOCATION;
     }
 
@@ -1442,7 +1548,7 @@ gamestate_t location_update( game_t* game ) {
 
     // opt:
     int opt = -1;
-    if( game->queued_dialog < 0 && game->queued_location < 0 ) {
+    if( game->queued_dialog < 0 && game->queued_location < 0 && game->queued_screen < 0) {
         if( was_key_pressed( game, APP_KEY_1 ) ) opt = 0;
         if( was_key_pressed( game, APP_KEY_2 ) ) opt = 1;
         if( was_key_pressed( game, APP_KEY_3 ) ) opt = 2;
@@ -1479,7 +1585,7 @@ gamestate_t location_update( game_t* game ) {
             }
             for( int k = 0; k < location->use->items[ j ].item_indices->count; ++k ) {
                 if( game->state.items->items[ i ] == location->use->items[ j ].item_indices->items[ k ] ) {
-                    if( game->queued_dialog < 0 && game->queued_location < 0 ) {
+                    if( game->queued_dialog < 0 && game->queued_location < 0 && game->queued_screen ) {
                         color = (uint8_t) game->render->color_use;
                         if( game->state.first_chr_or_use && !game->blink_visible ) {
                             color = (uint8_t) game->render->color_background;
@@ -1523,7 +1629,7 @@ gamestate_t location_update( game_t* game ) {
         }
         int ypos = 4 + ( ( 117 - ( chr_count * font_height( game->render, game->render->font_chr->height ) ) ) / 2 ) + c * font_height( game->render, game->render->font_chr->height );
         int color = game->render->color_chr;
-        if( game->queued_dialog >= 0 || game->queued_location >= 0 ) {
+        if( game->queued_dialog >= 0 || game->queued_location >= 0 || game->queued_screen >= 0) {
             color = game->render->color_disabled;
         } else if( game->state.first_chr_or_use && !game->blink_visible ) {
             color = (uint8_t) game->render->color_background;
@@ -1531,7 +1637,7 @@ gamestate_t location_update( game_t* game ) {
 
 
         pixelfont_bounds_t b = center( game->render,  game->render->font_chr, game->yarn->characters->items[ location->chr->items[ i ].chr_indices->items[ 0 ] ].short_name, 32, ypos, color );
-        if( game->queued_dialog < 0 && game->queued_location < 0 ) {
+        if( game->queued_dialog < 0 && game->queued_location < 0 && game->queued_screen < 0 ) {
             if( mouse_y >= ypos && mouse_y < ypos + b.height && mouse_x < 60 ) {
                 box( game->render, 4, ypos - 1, 56, b.height + 1, game->render->color_chr );
                 center( game->render,  game->render->font_chr, game->yarn->characters->items[ location->chr->items[ i ].chr_indices->items[ 0 ] ].short_name, 32, ypos, game->render->color_background );
@@ -1570,7 +1676,7 @@ gamestate_t location_update( game_t* game ) {
         return GAMESTATE_NO_CHANGE;
     }
 
-    if( game->queued_dialog < 0 && game->queued_location < 0 ) {
+    if( game->queued_dialog < 0 && game->queued_location < 0 && game->queued_screen < 0 ) {
         c = 0;
         for( int i = 0; i < location->opt->count; ++i ) {
             if( !test_cond( game, &location->opt->items[ i ].cond ) ) {
@@ -1620,6 +1726,16 @@ gamestate_t location_update( game_t* game ) {
                 game->state.current_dialog = game->queued_dialog;
                 return GAMESTATE_DIALOG;
             }
+        } else if( game->queued_screen >= 0 ) {
+            game->state.current_location = -1;
+            if( game->state.current_screen >= 0 ) {
+                game->state.current_screen = game->queued_screen;
+                game->disable_transition = true;
+                return GAMESTATE_SCREEN;
+            } else {
+                game->state.current_screen = game->queued_screen;
+                return GAMESTATE_SCREEN;
+            }
         } else if( game->queued_location >= 0 ) {
             game->state.current_location = game->queued_location;
             game->state.current_dialog = -1;
@@ -1634,10 +1750,11 @@ gamestate_t location_update( game_t* game ) {
 // dialog
 gamestate_t dialog_init( game_t* game ) {
     stack_entry_t entry;
-    entry.is_location = false;
+    entry.type = STACK_ENTRY_DIALOG;
     entry.index = game->state.current_dialog;
     array_add( game->state.section_stack, &entry );
 
+    game->queued_screen = -1;
     game->queued_location = -1;
     game->queued_dialog = -1;
 
@@ -1750,7 +1867,7 @@ gamestate_t dialog_update( game_t* game ) {
     // say:
     int say = -1;
     if( game->dialog.enable_options == 2 ) {
-        if( game->queued_dialog < 0 && game->queued_location < 0 ) {
+        if( game->queued_dialog < 0 && game->queued_location < 0 && game->queued_screen < 0 ) {
             if( was_key_pressed( game, APP_KEY_1 ) ) say = 0;
             if( was_key_pressed( game, APP_KEY_2 ) ) say = 1;
             if( was_key_pressed( game, APP_KEY_3 ) ) say = 2;
@@ -1764,7 +1881,7 @@ gamestate_t dialog_update( game_t* game ) {
             }
             int ypos = 197 + font_height( game->render, game->render->font_opt->height ) * c;
             pixelfont_bounds_t b = text( game->render, game->render->font_opt, dialog->say->items[ i ].text, 5, ypos, game->render->color_opt );
-            if( game->queued_dialog < 0 && game->queued_location < 0 ) {
+            if( game->queued_dialog < 0 && game->queued_location < 0 && game->queued_screen < 0 ) {
                 if( mouse_y >= ypos && mouse_y < ypos + b.height && mouse_x < 277 ) {
                     box( game->render, 4, ypos - 1, 315, b.height + 1, game->render->color_opt );
                     text( game->render, game->render->font_opt, dialog->say->items[ i ].text, 5, ypos, game->render->color_background );
@@ -1791,7 +1908,7 @@ gamestate_t dialog_update( game_t* game ) {
             for( int k = 0; k < dialog->use->items[ j ].item_indices->count; ++k ) {
                 if( game->state.items->items[ i ] == dialog->use->items[ j ].item_indices->items[ k ] ) {
                     if( game->dialog.enable_options == 2 ) {
-                        if( game->queued_dialog < 0 && game->queued_location < 0 ) {
+                        if( game->queued_dialog < 0 && game->queued_location < 0 && game->queued_screen < 0 ) {
                             color = (uint8_t) game->render->color_use;
                             enabled = true;
                         }
@@ -1827,6 +1944,11 @@ gamestate_t dialog_update( game_t* game ) {
             return GAMESTATE_DIALOG;
         }
     }
+    else if( game->queued_screen >= 0 && game->dialog.enable_options == 2  ) {
+        game->state.current_screen = game->queued_screen;
+        game->state.current_dialog = -1;
+        return GAMESTATE_SCREEN;
+    }
     else if( game->queued_location >= 0 && game->dialog.enable_options == 2  ) {
         game->state.current_location = game->queued_location;
         game->state.current_dialog = -1;
@@ -1835,7 +1957,7 @@ gamestate_t dialog_update( game_t* game ) {
 
     if( game->dialog.enable_options == 2 ) {
 
-        if( game->queued_dialog < 0 && game->queued_location < 0 ) {
+        if( game->queued_dialog < 0 && game->queued_location < 0 && game->queued_screen < 0 ) {
             c = 0;
             for( int i = 0; i < dialog->say->count; ++i ) {
                 if( !test_cond( game, &dialog->say->items[ i ].cond ) ) {
@@ -1871,6 +1993,10 @@ gamestate_t dialog_update( game_t* game ) {
                     game->state.current_dialog = game->queued_dialog;
                     return GAMESTATE_DIALOG;
                 }
+            } else if( game->queued_screen >= 0 ) {
+                game->state.current_screen = game->queued_screen;
+                game->state.current_dialog = -1;
+                return GAMESTATE_SCREEN;
             } else if( game->queued_location >= 0 ) {
                 game->state.current_location = game->queued_location;
                 game->state.current_dialog = -1;

@@ -104,6 +104,7 @@ string concat_data( array_param(string)* data_param ) {
 
 
 typedef struct compiler_context_t {
+    array(string_id)* screen_ids;
     array(string_id)* location_ids;
     array(string_id)* dialog_ids;
     array(string_id)* character_ids;
@@ -117,6 +118,7 @@ typedef struct compiler_context_t {
 
 compiler_context_t* empty_context( void ) {
     static compiler_context_t context;
+    context.screen_ids = managed_array(string_id);
     context.location_ids = managed_array(string_id);
     context.dialog_ids = managed_array(string_id);
     context.character_ids = managed_array(string_id);
@@ -152,6 +154,13 @@ int find_image_index( string_id name, yarn_t* yarn ) {
 }
 
 
+int find_scr_index( string_id name, yarn_t* yarn ) {
+    for( int i = 0; i < yarn->scr_names->count; ++i )
+        if( yarn->scr_names->items[ i ] == name ) return i;
+    return -1;
+}
+
+
 int find_audio_index( string_id name, yarn_t* yarn ) {
     for( int i = 0; i < yarn->audio_names->count; ++i )
         if( yarn->audio_names->items[ i ] == name ) return i;
@@ -159,16 +168,16 @@ int find_audio_index( string_id name, yarn_t* yarn ) {
 }
 
 
-int find_screen_index( string_id name, yarn_t* yarn ) {
-    for( int i = 0; i < yarn->screen_names->count; ++i )
-        if( yarn->screen_names->items[ i ] == name ) return i;
+int find_face_index( string_id name, yarn_t* yarn ) {
+    for( int i = 0; i < yarn->face_names->count; ++i )
+        if( yarn->face_names->items[ i ] == name ) return i;
     return -1;
 }
 
 
-int find_face_index( string_id name, yarn_t* yarn ) {
-    for( int i = 0; i < yarn->face_names->count; ++i )
-        if( yarn->face_names->items[ i ] == name ) return i;
+int find_screen_index( string_id id, compiler_context_t* context ) {
+    for( int i = 0; i < context->screen_ids->count; ++i )
+        if( context->screen_ids->items[ i ] == id ) return i;
     return -1;
 }
 
@@ -387,6 +396,18 @@ bool extract_declaration_fields( parser_section_t* section, yarn_t* yarn, compil
                 }
                 add_unique_id( yarn->image_names, image_name );
             }
+        } else if( CMP( decl->keyword,  "scr" ) ) {
+            if( decl->data->count != 1 || ( decl->data->count == 1 && cstr_len( cstr_trim( decl->data->items[ 0 ] ) ) <= 0 ) ) {
+                printf( "%s(%d): invalid image name '%s'\n", decl->filename, decl->line_number, concat_data( decl->data ) );
+                no_error = false;
+            } else {
+                string_id scr_name = cstr_cat( "images/", section->declarations->items[ j ].data->items[ 0 ] );
+                if( !file_exists( scr_name ) ) {
+                    printf( "%s(%d): image file not found '%s'\n", decl->filename, decl->line_number, scr_name );
+                    no_error = false;
+                }
+                add_unique_id( yarn->scr_names, scr_name );
+            }
         } else if( CMP( decl->keyword, "mus" ) || CMP( decl->keyword, "amb" ) || CMP( decl->keyword, "snd" ) ) {
             string_id audio_name = NULL;
             bool stop = false;
@@ -599,6 +620,15 @@ bool compile_action( array_param(string)* data_param, yarn_act_t* compiled_actio
         compiled_action->type = ACTION_TYPE_CHAR_DETACH;
         int char_index = find_character_index( command, context );
         compiled_action->param_char_index = char_index;
+    } else if( find_screen_index( command, context ) >= 0 ) {
+        compiled_action->type = ACTION_TYPE_GOTO_SCREEN;
+        int screen_index = find_screen_index( command, context );
+        if( screen_index >= 0 ) {
+            compiled_action->param_screen_index = screen_index;
+        } else {
+            printf( "%s(%d): screen '%s' was not declared\n", filename, line_number, command );
+            return false;
+        }
     } else if( find_location_index( command, context ) >= 0 ) {
         compiled_action->type = ACTION_TYPE_GOTO_LOCATION;
         int location_index = find_location_index( command, context );
@@ -754,6 +784,72 @@ bool compile_audio( yarn_audio_t* audio, parser_declaration_t* decl, yarn_t* yar
 }
 
 
+bool compile_screen( parser_section_t* section, yarn_t* yarn, compiler_context_t* context ) {
+    bool no_error = true;
+    yarn_screen_t* screen = array_add( yarn->screens, empty_screen() );
+    screen->id = section->id;
+
+    yarn_cond_t* cond = 0;
+    yarn_cond_t cond_inst;
+
+    for( int i = 0; i < section->declarations->count; ++i ) {
+        parser_declaration_t* decl = &section->declarations->items[ i ];
+        if( CMP( decl->keyword, "scr" ) ) {
+            yarn_scr_t* scr = array_add( screen->scr, empty_img() );
+            if( cond ) {
+                scr->cond = *cond;
+                cond = 0;
+            }
+            string scr_name = cstr_cat( "images/", decl->data->items[ 0 ] );
+            if( !file_exists( scr_name ) ) {
+                printf( "%s(%d): image file not found '%s'\n", decl->filename, decl->line_number, scr_name );
+                no_error = false;
+            }
+            scr->scr_index = find_scr_index( scr_name, yarn );
+            if( scr->scr_index < 0 ) {
+                printf( "%s(%d): image not found '%s'\n", decl->filename, decl->line_number, scr_name );
+                no_error = false;
+            }
+        } else if( CMP( decl->keyword, "mus" ) || CMP( decl->keyword, "amb" ) || CMP( decl->keyword, "snd" ) ) {
+            if( decl->data->count > 0 ) {
+                yarn_audio_t* audio = array_add( screen->audio, empty_audio() );
+                if( cond ) {
+                    audio->cond = *cond;
+                    cond = 0;
+                }                
+                if( !compile_audio( audio, decl, yarn ) ) {
+                    no_error = false;
+                }
+            } else {
+                printf( "%s(%d): '%s:' declaration missing audio name\n",  decl->filename, decl->line_number, decl->keyword );
+                no_error = false;
+            }
+        } else if( CMP( decl->keyword, "act"  ) ) {
+            yarn_act_t* action = array_add( screen->act, empty_act() );
+            if( cond ) { action->cond = *cond; cond = 0; }
+            no_error = no_error && compile_action( decl->data, action, decl->filename, decl->line_number, yarn, context );
+        } else if( CMP( decl->keyword, "?" ) ) {
+            if( !cond ) {
+                cond_inst = *empty_cond();
+                cond = &cond_inst;
+            }
+            no_error = no_error && compile_cond( decl->data, array_add( cond->ands, empty_cond_or() ), decl->filename, decl->line_number, yarn );
+        } else {
+            printf( "%s(%d): unknown keyword '%s'\n", decl->filename, decl->line_number, decl->keyword );
+            no_error = false;
+        }
+    }
+
+    if( cond ) {
+        parser_declaration_t* last_decl = &section->declarations->items[ section->declarations->count - 1 ];
+        printf( "%s(%d): unexpected conditional\n", last_decl->filename, last_decl->line_number );
+        no_error = false;
+    }
+
+    return no_error;
+}
+
+
 bool compile_location( parser_section_t* section, yarn_t* yarn, compiler_context_t* context ) {
     bool no_error = true;
     yarn_location_t* location = array_add( yarn->locations, empty_location() );
@@ -801,7 +897,7 @@ bool compile_location( parser_section_t* section, yarn_t* yarn, compiler_context
                     printf( "%s(%d): image not found '%s'\n", decl->filename, decl->line_number, image_name );
                     no_error = false;
                 }
-                img->image_index += yarn->screen_names->count;
+                img->image_index += yarn->scr_names->count;
             } else {
                 printf( "%s(%d): 'img:' declaration not valid inside an 'opt:', 'chr' or 'use:' block\n", decl->filename, decl->line_number );
                 no_error = false;
@@ -1072,7 +1168,7 @@ bool compile_character( parser_section_t* section, yarn_t* yarn ) {
             character->short_name = cstr_trim( decl->data->items[ 0 ] );
         } else if( CMP( decl->keyword, "face" ) ) {
             character->face_index = find_face_index( cstr_cat( "faces/", decl->data->items[ 0 ] ), yarn );
-            character->face_index += yarn->screen_names->count;
+            character->face_index += yarn->scr_names->count;
             character->face_index += yarn->image_names->count;
         } else {
             printf( "%s(%d): unexpected keyword '%s'. character sections may only contain 'name', 'short' and 'face' keywords\n", decl->filename, decl->line_number, decl->keyword );
@@ -1145,8 +1241,6 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
         }
     }
 
-    bool found_logo = false;
-    bool found_logo_music = false;
     yarn->globals.explicit_flags = false;
     yarn->globals.explicit_items = false;
     yarn->globals.background_location = -1;
@@ -1349,40 +1443,6 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
                     no_error = false;
                 }
             }
-        } else if( CMP( global->keyword, "logo" ) ) {
-            found_logo = true;
-            for( int j = 0; j < global->data->count; ++j ) {
-                if( cstr_len( cstr_trim( global->data->items[ j ] ) ) > 0 ) {
-                    string image_name = cstr_cat( "images/", cstr_trim( global->data->items[ j ] ) );
-                    if( !file_exists( image_name ) ) {
-                        printf( "%s(%d): image file not found '%s'\n", global->filename, global->line_number, image_name );
-                        no_error = false;
-                    }
-                    int image_index = find_screen_index( image_name, yarn );
-                    if( image_index < 0 ) {
-                        printf( "%s(%d): image not found '%s'\n", global->filename, global->line_number, image_name );
-                        no_error = false;
-                    }
-                    array_add( yarn->globals.logo_indices, &image_index );
-                }
-            }
-        } else if( CMP( global->keyword, "logo_music" ) ) {
-            if( global->data->count == 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) {
-                string audio_name = cstr_cat( "sound/", cstr_trim( global->data->items[ 0 ] ) );
-                if( !file_exists( audio_name ) ) {
-                    printf( "%s(%d): audio file not found '%s'\n", global->filename, global->line_number, audio_name );
-                    no_error = false;
-                }
-                int audio_index = find_audio_index( audio_name, yarn );
-                if( audio_index < 0 ) {
-                    printf( "%s(%d): audio not found '%s'\n", global->filename, global->line_number, audio_name );
-                    no_error = false;
-                }
-                yarn->globals.logo_music = audio_index;
-            } else {
-                printf( "%s(%d): invalid logo_music declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
-                no_error = false;
-            }
         } else if( CMP( global->keyword, "resolution" ) ) {
             if( global->data->count == 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) {
                 string_id id = cstr_trim( global->data->items[ 0 ] );
@@ -1463,7 +1523,7 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
                     printf( "%s(%d): image file not found '%s'\n", global->filename, global->line_number, image_name );
                     no_error = false;
                 }
-                int image_index = find_screen_index( image_name, yarn );
+                int image_index = find_scr_index( image_name, yarn );
                 if( image_index < 0 ) {
                     printf( "%s(%d): image not found '%s'\n", global->filename, global->line_number, image_name );
                     no_error = false;
@@ -1480,7 +1540,7 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
                     printf( "%s(%d): image file not found '%s'\n", global->filename, global->line_number, image_name );
                     no_error = false;
                 }
-                int image_index = find_screen_index( image_name, yarn );
+                int image_index = find_scr_index( image_name, yarn );
                 if( image_index < 0 ) {
                     printf( "%s(%d): image not found '%s'\n", global->filename, global->line_number, image_name );
                     no_error = false;
@@ -1513,21 +1573,6 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
             no_error = false;
         }
     }
-
-    if( !found_logo ) {
-        string image_name = "images/yarnspin_logo.png";
-        if( !file_exists( image_name ) ) {
-            printf( "no logo specified, and default image not found '%s'\n", image_name );
-            no_error = false;
-        }
-        int image_index = find_screen_index( image_name, yarn );
-        if( image_index < 0 ) {
-            printf( "no logo specified, and image not found '%s'\n", image_name );
-            no_error = false;
-        }
-        array_add( yarn->globals.logo_indices, &image_index );
-    }
-
 
     if( cstr_len( yarn->globals.title ) <= 0 ) {
         printf( "No title defined. Add a global declaration of the form 'title: My Game' to one of your script files\n" );
@@ -1591,30 +1636,14 @@ bool yarn_compiler( array_param(parser_global_t)* parser_globals_param, array_pa
         }
     }
 
-    bool found_logo = false;
     for( int i = 0; i < parser_globals->count; ++i ) {
         parser_global_t* global = &parser_globals->items[ i ];
-        if( CMP( global->keyword, "logo" ) ) {
-            found_logo = true;
+        if( CMP( global->keyword, "background_location" ) || CMP( global->keyword, "background_dialog" ) ) {
             for( int j = 0; j < global->data->count; ++j ) {
-                string_id logo_name = cstr_cat( "images/", cstr_trim( global->data->items[ j ] ) );
-                if( cstr_len( logo_name ) > 0 ) add_unique_id( yarn->screen_names, logo_name );
-            }
-        } else if( CMP( global->keyword, "logo_music" ) ) {
-            if( global->data->count == 1 ) {
-                string_id audio_name = cstr_cat( "sound/", cstr_trim( global->data->items[ 0 ] ) );
-                if( cstr_len( audio_name ) > 0 ) add_unique_id( yarn->audio_names, audio_name );
-            }
-        } else if( CMP( global->keyword, "background_location" ) || CMP( global->keyword, "background_dialog" ) ) {
-            for( int j = 0; j < global->data->count; ++j ) {
-                string_id screen_name = cstr_cat( "images/", cstr_trim( global->data->items[ j ] ) );
-                if( cstr_len( screen_name ) > 0 ) add_unique_id( yarn->screen_names, screen_name );
+                string_id scr_name = cstr_cat( "images/", cstr_trim( global->data->items[ j ] ) );
+                if( cstr_len( scr_name ) > 0 ) add_unique_id( yarn->scr_names, scr_name );
             }
         }
-    }
-
-    if( !found_logo ) {
-        add_unique_id( yarn->screen_names, "images/yarnspin_logo.png" );
     }
 
     if( !no_error ) return false;
@@ -1624,7 +1653,10 @@ bool yarn_compiler( array_param(parser_global_t)* parser_globals_param, array_pa
     for( int i = 0; i < parser_sections->count; ++i ) {
         parser_section_t* section = &parser_sections->items[ i ];
 
-        if( section->type == SECTION_TYPE_LOCATION ) {
+        if( section->type == SECTION_TYPE_SCREEN ) {
+            array_add( context.screen_ids, &section->id );
+            no_error = no_error && extract_declaration_fields( section, yarn, &context );
+        } else if( section->type == SECTION_TYPE_LOCATION ) {
             array_add( context.location_ids, &section->id );
             no_error = no_error && extract_declaration_fields( section, yarn, &context );
         } else if( section->type == SECTION_TYPE_DIALOG ) {
@@ -1681,7 +1713,9 @@ bool yarn_compiler( array_param(parser_global_t)* parser_globals_param, array_pa
     for( int i = 0; i < parser_sections->count; ++i ) {
         parser_section_t* section = &parser_sections->items[ i ];
 
-        if( section->type == SECTION_TYPE_LOCATION ) {
+        if( section->type == SECTION_TYPE_SCREEN ) {
+            no_error = no_error && compile_screen( section, yarn, &context );
+        } else if( section->type == SECTION_TYPE_LOCATION ) {
             no_error = no_error && compile_location( section, yarn, &context );
         } else if( section->type == SECTION_TYPE_DIALOG ) {
             no_error = no_error && compile_dialog( section, yarn, &context );
@@ -1698,9 +1732,10 @@ bool yarn_compiler( array_param(parser_global_t)* parser_globals_param, array_pa
         array_add( yarn->globals.display_filters, &value );
     }
 
+    yarn->start_screen = find_screen_index( yarn->globals.start, &context );
     yarn->start_location = find_location_index( yarn->globals.start, &context );
     yarn->start_dialog = find_dialog_index( yarn->globals.start, &context );
-    if( yarn->start_location < 0 && yarn->start_dialog < 0 ) {
+    if( yarn->start_screen < 0 && yarn->start_location < 0 && yarn->start_dialog < 0 ) {
         printf( "No start section defined. Add a global declaration of the form 'start: first_section_id' to one of your script files\n" );
         no_error = false;
     }

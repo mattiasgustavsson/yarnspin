@@ -1,11 +1,11 @@
 // introduction game - this line is a comment, and will not be executed
 
 title: Yarnspin Example Game
+version: 1.0
 author: Mattias Gustavsson
-start: welcome
+start: logo
 palette: yarnspin_default.png
 display_filters: tv, pc, none
-logo: yarnspin_logo.png
 
 // you can change the fonts used - but if you don't specify any, sensible defaults will be picked (the example lines below are commented out)
 
@@ -29,6 +29,12 @@ logo: yarnspin_logo.png
 // you can specify a background image for both the location screen and the dialog screen (the example lines below are commented out)
 // background_location: yarnspin_location_template.gif
 // background_dialog: yarnspin_dialog_template.gif
+
+
+=== logo ===
+
+scr: yarnspin_logo.png
+act: welcome
 
 
 === welcome ===
