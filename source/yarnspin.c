@@ -867,6 +867,8 @@ int main( int argc, char** argv ) {
 #undef PIXELFONT_FUNC_NAME
 #define PIXELFONT_COLOR PIXELFONT_U8
 #define PIXELFONT_FUNC_NAME pixelfont_blit
+#undef PIXELFONT_PIXEL_FUNC
+#define PIXELFONT_PIXEL_FUNC( dst, fnt, col ) *dst = fnt > 192 ? col : *dst;
 #include "libs/pixelfont.h"
 
 #define PIXELFONT_IMPLEMENTATION
