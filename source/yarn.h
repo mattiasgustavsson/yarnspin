@@ -896,6 +896,8 @@ typedef struct yarn_globals_t {
     array(yarn_display_filter_t)* display_filters;
     int background_location;
     int background_dialog;
+    int location_print_speed;
+    int dialog_print_speed;
     int color_background;
     int color_disabled;
     int color_txt;
@@ -942,6 +944,8 @@ yarn_globals_t* empty_globals( void ) {
     globals.display_filters = managed_array(int);
     globals.background_location = -1;
     globals.background_dialog = -1;
+    globals.location_print_speed = -1;
+    globals.dialog_print_speed = -1;
     globals.color_background = -1;
     globals.color_disabled = -1;
     globals.color_txt = -1;
@@ -994,6 +998,8 @@ void save_globals( buffer_t* out, yarn_globals_t* globals ) {
 
     buffer_write_i32( out, &globals->background_location, 1 );
     buffer_write_i32( out, &globals->background_dialog, 1 );
+    buffer_write_i32( out, &globals->location_print_speed, 1 );
+    buffer_write_i32( out, &globals->dialog_print_speed, 1 );
     buffer_write_i32( out, &globals->color_background, 1 );
     buffer_write_i32( out, &globals->color_disabled, 1 );
     buffer_write_i32( out, &globals->color_txt, 1 );
@@ -1053,6 +1059,8 @@ void load_globals( buffer_t* in, yarn_globals_t* globals ) {
 
     globals->background_location = read_int( in );
     globals->background_dialog = read_int( in );
+    globals->location_print_speed = read_int( in );
+    globals->dialog_print_speed = read_int( in );
     globals->color_background = read_int( in );
     globals->color_disabled = read_int( in );
     globals->color_txt = read_int( in );

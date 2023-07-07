@@ -1245,6 +1245,8 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
     yarn->globals.explicit_items = false;
     yarn->globals.background_location = -1;
     yarn->globals.background_dialog = -1;
+    yarn->globals.location_print_speed = 0;
+    yarn->globals.dialog_print_speed = 80;
     yarn->globals.color_background = rgbmode ? 0xff000000 : -1;
     yarn->globals.color_disabled = rgbmode ? 0xff707070 : -1;
     yarn->globals.color_txt = rgbmode ? 0xffffffff : -1;
@@ -1548,6 +1550,34 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
                 yarn->globals.background_dialog = image_index;
             } else {
                 printf( "%s(%d): invalid background_dialog declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
+                no_error = false;
+            }
+        } else if( CMP( global->keyword, "location_print_speed" ) ) {
+            if( global->data->count == 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) {
+                string str = cstr_trim( global->data->items[ 0 ] );
+                int speed = atoi( str );
+                if( ( speed == 0 && !cstr_is_equal( str, "0" ) ) || speed < 0 ) {
+                    printf( "%s(%d): invalid location_print_speed declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
+                    no_error = false;
+                } else {
+                    yarn->globals.location_print_speed = speed;
+                }
+            } else {
+                printf( "%s(%d): invalid location_print_speed '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
+                no_error = false;
+            }
+        } else if( CMP( global->keyword, "dialog_print_speed" ) ) {
+            if( global->data->count == 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) {
+                string str = cstr_trim( global->data->items[ 0 ] );
+                int speed = atoi( str );
+                if( ( speed == 0 && !cstr_is_equal( str, "0" ) ) || speed < 0 ) {
+                    printf( "%s(%d): invalid dialog_print_speed declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
+                    no_error = false;
+                } else {
+                    yarn->globals.dialog_print_speed = speed;
+                }
+            } else {
+                printf( "%s(%d): invalid dialog_print_speed '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
                 no_error = false;
             }
         } else if( CMP( global->keyword, "color_background" ) ) {

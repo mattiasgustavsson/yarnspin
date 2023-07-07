@@ -55,7 +55,7 @@ bool is_global_keyword( string keyword ) {
         "title", "author", "version", "start", "items", "flags",
         "palette", "resolution", "colormode", "screenmode", "display_filters", "alone_text", "nothing_text",
         "font_description", "font_options", "font_characters", "font_items", "font_name",
-        "background_location", "background_dialog",
+        "background_location", "background_dialog", "location_print_speed", "dialog_print_speed",
         "color_background", "color_disabled", "color_txt", "color_opt", "color_chr", "color_use", "color_name",
         "debug_start", "debug_set_flags", "debug_get_items", "debug_attach_chars",
     };
