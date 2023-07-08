@@ -1590,7 +1590,7 @@ gamestate_t location_update( game_t* game ) {
     int c = 0;
     for( int i = 0; i < game->state.items->count; ++i ) {
         string usetxt = game->yarn->item_ids->items[ game->state.items->items[ i ] ];
-        uint8_t color = (uint8_t) game->render->color_disabled;
+        int color = game->render->color_disabled;
         bool enabled = false;
         for( int j = 0; j < location->use->count; ++j ) {
             if( !test_cond( game, &location->use->items[ j ].cond ) ) {
@@ -1599,9 +1599,9 @@ gamestate_t location_update( game_t* game ) {
             for( int k = 0; k < location->use->items[ j ].item_indices->count; ++k ) {
                 if( game->state.items->items[ i ] == location->use->items[ j ].item_indices->items[ k ] ) {
                     if( game->queued_dialog < 0 && game->queued_location < 0 && game->queued_screen ) {
-                        color = (uint8_t) game->render->color_use;
+                        color = game->render->color_use;
                         if( game->state.first_chr_or_use && !game->blink_visible ) {
-                            color = (uint8_t) game->render->color_background;
+                            color = game->render->color_background;
                         }
                         enabled = true;
                     }
@@ -1645,7 +1645,7 @@ gamestate_t location_update( game_t* game ) {
         if( game->queued_dialog >= 0 || game->queued_location >= 0 || game->queued_screen >= 0) {
             color = game->render->color_disabled;
         } else if( game->state.first_chr_or_use && !game->blink_visible ) {
-            color = (uint8_t) game->render->color_background;
+            color = game->render->color_background;
         }
 
 
@@ -1916,7 +1916,7 @@ gamestate_t dialog_update( game_t* game ) {
     int c = 0;
     for( int i = 0; i < game->state.items->count; ++i ) {
         string txt = game->yarn->item_ids->items[ game->state.items->items[ i ] ];
-        uint8_t color = (uint8_t) game->render->color_disabled;
+        int color = game->render->color_disabled;
         bool enabled = false;
         for( int j = 0; j < dialog->use->count; ++j ) {
             if( !test_cond( game, &dialog->use->items[ j ].cond ) ) {
@@ -1926,7 +1926,7 @@ gamestate_t dialog_update( game_t* game ) {
                 if( game->state.items->items[ i ] == dialog->use->items[ j ].item_indices->items[ k ] ) {
                     if( game->dialog.enable_options == 2 ) {
                         if( game->queued_dialog < 0 && game->queued_location < 0 && game->queued_screen < 0 ) {
-                            color = (uint8_t) game->render->color_use;
+                            color = game->render->color_use;
                             enabled = true;
                         }
                     }
