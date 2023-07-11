@@ -540,7 +540,7 @@ img_rgba_t sample_average( img_t* img, int x0, int y0, int x1, int y1 ) {
 
 
 img_t resize_image( img_t img, int new_width, int new_height ) {
-    if( new_width < img.width && new_height < img.height) {
+    if( new_width != img.width && new_height != img.height) {
         float horiz = new_width / (float) img.width;
         float vert = new_height / (float) img.height;
         float scale = max( horiz, vert );

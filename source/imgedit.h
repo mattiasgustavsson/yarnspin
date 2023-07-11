@@ -20,7 +20,7 @@ void imgedit_resize( imgedit_image_t* image ) {
     int height = image->orig_height;
     int new_width = image->sized_width;
     int new_height = image->sized_height;
-    if( new_width < width && new_height < height) {
+    if( new_width != width && new_height != height) {
         float horiz = new_width / (float) width;
         float vert = new_height / (float) height;
         float scale = max( horiz, vert );
@@ -39,12 +39,10 @@ void imgedit_resize( imgedit_image_t* image ) {
         }
         free( scaled );
         image->sized_pixels = cropped;
-    } else if( new_width == width && new_height == height) {
+    } else {
         uint32_t* cropped = (uint32_t*) malloc( new_width * new_height * sizeof( uint32_t ) );
         memcpy( cropped, image->orig_pixels, new_width * new_height * sizeof( uint32_t ) );
         image->sized_pixels = cropped;
-    } else {
-        printf( "Image too small\n" );
     }
 }
 
@@ -504,7 +502,7 @@ int imgedit_process_thread( void* user_data ) {
                 int outh =image.sized_height;
                 uint8_t* pixels = (uint8_t*) malloc( 2 * outw * outh );
 
-                uint32_t* img = (uint32_t*) malloc( sizeof( uint32_t ) * image.orig_width *image.orig_height );
+                uint32_t* img = (uint32_t*) malloc( sizeof( uint32_t ) * max( image.orig_width, outw ) * max( image.orig_height, outh ) );
                 memcpy( img, image.orig_pixels, sizeof( uint32_t ) * image.orig_width *image.orig_height );
                 if( is_image ) {
                     if( settings[ single_image >= 0 ? IMGEDIT_MODE_SINGLE : IMGEDIT_MODE_IMAGES ].use_portrait_processor ) {
@@ -841,29 +839,31 @@ void imgedit_images( imgedit_t* imgedit, imgedit_input_t const* input ) {
                 imgedit_rect( imgedit, xp + 1, ( yp + imgedit->panel_height ) + 1, image->sized_width * imgedit->panels[ imgedit->mode ].scale - 3, image->sized_height * imgedit->panels[ imgedit->mode ].scale - 3, 0xff00ff00 );
             }
 
-            int mouse_x = input->mouse_x;
-            int mouse_y = input->mouse_y;
-            if( mouse_x >= xp && mouse_y >= ( yp + imgedit->panel_height ) && mouse_y > imgedit->panel_height && mouse_x < xp + image->sized_width * imgedit->panels[ imgedit->mode ].scale && mouse_y < ( yp + imgedit->panel_height ) + image->sized_height * imgedit->panels[ imgedit->mode ].scale ) {
-                imgedit_rect( imgedit, xp, ( yp + imgedit->panel_height ), image->sized_width * imgedit->panels[ imgedit->mode ].scale - 1, image->sized_height * imgedit->panels[ imgedit->mode ].scale - 1, 0xff00ffff );
-                imgedit_rect( imgedit, xp + 1, ( yp + imgedit->panel_height ) + 1, image->sized_width * imgedit->panels[ imgedit->mode ].scale - 3, image->sized_height * imgedit->panels[ imgedit->mode ].scale - 3, 0xff00ffff );
-                for( int y = -1; y < 2; ++y ) {
-                    for( int x = -1; x < 2; ++x ) {
-                        imgedit_text( imgedit, xp + ( x == 0 ? 2 : x ) + ( image->sized_width * imgedit->panels[ imgedit->mode ].scale / 2 ) - ( ( strlen( image->name ) * 9 ) / 2 ), ( yp + imgedit->panel_height ) + ( y == 0 ? 2 : y )  + 2, image->name, 0xff000000 );
+            if( !imgedit->dropdowns[ 0 ].active ) {
+                int mouse_x = input->mouse_x;
+                int mouse_y = input->mouse_y;
+                if( mouse_x >= xp && mouse_y >= ( yp + imgedit->panel_height ) && mouse_y > imgedit->panel_height && mouse_x < xp + image->sized_width * imgedit->panels[ imgedit->mode ].scale && mouse_y < ( yp + imgedit->panel_height ) + image->sized_height * imgedit->panels[ imgedit->mode ].scale ) {
+                    imgedit_rect( imgedit, xp, ( yp + imgedit->panel_height ), image->sized_width * imgedit->panels[ imgedit->mode ].scale - 1, image->sized_height * imgedit->panels[ imgedit->mode ].scale - 1, 0xff00ffff );
+                    imgedit_rect( imgedit, xp + 1, ( yp + imgedit->panel_height ) + 1, image->sized_width * imgedit->panels[ imgedit->mode ].scale - 3, image->sized_height * imgedit->panels[ imgedit->mode ].scale - 3, 0xff00ffff );
+                    for( int y = -1; y < 2; ++y ) {
+                        for( int x = -1; x < 2; ++x ) {
+                            imgedit_text( imgedit, xp + ( x == 0 ? 2 : x ) + ( image->sized_width * imgedit->panels[ imgedit->mode ].scale / 2 ) - ( ( strlen( image->name ) * 9 ) / 2 ), ( yp + imgedit->panel_height ) + ( y == 0 ? 2 : y )  + 2, image->name, 0xff000000 );
+                        }
                     }
-                }
-                imgedit_text( imgedit, xp + 0 + ( image->sized_width * imgedit->panels[ imgedit->mode ].scale / 2 ) - ( ( strlen( image->name ) * 9 ) / 2 ), ( yp + imgedit->panel_height ) + 0 + 2, image->name, 0xff00ffff );
-                if( input->clicked ) {
-                    if( imgedit->mode == IMGEDIT_MODE_IMAGES ) {
-                        imgedit->single_image = i;
-                        imgedit->panels[ IMGEDIT_MODE_SINGLE ].settings = imgedit->panels[ IMGEDIT_MODE_IMAGES ].settings;
-                    } else if( imgedit->mode == IMGEDIT_MODE_FACES ) {
-                        imgedit->single_face = i;
-                        imgedit->panels[ IMGEDIT_MODE_SINGLE ].settings = imgedit->panels[ IMGEDIT_MODE_FACES ].settings;
+                    imgedit_text( imgedit, xp + 0 + ( image->sized_width * imgedit->panels[ imgedit->mode ].scale / 2 ) - ( ( strlen( image->name ) * 9 ) / 2 ), ( yp + imgedit->panel_height ) + 0 + 2, image->name, 0xff00ffff );
+                    if( input->clicked ) {
+                        if( imgedit->mode == IMGEDIT_MODE_IMAGES ) {
+                            imgedit->single_image = i;
+                            imgedit->panels[ IMGEDIT_MODE_SINGLE ].settings = imgedit->panels[ IMGEDIT_MODE_IMAGES ].settings;
+                        } else if( imgedit->mode == IMGEDIT_MODE_FACES ) {
+                            imgedit->single_face = i;
+                            imgedit->panels[ IMGEDIT_MODE_SINGLE ].settings = imgedit->panels[ IMGEDIT_MODE_FACES ].settings;
+                        }
+                        if( image->use_individual_settings ) {
+                            imgedit->panels[ IMGEDIT_MODE_SINGLE ].settings = image->settings;
+                        }
+                        imgedit->panels[ IMGEDIT_MODE_SINGLE ].pending_settings = imgedit->panels[ IMGEDIT_MODE_SINGLE ].settings;
                     }
-                    if( image->use_individual_settings ) {
-                        imgedit->panels[ IMGEDIT_MODE_SINGLE ].settings = image->settings;
-                    }
-                    imgedit->panels[ IMGEDIT_MODE_SINGLE ].pending_settings = imgedit->panels[ IMGEDIT_MODE_SINGLE ].settings;
                 }
             }
         }
@@ -1154,7 +1154,6 @@ void imgedit_add_undo_state( imgedit_panel_t* panel, process_settings_t state ) 
     if( panel->undo_index > 0 ) {
         process_settings_t undo = panel->undo[ panel->undo_index - 1 ];
         bool different = false;
-        different |= state.use_portrait_processor != undo.use_portrait_processor;
         different |= state.bayer_dither != undo.bayer_dither;
         different |= state.brightness != undo.brightness;
         different |= state.contrast != undo.contrast;
@@ -1235,10 +1234,9 @@ void imgedit_panel( imgedit_t* imgedit, imgedit_input_t* input ) {
 
     panel->show_processed = imgedit_checkbox( imgedit, 10, 40, "Show processed", panel->show_processed, input );     
 
-    panel->pending_settings.use_portrait_processor = imgedit_checkbox( imgedit, 10, 60, "Use portrait processor", panel->pending_settings.use_portrait_processor, input ); 
-    panel->pending_settings.bayer_dither = imgedit_checkbox( imgedit, 10, 80, "Use bayer dithering", panel->pending_settings.bayer_dither, input ); 
+    panel->pending_settings.bayer_dither = imgedit_checkbox( imgedit, 10, 60, "Use bayer dithering", panel->pending_settings.bayer_dither, input ); 
     
-    panel->preview_changes = imgedit_checkbox( imgedit, 10, 100, "Auto-apply changes", panel->preview_changes, input ); 
+    panel->preview_changes = imgedit_checkbox( imgedit, 10, 80, "Auto-apply changes", panel->preview_changes, input ); 
 
     char const* scales[] = { "100%", "200%", "300%", "400%", };
     panel->scale = 1 + imgedit_radiobuttons( imgedit, 250, 40, scales, sizeof( scales ) / sizeof( *scales ), panel->scale - 1, input );
@@ -1259,7 +1257,7 @@ void imgedit_panel( imgedit_t* imgedit, imgedit_input_t* input ) {
     int new_selected_palette = imgedit->selected_palette;
     if( imgedit->single_image < 0 && imgedit->single_face < 0 ) {
         imgedit_text( imgedit, 230, 5, "Palette", 0xffffffff );
-        int new_selected_palette = imgedit_dropdown( imgedit, 300, 2, array_item( imgedit->palettes, 0 ), array_count( imgedit->palettes ), &imgedit->dropdowns[ 0 ], imgedit->selected_palette, !imgedit->converting_palette, &dropdown_input );     
+        new_selected_palette = imgedit_dropdown( imgedit, 300, 2, array_item( imgedit->palettes, 0 ), array_count( imgedit->palettes ), &imgedit->dropdowns[ 0 ], imgedit->selected_palette, !imgedit->converting_palette, &dropdown_input );     
         if( imgedit->converting_palette ) {
             static int c = 0;
             ++c;
@@ -1272,7 +1270,6 @@ void imgedit_panel( imgedit_t* imgedit, imgedit_input_t* input ) {
 
     if( imgedit_button( imgedit, 90, 125, "Reset", true, input ) ) {
         if( imgedit->single_image < 0 && imgedit->single_face < 0 ) {
-            panel->pending_settings.use_portrait_processor = ( imgedit->mode == IMGEDIT_MODE_FACES );
             panel->pending_settings.bayer_dither = false;
             panel->pending_settings.brightness = 0.5f;
             panel->pending_settings.contrast = 0.5f;
@@ -1293,7 +1290,6 @@ void imgedit_panel( imgedit_t* imgedit, imgedit_input_t* input ) {
     }
 
     bool changes = false;
-    changes |= panel->pending_settings.use_portrait_processor != panel->settings.use_portrait_processor;
     changes |= panel->pending_settings.bayer_dither != panel->settings.bayer_dither;
     changes |= panel->pending_settings.brightness != panel->settings.brightness;
     changes |= panel->pending_settings.contrast != panel->settings.contrast;
@@ -1421,7 +1417,7 @@ int imgedit_proc( app_t* app, void* user_data ) {
         imgedit.panels[ i ].preview_changes = true;
         imgedit.panels[ i ].scale = i == IMGEDIT_MODE_SINGLE ? 3 : 2;
         imgedit.panels[ i ].scroll = 0;
-        imgedit.panels[ i ].settings.use_portrait_processor = ( i == IMGEDIT_MODE_FACES );
+        imgedit.panels[ i ].settings.use_portrait_processor = false;
         imgedit.panels[ i ].settings.brightness = 0.5f;
         imgedit.panels[ i ].settings.contrast = 0.5f;
         imgedit.panels[ i ].settings.saturation = 0.5f;
