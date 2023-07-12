@@ -1101,6 +1101,12 @@ void savegame_menu_update( game_t* game ) {
     int mouse_y = input_get_mouse_y( game->input );
     scale_for_resolution_inverse( game->render, &mouse_x, &mouse_y );
 
+    bool cancel_hover = mouse_y < 16 && mouse_x > 295;
+    if( cancel_hover ) {
+        box( game->render, 308, 0, 11, 10, game->render->color_opt );
+    }
+    cancel_icon( game->render, 309, 1, cancel_hover ? game->render->color_background : game->render->color_opt );    
+
     int hover_index = 0;
     for( int y = 0; y < 3; ++y ) {
         for( int x = 0; x < 3; ++x ) {
@@ -1171,7 +1177,7 @@ void savegame_menu_update( game_t* game ) {
         save_game( game, 9 );
     }
 
-    if( was_key_pressed( game, APP_KEY_ESCAPE ) ) {
+    if( was_key_pressed( game, APP_KEY_ESCAPE ) || ( cancel_hover && was_key_pressed( game, APP_KEY_LBUTTON ) ) ) {
         game->ingame_menu = false;
         game->savegame_menu = false;
     }
@@ -1186,6 +1192,12 @@ void loadgame_menu_update( game_t* game ) {
     int mouse_x = input_get_mouse_x( game->input );
     int mouse_y = input_get_mouse_y( game->input );
     scale_for_resolution_inverse( game->render, &mouse_x, &mouse_y );
+
+    bool cancel_hover = mouse_y < 16 && mouse_x > 295;
+    if( cancel_hover ) {
+        box( game->render, 308, 0, 11, 10, game->render->color_opt );
+    }
+    cancel_icon( game->render, 309, 1, cancel_hover ? game->render->color_background : game->render->color_opt );    
 
     int hover_index = 0;
     for( int y = 0; y < 3; ++y ) {
@@ -1257,7 +1269,7 @@ void loadgame_menu_update( game_t* game ) {
         load_game( game, 9 );
     }
 
-    if( was_key_pressed( game, APP_KEY_ESCAPE ) ) {
+    if( was_key_pressed( game, APP_KEY_ESCAPE ) || ( cancel_hover && was_key_pressed( game, APP_KEY_LBUTTON ) ) ) {
         game->ingame_menu = false;
         game->loadgame_menu = false;
     }

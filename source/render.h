@@ -1028,6 +1028,104 @@ void menu_icon( render_t* render, int x, int y, int c ) {
 }
 
 
+void cancel_icon( render_t* render, int x, int y, int c ) {
+    scale_for_resolution( render, &x, &y );
+    int s = 8;
+    int t = ( render->screen_width >= 1280 ? 5 : render->screen_width >= 480 ? 2 : 1 );
+    scale_for_resolution( render, &s, NULL );
+    int h = s;
+    if( render->screen ) {
+        for( int iy = 0; iy < h; ++iy ) {
+            for( int ix = 0; ix <= t; ++ix ) {
+                int xp = x + iy + ix;
+                int yp = y + iy;
+                if( xp >= 0 && xp < render->screen_width && yp >= 0 && yp < render->screen_height ) {
+                    render->screen[ xp + yp * render->screen_width ] = (uint8_t) c;
+                }
+                xp = x + s - iy + ix - 1;
+                yp = y + iy;
+                if( xp >= 0 && xp < render->screen_width && yp >= 0 && yp < render->screen_height ) {
+                    render->screen[ xp + yp * render->screen_width ] = (uint8_t) c;
+                }
+            }
+        }
+    } else {
+        t += 1;
+        {
+        float width = render->screen_width;
+        float height = render->screen_height;
+        float x1 = x / width;
+        float y1 = y / height;
+        float x2 = x1 + t / width;
+        float y2 = y1;
+        float x3 = x1 + s / width;
+        float y3 = y1 + s / height;
+        float x4 = x3 + t / width;
+        float y4 = y3;
+
+        GLfloat vertices[] = {
+            2.0f * x1 - 1.0f, 2.0f * y1 - 1.0f, 0.0f, 0.0f,
+            2.0f * x3 - 1.0f, 2.0f * y3 - 1.0f, 1.0f, 0.0f,
+            2.0f * x4 - 1.0f, 2.0f * y4 - 1.0f, 1.0f, 1.0f,
+            2.0f * x2 - 1.0f, 2.0f * y2 - 1.0f, 1.0f, 1.0f,
+        };
+        glBindBuffer( GL_ARRAY_BUFFER, render->vertexbuffer );
+        glEnableVertexAttribArray( 0 );
+        glVertexAttribPointer( 0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof( GLfloat ), 0 );
+        glBufferData( GL_ARRAY_BUFFER, 4 * 4 * sizeof( GLfloat ), vertices, GL_STATIC_DRAW );
+
+        uint32_t color = c;
+        float a = ( ( color >> 24 ) & 0xff ) / 255.0f;
+        float r = ( ( color >> 16 ) & 0xff ) / 255.0f;
+        float g = ( ( color >> 8  ) & 0xff ) / 255.0f;
+        float b = ( ( color       ) & 0xff ) / 255.0f;
+        glUseProgram( render->shader );
+        glActiveTexture( GL_TEXTURE0 );
+        glBindTexture( GL_TEXTURE_2D, render->white_tex );
+        glUniform1i( glGetUniformLocation( render->shader, "tex0" ), 0 );
+        glUniform4f( glGetUniformLocation( render->shader, "col" ), r, g, b, a );
+        glDrawArrays( GL_TRIANGLE_FAN, 0, 4 );
+        glBindTexture( GL_TEXTURE_2D, 0 );
+        }
+        {
+        float width = render->screen_width;
+        float height = render->screen_height;
+        float x1 = ( x + s ) / width;
+        float y1 = y / height;
+        float x2 = x1 + t / width;
+        float y2 = y1;
+        float x3 = x1 - s / width;
+        float y3 = y1 + s / height;
+        float x4 = x3 + t / width;
+        float y4 = y3;
+
+        GLfloat vertices[] = {
+            2.0f * x1 - 1.0f, 2.0f * y1 - 1.0f, 0.0f, 0.0f,
+            2.0f * x3 - 1.0f, 2.0f * y3 - 1.0f, 1.0f, 0.0f,
+            2.0f * x4 - 1.0f, 2.0f * y4 - 1.0f, 1.0f, 1.0f,
+            2.0f * x2 - 1.0f, 2.0f * y2 - 1.0f, 1.0f, 1.0f,
+        };
+        glBindBuffer( GL_ARRAY_BUFFER, render->vertexbuffer );
+        glEnableVertexAttribArray( 0 );
+        glVertexAttribPointer( 0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof( GLfloat ), 0 );
+        glBufferData( GL_ARRAY_BUFFER, 4 * 4 * sizeof( GLfloat ), vertices, GL_STATIC_DRAW );
+
+        uint32_t color = c;
+        float a = ( ( color >> 24 ) & 0xff ) / 255.0f;
+        float r = ( ( color >> 16 ) & 0xff ) / 255.0f;
+        float g = ( ( color >> 8  ) & 0xff ) / 255.0f;
+        float b = ( ( color       ) & 0xff ) / 255.0f;
+        glUseProgram( render->shader );
+        glActiveTexture( GL_TEXTURE0 );
+        glBindTexture( GL_TEXTURE_2D, render->white_tex );
+        glUniform1i( glGetUniformLocation( render->shader, "tex0" ), 0 );
+        glUniform4f( glGetUniformLocation( render->shader, "col" ), r, g, b, a );
+        glDrawArrays( GL_TRIANGLE_FAN, 0, 4 );
+        glBindTexture( GL_TEXTURE_2D, 0 );
+        }
+    }
+}
+
 
 pixelfont_bounds_t center( render_t* render, pixelfont_t* font, string str, int x, int y, int color ) {
     scale_for_resolution( render, &x, &y );
