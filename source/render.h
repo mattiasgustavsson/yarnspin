@@ -609,7 +609,7 @@ void render_present( render_t* render, int width, int height ) {
 
     float x1, y1, x2, y2;
 
-    if( render->yarn->globals.resolution == YARN_RESOLUTION_FULL ) {
+    if( render->yarn->globals.resolution == YARN_RESOLUTION_FULL || render->yarn->globals.resolution == YARN_RESOLUTION_HIGH ) {
         float hscale = view_width / (float) render->screen_width;
         float vscale = view_height / (float) render->screen_height;
         float pixel_scale = hscale < vscale ? hscale : vscale;
@@ -662,7 +662,7 @@ void render_present( render_t* render, int width, int height ) {
     glUniform1i( glGetUniformLocation( render->shader, "tex0" ), 0 );
     glUniform4f( glGetUniformLocation( render->shader, "col" ), r, g, b, a );
     glActiveTexture( GL_TEXTURE0 );
-    if( render->yarn->globals.resolution == YARN_RESOLUTION_FULL ) {
+    if( render->yarn->globals.resolution == YARN_RESOLUTION_FULL || render->yarn->globals.resolution == YARN_RESOLUTION_HIGH ) {
         glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
         glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
     } else {
