@@ -1770,6 +1770,17 @@ bool yarn_compiler( array_param(parser_global_t)* parser_globals_param, array_pa
         no_error = false;
     }
 
+    if( yarn->globals.resolution == YARN_RESOLUTION_FULL ) {
+        if( yarn->globals.colormode == YARN_COLORMODE_PALETTE ) {
+            printf( "Palette colormode is not supported for 'full' resolution. Use an RGB colormode instead.\n" );
+            no_error = false;
+        }
+        if( yarn->globals.display_filters->count > 1 || yarn->globals.display_filters->items[ 0 ] != YARN_DISPLAY_FILTER_NONE ) {
+            printf( "Display filters are not supported for 'full' resolution. Use display_filter: none.\n" );
+            no_error = false;
+        }
+    }
+
     yarn->debug_start_location = find_location_index( yarn->globals.debug_start, &context );
     yarn->debug_start_dialog = find_dialog_index( yarn->globals.debug_start, &context );
     return no_error;
