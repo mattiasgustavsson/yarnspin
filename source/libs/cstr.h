@@ -39,7 +39,6 @@ before you include this file in *one* C/C++ file to create the implementation.
     #define CSTR_VA_LIST_T va_list
 #endif
 
-typedef char const* cstr_t;
 
 #ifndef CSTR_NO_GLOBAL_API
 

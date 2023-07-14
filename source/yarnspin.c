@@ -40,7 +40,10 @@
 #include "libs/stb_image_resize.h"
 #include "libs/stb_image_write.h"
 #include "libs/thread.h"
-#include "libs/ya_getopt.h"
+
+#ifndef __wasm__
+    #include "libs/ya_getopt.h"
+#endif
 
 #ifdef _WIN32
     #include "libs/glad.h"
@@ -114,6 +117,9 @@ typedef struct datetime_t {
 } datetime_t;
 
 datetime_t get_datetime( void );
+
+typedef char const* cstr_t;
+
 
 // automatic memory management helper stuff
 
@@ -566,43 +572,45 @@ int main( int argc, char** argv ) {
     bool opt_window = false;
     bool opt_fullscreen = false;
 
-    static struct option long_options[] = {
-        { "images",     no_argument, NULL, 'i' },
-        { "run",        no_argument, NULL, 'r' },
-        { "debug",      no_argument, NULL, 'd' },
-        { "compile",    no_argument, NULL, 'c' },
-        { "nosound",    no_argument, NULL, 'n' },
-        { "window",     no_argument, NULL, 'w' },
-        { "fullscreen", no_argument, NULL, 'f' },
-        { NULL,         0,           NULL, 0 }
-    };
+    #ifndef __wasm__
+        static struct option long_options[] = {
+            { "images",     no_argument, NULL, 'i' },
+            { "run",        no_argument, NULL, 'r' },
+            { "debug",      no_argument, NULL, 'd' },
+            { "compile",    no_argument, NULL, 'c' },
+            { "nosound",    no_argument, NULL, 'n' },
+            { "window",     no_argument, NULL, 'w' },
+            { "fullscreen", no_argument, NULL, 'f' },
+            { NULL,         0,           NULL, 0 }
+        };
 
-    int opt = 0;
-    while( ( opt = ya_getopt_long( argc, argv, "irdcnwf", long_options, NULL ) ) != -1 ) {
-        switch( opt ) {
-            case 'i': {
-                opt_images = true;
-            } break;
-            case 'r': {
-                opt_run = true;
-            } break;
-            case 'd': {
-                opt_debug = true;
-            } break;
-            case 'c': {
-                opt_compile = true;
-            } break;
-            case 'n': {
-                opt_nosound = true;
-            } break;
-            case 'w': {
-                opt_window = true;
-            } break;
-            case 'f': {
-                opt_fullscreen = true;
-            } break;
+        int opt = 0;
+        while( ( opt = ya_getopt_long( argc, argv, "irdcnwf", long_options, NULL ) ) != -1 ) {
+            switch( opt ) {
+                case 'i': {
+                    opt_images = true;
+                } break;
+                case 'r': {
+                    opt_run = true;
+                } break;
+                case 'd': {
+                    opt_debug = true;
+                } break;
+                case 'c': {
+                    opt_compile = true;
+                } break;
+                case 'n': {
+                    opt_nosound = true;
+                } break;
+                case 'w': {
+                    opt_window = true;
+                } break;
+                case 'f': {
+                    opt_fullscreen = true;
+                } break;
+            }
         }
-    }
+    #endif
 
     // if -i or --images parameter were specified, run image editor
     #ifndef YARNSPIN_RUNTIME_ONLY
@@ -917,8 +925,10 @@ uint32_t pixelfont_blend( uint32_t color1, uint32_t color2, uint8_t alpha )	{
 #include "libs/stb_image_write.h"
 #pragma warning( pop )
 
-#define YA_GETOPT_IMPLEMENTATION
-#include "libs/ya_getopt.h"
+#ifndef __wasm__
+    #define YA_GETOPT_IMPLEMENTATION
+    #include "libs/ya_getopt.h"
+#endif
 
 #ifdef _WIN32
     #define GLAD_GL_IMPLEMENTATION
@@ -1002,6 +1012,11 @@ uint32_t pixelfont_blend( uint32_t color1, uint32_t color2, uint8_t alpha )	{
             SleepConditionVariableCS = GetProcAddress( kernel, "SleepConditionVariableCS");
         #endif
     }
+#else    
+    void thread_mutex_init( thread_mutex_t* mutex ) {}
+    void thread_mutex_term( thread_mutex_t* mutex ) {}
+    void thread_mutex_lock( thread_mutex_t* mutex ) {}
+    void thread_mutex_unlock( thread_mutex_t* mutex ) {}
 #endif
    
 
