@@ -96,11 +96,12 @@ bool g_disable_sound = false;
     void delete_file( char const* filename );
     void create_path( char const* path, int pos );
     int file_more_recent( char const* source_path, char const* output_path );
-    int file_exists( char const* filename );
-    int folder_exists( char const* filename );
 
     void* compress_lzma( void* data, size_t size, size_t* out_size );
 #endif
+
+int file_exists( char const* filename );
+int folder_exists( char const* filename );
 
 size_t decompress_lzma( void* compressed_data, size_t compressed_size, void* buffer, size_t size );
 char const* get_executable_filename( void );
