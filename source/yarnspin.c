@@ -572,6 +572,8 @@ int main( int argc, char** argv ) {
     bool opt_nosound = false;
     bool opt_window = false;
     bool opt_fullscreen = false;
+    bool opt_package = false;
+    char const* package_filename = NULL;
 
     #ifndef __wasm__
         static struct option long_options[] = {
@@ -582,11 +584,12 @@ int main( int argc, char** argv ) {
             { "nosound",    no_argument, NULL, 'n' },
             { "window",     no_argument, NULL, 'w' },
             { "fullscreen", no_argument, NULL, 'f' },
+            { "package",    no_argument, NULL, 'p' },
             { NULL,         0,           NULL, 0 }
         };
 
         int opt = 0;
-        while( ( opt = ya_getopt_long( argc, argv, "irdcnwf", long_options, NULL ) ) != -1 ) {
+        while( ( opt = ya_getopt_long( argc, argv, "irdcnwfp", long_options, NULL ) ) != -1 ) {
             switch( opt ) {
                 case 'i': {
                     opt_images = true;
@@ -609,8 +612,37 @@ int main( int argc, char** argv ) {
                 case 'f': {
                     opt_fullscreen = true;
                 } break;
+                case 'p': {
+                    opt_package = true;
+                } break;
             }
         }
+
+    if( opt_package && ( opt_images || opt_run || opt_debug || opt_compile || opt_nosound || opt_window || opt_fullscreen ) ) {
+        printf( "Option '--package' is not compatible with any other options." );
+        return EXIT_FAILURE;
+    }
+    if( opt_package ) {
+        int index = -1;
+        for( int i = 0; i < argc; ++i ) {
+            if( cstr_compare_nocase( argv[ i ], "--package" ) == 0 || cstr_compare_nocase( argv[ i ], "-p" ) == 0 ) {
+                index = i + 1;
+                break;
+            }
+        }
+        if( index != argc && *argv[ index ] != '-' ) {
+            package_filename = argv[ index ];
+        }
+        if( !package_filename ) {
+            printf( "Option '--package' requires an output filename, for example '--package game.exe' or '--package game.html'" );
+            return EXIT_FAILURE;
+        }
+        if( cstr_compare_nocase( package_filename, "yarnspin.exe" ) == 0 || cstr_compare_nocase( package_filename, "yarnspin" ) == 0 ) {
+            printf( "The name 'yarnspin' is reserved for the Yarnspin executable, and can't be used as package output name." );
+            return EXIT_FAILURE;
+        }
+    }
+
     #endif
 
     // if -i or --images parameter were specified, run image editor
@@ -801,7 +833,7 @@ int main( int argc, char** argv ) {
                 return EXIT_FAILURE;
             }
             memcpy( buffer_data( decompressed_yarn ), data, uncompressed_size ); 
-                free( data );
+            free( data );
         }
         
     #endif
@@ -811,6 +843,37 @@ int main( int argc, char** argv ) {
     if( opt_compile ) {
         return EXIT_SUCCESS;
     }
+
+    // if -p or --package parameter were specified, don't run the game, instead package the exe after compiling the yarn
+    #ifndef YARNSPIN_RUNTIME_ONLY
+        if( opt_package ) {
+            if( cstr_compare_nocase( cextname( package_filename ), ".html" ) == 0 ) {
+                #ifdef _WIN32 
+                    cstr_t command = cstr_cat( "build\\node build\\wajicup.js -embed yarnspin.dat yarnspin.dat -template build/template.html build/runtime.wasm ", package_filename );
+                #else 
+                    cstr_t command = cstr_cat( "build/node build/wajicup.js -embed yarnspin.dat yarnspin.dat -template build/template.html build/runtime.wasm ", package_filename );
+                #endif
+                int result = system( command );
+                if( result != EXIT_SUCCESS ) {
+                    printf( "Packaging failed.\n" );
+                    return EXIT_FAILURE;
+                }
+                return EXIT_SUCCESS;
+            } else {
+                #ifdef _WIN32 
+                    cstr_t command = cstr_cat( "copy /b build\\runtime.exe + yarnspin.dat ", package_filename );
+                #else 
+                    cstr_t command = cstr_cat( "cat build/runtime yarnspin.dat > ", package_filename );
+                #endif
+                int result = system( command );
+                if( result != EXIT_SUCCESS ) {
+                    printf( "Packaging failed.\n" );
+                    return EXIT_FAILURE;
+                }
+                return EXIT_SUCCESS;
+            }
+        }
+    #endif
 
     // load yarn
     yarn_t yarn;
@@ -1530,7 +1593,7 @@ void ensure_console_open( void ) {
 #endif
 
 
-    #ifdef _WIN32
+#ifdef _WIN32
 
     int opengl_preinit_thread_proc( void* user_data ) {
         (void) user_data;
@@ -1544,6 +1607,139 @@ void ensure_console_open( void ) {
     void opengl_preinit( void ) {
         thread_create( opengl_preinit_thread_proc, NULL, THREAD_STACK_SIZE_DEFAULT );
     }
+
+    #ifndef YARNSPIN_RUNTIME_ONLY
+
+        typedef struct png_t {
+	        void* data;
+	        int size;
+        } png_t;
+
+
+        png_t make_png(stbi_uc* img, int w, int h, int icon_size) {
+	        int ow = icon_size;
+	        int oh = icon_size;
+	        float ar = ((float)w) / ((float)h);
+	        if (ar < 1.0f) {
+		        ow = (int)(ar * icon_size);
+	        }
+	        else {
+		        oh = (int)((1.0f / ar) * icon_size);
+	        }
+
+	        uint32_t szimg[256 * 256] = { 0 };
+	        stbir_resize_uint8((stbi_uc*)img, w, h, w * 4, (stbi_uc*)(szimg + (icon_size - ow) / 2 + ((icon_size - oh) / 2) * icon_size), ow, oh, icon_size * 4, 4);
+
+	        if (w > icon_size || h > icon_size) {
+		        img_t im = img_from_abgr32(szimg, icon_size, icon_size);
+		        img_sharpen(&im, 0.2f, 0.75f);
+		        img_to_argb32(&im, szimg);
+		        img_free(&im);
+	        }
+
+	        png_t png;
+	        png.data = stbi_write_png_to_mem((stbi_uc*)szimg, icon_size * 4, icon_size, icon_size, 4, &png.size);
+	        return png;
+        }
+    
+
+        bool update_icon( const char* exe_file, const char* image_filename ) {
+            int w, h, c;
+            stbi_uc* img = stbi_load( image_filename, &w, &h, &c, 4 );
+	        if( !img) { 
+                printf( "Failed to open image file: %s\n", image_filename ); 
+                return false; 
+            }
+            HANDLE hUpdateRes = BeginUpdateResourceA( exe_file, FALSE );
+	        if( hUpdateRes == NULL ) { 
+                free( img );
+                printf( "Failed to open exe file: %s\n", exe_file ); 
+                return FALSE; 
+            }
+
+	        int sizes[] = { 256, 48, 32, 16 };
+	        png_t png[4];
+	        for (int i = 0; i < 4; ++i) {
+		        png[i] = make_png(img, w, h, sizes[i]);
+	        }
+	        free(img);
+
+	        #pragma pack(push,2)
+	        typedef struct GRPICONDIRENTRY {
+		        BYTE  bWidth;
+		        BYTE  bHeight;
+		        BYTE  bColorCount;
+		        BYTE  bReserved;
+		        WORD  wPlanes;
+		        WORD  wBitCount;
+		        DWORD dwBytesInRes;
+		        WORD  nId;
+	        } GRPICONDIRENTRY;
+
+	        typedef struct GRPICONDIR {
+		        WORD idReserved;
+		        WORD idType;
+		        WORD idCount;
+		        GRPICONDIRENTRY idEntries[1];
+	        } GRPICONDIR;
+	        #pragma pack(pop)
+            
+            size_t icondir_size = sizeof(GRPICONDIR) + ( 4 - 1 ) * sizeof(GRPICONDIRENTRY);
+	        void* data = malloc( icondir_size );
+
+	        GRPICONDIR* grpicondir = (GRPICONDIR*)data;
+            grpicondir->idReserved = 0; 
+	        grpicondir->idType = 1; 
+	        grpicondir->idCount = 4;
+
+            for( int i = 0; i < 4; ++i ) {
+		        GRPICONDIRENTRY* entry = grpicondir->idEntries + i;
+		        entry->bWidth = (BYTE)(sizes[i]==256 ? 0 : sizes[i]);
+		        entry->bHeight = (BYTE)(sizes[i]== 256 ? 0 : sizes[i]);
+		        entry->bColorCount = 0;
+		        entry->bReserved = 0;
+		        entry->wPlanes = 1;
+		        entry->wBitCount = 24;
+                entry->dwBytesInRes = png[i].size;
+                entry->nId = (WORD)( i + 2 );
+            }
+
+	        BOOL result = UpdateResourceA( hUpdateRes, RT_GROUP_ICON, MAKEINTRESOURCEA( 1 ), MAKELANGID(LANG_NEUTRAL, SUBLANG_NEUTRAL), data, (DWORD) icondir_size );
+	        if (result == FALSE ) { 
+	            for (int i = 0; i < 4; ++i) {
+		            free( png[i].data );
+	            }
+                free( data );
+                printf( "Could not add resource.\n" ); 
+                return false;
+            }
+
+            for( int i = 0; i < 4; ++i ) {
+                result = UpdateResourceA( hUpdateRes, RT_ICON, MAKEINTRESOURCEA( i + 2 ),  MAKELANGID(LANG_NEUTRAL, SUBLANG_NEUTRAL), png[i].data, png[i].size );
+	            if( result == FALSE ) { 
+	                for (int i = 0; i < 4; ++i) {
+		                free( png[i].data );
+	                }
+                    free( data );
+                    printf( "Could not add resource.\n" ); 
+                    return false; 
+                }
+            }
+            free( data );
+	        for (int i = 0; i < 4; ++i) {
+		        free( png[i].data );
+	        }
+
+  	        if( !EndUpdateResourceA( hUpdateRes, FALSE ) ) { 
+                printf( "seticon: Could not write changes to file: %s.\n", exe_file ); 
+                return false;
+            }
+
+            return true;
+        }
+
+    #endif /* YARNSPIN_RUNTIME_ONLY */
+
 
 #endif
 
