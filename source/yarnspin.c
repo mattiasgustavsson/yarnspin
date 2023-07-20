@@ -542,6 +542,9 @@ int app_proc( app_t* app, void* user_data ) {
 #ifndef YARNSPIN_RUNTIME_ONLY
     #include "imgedit.h"
     void threads_init( void );
+    #ifdef _WIN32
+        bool update_icon( const char* exe_file, const char* image_filename );
+    #endif
 #endif
 
 #ifdef _WIN32
@@ -870,6 +873,12 @@ int main( int argc, char** argv ) {
                     printf( "Packaging failed.\n" );
                     return EXIT_FAILURE;
                 }
+                #ifdef _WIN32 
+                    if( !update_icon( package_filename, "build\\icon.png" ) ) {
+                        printf( "Failed to apply icon\n" );
+                        return EXIT_FAILURE;
+                    }
+                #endif
                 return EXIT_SUCCESS;
             }
         }
