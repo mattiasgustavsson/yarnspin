@@ -786,7 +786,17 @@ char const* cstri_join( struct cstri_t* cstri, char const* a, char const* b, cha
 
 
 char const* cstri_replace( struct cstri_t* cstri, char const* str, char const* find, char const* replacement ) {
-    return NULL; // todo
+    size_t repl_len = cstri_len( cstri, replacement );
+    size_t find_len = cstri_len( cstri, find );
+    char const* tmp = str;
+    int pos = cstri_find( cstri, tmp, find, 0 );
+    while( pos >= 0 ) {
+        size_t len = cstri_len( cstri, tmp ) + repl_len;
+        tmp = cstri_cat( cstri, cstri_cat( cstri, cstri_left( cstri, tmp, pos ), replacement ), cstri_mid( cstri, tmp, pos + find_len, 0 ) );
+        pos += repl_len;
+        pos = cstri_find( cstri, tmp, find, pos );        
+    }
+    return tmp;
 }
 
 
