@@ -785,6 +785,9 @@ char const* cstri_join( struct cstri_t* cstri, char const* a, char const* b, cha
 }
 
 
+int cstri_find( struct cstri_t* cstri, char const* str, char const* find, int start );
+
+
 char const* cstri_replace( struct cstri_t* cstri, char const* str, char const* find, char const* replacement ) {
     size_t repl_len = cstri_len( cstri, replacement );
     size_t find_len = cstri_len( cstri, find );
