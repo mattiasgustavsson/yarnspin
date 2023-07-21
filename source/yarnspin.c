@@ -937,7 +937,8 @@ int main( int argc, char** argv ) {
                     return EXIT_FAILURE;
                 }
                 #ifdef _WIN32 
-                    if( !update_icon( package_filename, "build\\icon.png" ) ) {
+                    char const* icon_filename = file_exists( "images\\icon.png" ) ? "images\\icon.png" : "build\\yarnspin_icon.png";
+                    if( !update_icon( package_filename, icon_filename ) ) {
                         printf( "Failed to apply icon\n" );
                         return EXIT_FAILURE;
                     }
