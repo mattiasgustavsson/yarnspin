@@ -1,0 +1,14 @@
+*.exe
+*.sln
+*.vcproj
+*.vcxproj
+*.vcxproj.user
+*.obj
+*.o
+*.wasm
+*.dat
+.cache
+.vs
+savegame
+wasm
+x64
