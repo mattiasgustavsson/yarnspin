@@ -816,8 +816,10 @@ void process_image( uint32_t* image, int width, int height, uint8_t* output, int
         }
         img_sharpen( &img, settings->sharpen_radius * resolution_scale , sharpen_strength );
     } else {
-        auto_contrast( &img, 1.0f );
-        img_sharpen( &img, 0.15f * resolution_scale, 1.0f );
+        if( resolution_scale < 4.0f ) {
+            auto_contrast( &img, 1.0f );
+            img_sharpen( &img, 0.15f * resolution_scale, 1.0f );
+        }
     } 
 
     for( int y = 0; y < img.height; ++y ) {
@@ -1189,7 +1191,7 @@ palrle_data_t* convert_bitmap( string image_filename, int width, int height, str
             load_settings( &settings, ini_filename );
         }
 
-        bool use_portrait_processor = is_face;
+        bool use_portrait_processor = false;
         if( have_settings ) use_portrait_processor = settings.use_portrait_processor;
         if( use_portrait_processor ) {
             process_face( (uint32_t*) img, w, h, pixels, outw, outh, palette, have_settings ? &settings : NULL );
@@ -1540,7 +1542,7 @@ qoi_data_t* convert_rgb( string image_filename, int width, int height, int bpp, 
             load_settings( &settings, ini_filename );
         }
 
-        bool use_portrait_processor = is_face;
+        bool use_portrait_processor = false;
         if( have_settings ) use_portrait_processor = settings.use_portrait_processor;
         if( use_portrait_processor ) {
             process_face( (uint32_t*) img, w, h, NULL, outw, outh, NULL, have_settings ? &settings : NULL );

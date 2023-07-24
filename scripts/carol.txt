@@ -1,7 +1,7 @@
 === carol ===
 name: Carol the Writer
 short: Carol
-face: 0526.png
+face: carol.jpg
 
 
 === talk_to_carol ===

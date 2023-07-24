@@ -2,7 +2,7 @@
 
 name: Alice the Code Wiz
 short: Alice
-face: 0893.png
+face: alice.jpg
 
 
 === talk_to_alice ===

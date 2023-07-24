@@ -1,7 +1,7 @@
 === your_desk ===
 
-not show_alternate_desk? img: home-office-336377_960_720.jpg
-    show_alternate_desk? img: workstation-336369_960_720.jpg
+not show_alternate_desk? img: desk2.jpg
+    show_alternate_desk? img: desk3.jpg
 
 talked_about_flags? act: toggle show_alternate_desk
 
@@ -29,7 +29,7 @@ act: end_sure
 
 act: set visited_another_room
 
-img: lobby-797961_960_720.jpg
+img: office.jpg
 txt: A location consists of an image (like the one with the nice window above), a description text (you are reading it) and three different types of interactions: Characters, Items and Options.
 
 opt: Characters. What's that about?
@@ -85,7 +85,7 @@ act: about_locations
 === eat_apple ===
 
 act: drop Apple
-img: apple-1181850_960_720.jpg
+img: apple.jpg
 txt: Delicious, isn't it? Items can be set up for use in both locations and dialogs, and are useful as an extra option in addition to the ones at the bottom of the screen.
 txt: If you want to know more about Items, please check out the Yarnspin documentation.
 act: about_locations
@@ -106,7 +106,7 @@ act: about_locations
 
 act: set visited_another_room
 
-img: painting-911804_960_720.jpg
+img: artroom.jpg
 txt: Making art for your story can seem hard, but Yarnspin can help you out. It is great if you feel confident to draw your own images, but if you'd rather not, you can still get some nice visuals for your game. Ask John, he can tell you all about it.
 
 chr: john
@@ -124,7 +124,7 @@ act: your_desk
 
 act: set visited_another_room
 
-img: monitor-1307227_960_720.jpg
+img: coderoom.jpg
 txt: Code is what drives the game, makes it possible for the player to interact with things, and decides what will happen. But don't worry, code in Yarnspin is very friendly. Just ask Alice, she will tell you all about it.
 
 chr: alice

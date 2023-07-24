@@ -3,6 +3,7 @@
 *.vcproj
 *.vcxproj
 *.vcxproj.user
+*.res
 *.obj
 *.o
 *.wasm

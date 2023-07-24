@@ -4,16 +4,16 @@ title: Yarnspin Example Game
 version: 1.0
 author: Mattias Gustavsson
 start: logo
-palette: yarnspin_default.png
-display_filters: tv, pc, none
+resolution: full
+colormode: rgb
 
 // you can change the fonts used - but if you don't specify any, sensible defaults will be picked (the example lines below are commented out)
 
-// font_description: Berkelium64.ttf
-// font_options: Sierra-SCI-Menu-Font.ttf
-// font_characters: Berkelium64.ttf
-// font_items: Berkelium64.ttf
-// font_name: Sierra-SCI-Menu-Font.ttf
+font_description: AlegreyaSans-Medium.ttf,37
+font_options: AlegreyaSans-Bold.ttf,40
+font_characters: AlegreyaSans-Bold.ttf,45
+font_items: AlegreyaSans-Bold.ttf,45
+font_name: AlegreyaSans-Bold.ttf,50
 
 // you can change the color of all elements - but if you don't specify them, sensible defaults will be picked (the example lines below are commented out)
 
@@ -33,20 +33,21 @@ display_filters: tv, pc, none
 
 === logo ===
 
+mus: music.ogg
 scr: yarnspin_logo.png
 act: welcome
 
 
 === welcome ===
 
-img: home-office-336378_960_720.jpg
+img: desk1.jpg
 txt: Welcome to Yarnspin, the friendly story-telling engine. This short example game will tell you about - and show you - some of the basic features.
 act: your_desk
 
 
 === end_sure ===
 
-img: office-702539_960_720.jpg
+img: corridor.jpg
 txt: Are you sure you want to leave so soon?
 
 opt: Yes, I'm sure. Let me out already!
@@ -58,7 +59,7 @@ act: your_desk
 
 === end ===
 
-img: yarnspin_logo.png
+img: made_with_yarnspin.jpg
 txt: Thank you for stopping by. To find out more about how to tell stories with Yarnspin, please check out the documentation - the file is called "yarnspin.pdf", or visit the Yarnspin website:
 txt:
 txt: mattiasgustavsson.com/yarnspin

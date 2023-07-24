@@ -2,7 +2,7 @@
 
 name: John the Art Guy
 short: John
-face: 0578.png
+face: john.jpg
 
 
 === talk_to_john ===

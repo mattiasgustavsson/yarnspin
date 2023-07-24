@@ -33,7 +33,7 @@ jobs:
           copy wasm\wajicup.js build
           move runtime.exe build
           move runtime.wasm build
-          7z a yarnspin-win.zip yarnspin.exe faces fonts images palettes scripts build\runtime.exe build\runtime.wasm build\wajicup.js build\node.exe build\template.html
+          7z a yarnspin-win.zip yarnspin.exe faces fonts images palettes scripts sound build\runtime.exe build\runtime.wasm build\wajicup.js build\node.exe build\template.html
       - name: upload artifacts
         uses: softprops/action-gh-release@v1
         with:
@@ -69,7 +69,7 @@ jobs:
           mv runtime.wasm build
           cp wasm/wajicup.js build
           cp /usr/local/bin/node build
-          tar -czvf yarnspin-mac.tar.gz yarnspin faces fonts images palettes scripts build/runtime build/runtime.wasm build/wajicup.js build/node build/template.html
+          tar -czvf yarnspin-mac.tar.gz yarnspin faces fonts images palettes scripts sound build/runtime build/runtime.wasm build/wajicup.js build/node build/template.html
       - name: upload artifacts
         uses: softprops/action-gh-release@v1
         with:
@@ -118,7 +118,7 @@ jobs:
           mv runtime.wasm build
           cp wasm/wajicup.js build
           cp /usr/local/bin/node build
-          tar -czvf yarnspin-linux.tar.gz yarnspin faces fonts images palettes scripts build/runtime build/runtime.wasm build/wajicup.js build/node build/template.html
+          tar -czvf yarnspin-linux.tar.gz yarnspin faces fonts images palettes scripts sound build/runtime build/runtime.wasm build/wajicup.js build/node build/template.html
       - name: upload artifacts
         uses: softprops/action-gh-release@v1
         with:
