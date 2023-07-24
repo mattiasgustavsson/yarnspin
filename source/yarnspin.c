@@ -927,23 +927,34 @@ int main( int argc, char** argv ) {
                 return EXIT_SUCCESS;
             } else {
                 #ifdef _WIN32 
-                    cstr_t command = cstr_cat( "copy /b build\\runtime.exe + yarnspin.dat ", package_filename );
-                #else 
-                    cstr_t command = cstr_cat( "cat build/runtime yarnspin.dat > ", package_filename );
-                #endif
-                int result = system( command );
-                if( result != EXIT_SUCCESS ) {
-                    printf( "Packaging failed.\n" );
-                    return EXIT_FAILURE;
-                }
-                #ifdef _WIN32 
+                    int result = system( "copy /y build\\runtime.exe temp.exe" );
+                    if( result != EXIT_SUCCESS ) {
+                        printf( "Failed to copy build\\runtime.exe.\n" );
+                        return EXIT_FAILURE;
+                    }
                     char const* icon_filename = file_exists( "images\\icon.png" ) ? "images\\icon.png" : "build\\yarnspin_icon.png";
-                    if( !update_icon( package_filename, icon_filename ) ) {
+                    if( !update_icon( "temp.exe", icon_filename ) ) {
+                        delete_file( "temp.exe" );
                         printf( "Failed to apply icon\n" );
                         return EXIT_FAILURE;
                     }
+                    cstr_t command = cstr_cat( "copy /y /b temp.exe + yarnspin.dat ", package_filename );
+                    result = system( command );
+                    if( result != EXIT_SUCCESS ) {
+                        delete_file( "temp.exe" );
+                        printf( "Packaging failed.\n" );
+                       return EXIT_FAILURE;
+                    }                    
+                    delete_file( "temp.exe" );
+                #else 
+                    cstr_t command = cstr_cat( "cat build/runtime yarnspin.dat > ", package_filename );
+                    int result = system( command );
+                    if( result != EXIT_SUCCESS ) {
+                        printf( "Packaging failed.\n" );
+                        return EXIT_FAILURE;
+                    }
                 #endif
-                return EXIT_SUCCESS;
+            return EXIT_SUCCESS;
             }
         }
     #endif
