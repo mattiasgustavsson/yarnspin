@@ -1291,18 +1291,18 @@ void ingame_menu_update( game_t* game ) {
 
     frame( game->render, 99, 39, 124, 164, game->render->color_background, game->render->color_opt );
 
-    int spacing = 20;
-    int ypos = 40 + ( 160 - ( 6 * spacing ) ) / 2 - spacing;
-    int option = ( mouse_y - ypos ) / spacing - 1;
-    if( option > 5 || option == 3 ) {
+    int spacing = game->render->font_name->height * 2;
+    scale_for_resolution_inverse( game->render, &spacing, NULL );
+    int ypos = 40 + ( 160 - ( 6 * spacing ) ) / 2;
+    int option = ( mouse_y - ypos ) / spacing;
+    if( option > 5 || option == 3 || mouse_y < ypos ) {
         option = -1;
     }
-
     if( option >= 0 ) {
-        box( game->render, 110, ypos + ( option + 1 ) * spacing + 3, 100, spacing - 8, game->render->color_opt );
+        box( game->render, 110, ypos + ( option  ) * spacing + spacing / 6, 100, spacing - spacing / 3, game->render->color_opt );
     }
 
-    int offs = ( spacing - game->render->font_name->height ) / 2;
+    int offs = -spacing + spacing / 4;
     center( game->render, game->render->font_name, "RESUME", 160, offs + ( ypos+=spacing ), option == 0 ? game->render->color_background : game->render->color_opt );
     center( game->render, game->render->font_name, "SAVE GAME", 160, offs + ( ypos+=spacing ), option == 1 ? game->render->color_background : game->render->color_opt );
     center( game->render, game->render->font_name, "LOAD GAME", 160, offs + ( ypos+=spacing ), option == 2 ? game->render->color_background : game->render->color_opt );

@@ -7,29 +7,6 @@ start: logo
 resolution: full
 colormode: rgb
 
-// you can change the fonts used - but if you don't specify any, sensible defaults will be picked (the example lines below are commented out)
-
-font_description: AlegreyaSans-Medium.ttf,37
-font_options: AlegreyaSans-Bold.ttf,40
-font_characters: AlegreyaSans-Bold.ttf,45
-font_items: AlegreyaSans-Bold.ttf,45
-font_name: AlegreyaSans-Bold.ttf,50
-
-// you can change the color of all elements - but if you don't specify them, sensible defaults will be picked (the example lines below are commented out)
-
-// color_background: 1
-// color_disabled: 2
-// color_txt: 3
-// color_opt: 4
-// color_chr: 5
-// color_use: 6
-// color_name: 7
-// color_facebg: 8
-
-// you can specify a background image for both the location screen and the dialog screen (the example lines below are commented out)
-// background_location: yarnspin_location_template.gif
-// background_dialog: yarnspin_dialog_template.gif
-
 
 === logo ===
 

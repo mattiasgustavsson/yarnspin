@@ -817,7 +817,7 @@ void process_image( uint32_t* image, int width, int height, uint8_t* output, int
         img_sharpen( &img, settings->sharpen_radius * resolution_scale , sharpen_strength );
     } else {
         if( resolution_scale < 4.0f ) {
-            auto_contrast( &img, 1.0f );
+            auto_contrast( &img, 0.25f / resolution_scale );
             img_sharpen( &img, 0.15f * resolution_scale, 1.0f );
         }
     } 

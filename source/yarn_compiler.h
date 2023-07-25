@@ -1781,6 +1781,152 @@ bool yarn_compiler( array_param(parser_global_t)* parser_globals_param, array_pa
         }
     }
 
+    if( !yarn->globals.font_description ) {
+        switch( yarn->globals.resolution ) {
+            case YARN_RESOLUTION_RETRO: {
+                yarn->globals.font_description = cstr( "fonts/Berkelium64.ttf" );
+                yarn->globals.font_description_size = 0;
+            } break;   
+            case YARN_RESOLUTION_LOW: {
+                yarn->globals.font_description = cstr( "fonts/scifont004.fnt" );
+                yarn->globals.font_description_size = 0;
+            } break;   
+            case YARN_RESOLUTION_MEDIUM: {
+                yarn->globals.font_description = cstr( "fonts/scifont004.fnt" );
+                yarn->globals.font_description_size = 0;
+            } break;   
+            case YARN_RESOLUTION_HIGH: {
+                if( yarn->globals.colormode == YARN_COLORMODE_PALETTE ) {
+                    yarn->globals.font_description = cstr( "fonts/scifont001.fnt" );
+                    yarn->globals.font_description_size = 0;
+                } else {
+                    yarn->globals.font_description = cstr( "fonts/AlegreyaSans-Medium.ttf" );
+                    yarn->globals.font_description_size = 20;
+                }
+            } break;   
+            case YARN_RESOLUTION_FULL: {
+                yarn->globals.font_description = cstr( "fonts/AlegreyaSans-Medium.ttf" );
+                yarn->globals.font_description_size = 40;
+            } break;
+        }
+    }
+    if( !yarn->globals.font_options ) {
+        switch( yarn->globals.resolution ) {
+            case YARN_RESOLUTION_RETRO: {
+                yarn->globals.font_options = cstr( "fonts/Sierra-SCI-Menu-Font.ttf" );
+                yarn->globals.font_options_size = 0;
+            } break;   
+            case YARN_RESOLUTION_LOW: {
+                yarn->globals.font_options = cstr( "fonts/Sierra-SCI-Menu-Font.ttf" );
+                yarn->globals.font_options_size = 0;
+            } break;   
+            case YARN_RESOLUTION_MEDIUM: {
+                yarn->globals.font_options = cstr( "fonts/Sierra-SCI-Menu-Font.ttf" );
+                yarn->globals.font_options_size = 0;
+            } break;   
+            case YARN_RESOLUTION_HIGH: {
+                if( yarn->globals.colormode == YARN_COLORMODE_PALETTE ) {
+                    yarn->globals.font_options = cstr( "fonts/RPGSystem.ttf" );
+                    yarn->globals.font_options_size = 0;
+                } else {
+                    yarn->globals.font_options = cstr( "fonts/AlegreyaSans-Bold.ttf" );
+                    yarn->globals.font_options_size = 22;
+                }
+            } break;   
+            case YARN_RESOLUTION_FULL: {
+                yarn->globals.font_options = cstr( "fonts/AlegreyaSans-Bold.ttf" );
+                yarn->globals.font_options_size = 44;
+            } break;
+        }
+    }
+    if( !yarn->globals.font_characters ) {
+        switch( yarn->globals.resolution ) {
+            case YARN_RESOLUTION_RETRO: {
+                yarn->globals.font_characters = cstr( "fonts/Berkelium64.ttf" );
+                yarn->globals.font_characters_size = 0;
+            } break;   
+            case YARN_RESOLUTION_LOW: {
+                yarn->globals.font_characters = cstr( "fonts/scifont003.fnt" );
+                yarn->globals.font_characters_size = 0;
+            } break;   
+            case YARN_RESOLUTION_MEDIUM: {
+                yarn->globals.font_characters = cstr( "fonts/scifont003.fnt" );
+                yarn->globals.font_characters_size = 0;
+            } break;   
+            case YARN_RESOLUTION_HIGH: {
+                if( yarn->globals.colormode == YARN_COLORMODE_PALETTE ) {
+                    yarn->globals.font_characters = cstr( "fonts/scifont002.fnt" );
+                    yarn->globals.font_characters_size = 0;
+                } else {
+                    yarn->globals.font_characters = cstr( "fonts/AlegreyaSans-Bold.ttf" );
+                    yarn->globals.font_characters_size = 21;
+                }
+            } break;   
+            case YARN_RESOLUTION_FULL: {
+                yarn->globals.font_characters = cstr( "fonts/AlegreyaSans-Bold.ttf" );
+                yarn->globals.font_characters_size = 42;
+            } break;
+        }
+    }
+    if( !yarn->globals.font_items ) {
+        switch( yarn->globals.resolution ) {
+            case YARN_RESOLUTION_RETRO: {
+                yarn->globals.font_items = cstr( "fonts/Berkelium64.ttf" );
+                yarn->globals.font_items_size = 0;
+            } break;   
+            case YARN_RESOLUTION_LOW: {
+                yarn->globals.font_items = cstr( "fonts/scifont003.fnt" );
+                yarn->globals.font_items_size = 0;
+            } break;   
+            case YARN_RESOLUTION_MEDIUM: {
+                yarn->globals.font_items = cstr( "fonts/scifont003.fnt" );
+                yarn->globals.font_items_size = 0;
+            } break;   
+            case YARN_RESOLUTION_HIGH: {
+                if( yarn->globals.colormode == YARN_COLORMODE_PALETTE ) {
+                    yarn->globals.font_items = cstr( "fonts/scifont002.fnt" );
+                    yarn->globals.font_items_size = 0;
+                } else {
+                    yarn->globals.font_items = cstr( "fonts/AlegreyaSans-Bold.ttf" );
+                    yarn->globals.font_items_size = 21;
+                }
+            } break;   
+            case YARN_RESOLUTION_FULL: {
+                yarn->globals.font_items = cstr( "fonts/AlegreyaSans-Bold.ttf" );
+                yarn->globals.font_items_size = 42;
+            } break;
+        }
+    }
+    if( !yarn->globals.font_name ) {
+        switch( yarn->globals.resolution ) {
+            case YARN_RESOLUTION_RETRO: {
+                yarn->globals.font_name = cstr( "fonts/Sierra-SCI-Menu-Font.ttf" );
+                yarn->globals.font_name_size = 0;
+            } break;   
+            case YARN_RESOLUTION_LOW: {
+                yarn->globals.font_name = cstr( "fonts/scifont001.fnt" );
+                yarn->globals.font_name_size = 0;
+            } break;   
+            case YARN_RESOLUTION_MEDIUM: {
+                yarn->globals.font_name = cstr( "fonts/scifont001.fnt" );
+                yarn->globals.font_name_size = 0;
+            } break;   
+            case YARN_RESOLUTION_HIGH: {
+                if( yarn->globals.colormode == YARN_COLORMODE_PALETTE ) {
+                    yarn->globals.font_name = cstr( "fonts/scifont009.fnt" );
+                    yarn->globals.font_name_size = 0;
+                } else {
+                    yarn->globals.font_name = cstr( "fonts/AlegreyaSans-Bold.ttf" );
+                    yarn->globals.font_name_size = 22;
+                }
+            } break;   
+            case YARN_RESOLUTION_FULL: {
+                yarn->globals.font_name = cstr( "fonts/AlegreyaSans-Bold.ttf" );
+                yarn->globals.font_name_size = 44;
+            } break;
+        }
+    }
+
     yarn->debug_start_location = find_location_index( yarn->globals.debug_start, &context );
     yarn->debug_start_dialog = find_dialog_index( yarn->globals.debug_start, &context );
     return no_error;
