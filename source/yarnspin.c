@@ -326,7 +326,16 @@ int app_proc( app_t* app, void* user_data ) {
 
     // main loop
     APP_U64 time = 0;
-    while( app_yield( app ) != APP_STATE_EXIT_REQUESTED && !game.exit_flag ) {
+    while( !game.exit_flag ) {
+        bool exit_requested = app_yield( app ) == APP_STATE_EXIT_REQUESTED;
+        if( exit_requested ) {
+            if( game.exit_dialog ) {
+                game.exit_flag = true;
+            } else {
+                game.exit_dialog = true;
+                app_cancel_exit( app );
+            }
+        }
         frametimer_update( frametimer );
         input_update( &input, screen_width, screen_height, crtemu_lite, crtemu_pc, crtemu_tv );
         

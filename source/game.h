@@ -199,6 +199,8 @@ typedef struct game_t {
     bool blink_visible;
     bool exit_flag;
     bool exit_requested;
+    bool exit_dialog;
+    bool exit_confirmed;
     bool restart_requested;    
     bool quickload_requested;
     gamestate_t current_state;
@@ -344,6 +346,8 @@ void game_init( game_t* game, yarn_t* yarn, render_t* render, input_t* input, au
     game->delta_time = 0.0f;
     game->exit_flag = false;
     game->exit_requested = false;
+    game->exit_dialog = false;
+    game->exit_confirmed = false;
     game->render = render;
     game->audiosys = audiosys;
     game->rnd = rnd;
@@ -391,7 +395,7 @@ gamestate_t terminate_init( game_t* game );
 gamestate_t terminate_update( game_t* game );
 
 void ingame_menu_update( game_t* game );
-
+void exit_dialog_update( game_t* game );
 
 typedef struct qoa_decode_t {
     qoa_data_t* audio_data;
@@ -552,7 +556,15 @@ void enter_menu( game_t* game ) {
 
 
 void game_update( game_t* game, float delta_time ) {
-	if( game->blink_count > 0 ) {
+    if( game->exit_confirmed ) {
+        game->new_state = GAMESTATE_TERMINATE;
+        game->disable_transition = true;
+        game->exit_dialog = false;
+        game->exit_confirmed = false;
+        game->ingame_menu = false;
+    }
+
+    if( game->blink_count > 0 ) {
 		--game->blink_count;
 		if( game->blink_count > 0 ) {
 			game->blink_visible = game->blink_count % 30 < 15;
@@ -566,6 +578,11 @@ void game_update( game_t* game, float delta_time ) {
 			game->blink_count = 100;
 		}
 	}
+
+    if( game->exit_dialog ) {
+        exit_dialog_update( game );
+        return;
+    }
 
     bool menu_requested = false;
     if( game->ingame_menu ) {
@@ -670,6 +687,7 @@ void game_update( game_t* game, float delta_time ) {
         game->new_state = GAMESTATE_EXIT;
         game->disable_transition = true;
         game->exit_requested = false;
+        game->ingame_menu = false;
     }
 }
 
@@ -1289,7 +1307,6 @@ void ingame_menu_update( game_t* game ) {
     int mouse_y = input_get_mouse_y( game->input );
     scale_for_resolution_inverse( game->render, &mouse_x, &mouse_y );
 
-    frame( game->render, 99, 39, 124, 164, game->render->color_background, game->render->color_opt );
 
     int spacing = game->render->font_name->height * 2;
     scale_for_resolution_inverse( game->render, &spacing, NULL );
@@ -1298,17 +1315,7 @@ void ingame_menu_update( game_t* game ) {
     if( option > 5 || option == 3 || mouse_y < ypos ) {
         option = -1;
     }
-    if( option >= 0 ) {
-        box( game->render, 110, ypos + ( option  ) * spacing + spacing / 6, 100, spacing - spacing / 3, game->render->color_opt );
-    }
 
-    int offs = -spacing + spacing / 4;
-    center( game->render, game->render->font_name, "RESUME", 160, offs + ( ypos+=spacing ), option == 0 ? game->render->color_background : game->render->color_opt );
-    center( game->render, game->render->font_name, "SAVE GAME", 160, offs + ( ypos+=spacing ), option == 1 ? game->render->color_background : game->render->color_opt );
-    center( game->render, game->render->font_name, "LOAD GAME", 160, offs + ( ypos+=spacing ), option == 2 ? game->render->color_background : game->render->color_opt );
-    center( game->render, game->render->font_name, "OPTION", 160, offs + ( ypos+=spacing ), option == 3 ? game->render->color_background : game->render->color_disabled );
-    center( game->render, game->render->font_name, "RESTART", 160, offs + ( ypos+=spacing ), option == 4 ? game->render->color_background : game->render->color_opt );
-    center( game->render, game->render->font_name, "QUIT", 160, offs + ( ypos+=spacing ), option == 5 ? game->render->color_background : game->render->color_opt );
     bool clicked = was_key_pressed( game, APP_KEY_LBUTTON );
     if( was_key_pressed( game, APP_KEY_ESCAPE ) || was_key_pressed( game, APP_KEY_1 ) || ( clicked && option == 0 ) ) {
         game->ingame_menu = false;
@@ -1323,8 +1330,65 @@ void ingame_menu_update( game_t* game ) {
         game->restart_requested = true;    
         game->ingame_menu = false;
     } else if( was_key_pressed( game, APP_KEY_6 ) || ( clicked && option == 5 ) ) {
-        game->new_state = GAMESTATE_TERMINATE;
-        game->ingame_menu = false;
+        game->exit_dialog = true;
+    }
+
+    int color_opt = game->exit_dialog ? game->render->color_disabled : game->render->color_opt;
+
+    frame( game->render, 99, 39, 124, 164, game->render->color_background, color_opt );
+    if( option >= 0 ) {
+        box( game->render, 110, ypos + ( option  ) * spacing + spacing / 6, 100, spacing - spacing / 3, color_opt );
+    }
+    int offs = -spacing + spacing / 4;
+    center( game->render, game->render->font_name, "RESUME", 160, offs + ( ypos+=spacing ), option == 0 ? game->render->color_background : color_opt );
+    center( game->render, game->render->font_name, "SAVE GAME", 160, offs + ( ypos+=spacing ), option == 1 ? game->render->color_background : color_opt );
+    center( game->render, game->render->font_name, "LOAD GAME", 160, offs + ( ypos+=spacing ), option == 2 ? game->render->color_background : color_opt );
+    center( game->render, game->render->font_name, "OPTION", 160, offs + ( ypos+=spacing ), option == 3 ? game->render->color_background : game->render->color_disabled );
+    center( game->render, game->render->font_name, "RESTART", 160, offs + ( ypos+=spacing ), option == 4 ? game->render->color_background : color_opt );
+    center( game->render, game->render->font_name, "QUIT", 160, offs + ( ypos+=spacing ), option == 5 ? game->render->color_background : color_opt );
+}
+
+
+void exit_dialog_update( game_t* game ) {
+    int mouse_x = input_get_mouse_x( game->input );
+    int mouse_y = input_get_mouse_y( game->input );
+    scale_for_resolution_inverse( game->render, &mouse_x, &mouse_y );
+
+    frame( game->render, 120, 95, 80, 50, game->render->color_background, game->render->color_opt );
+    center_wrap( game->render, game->render->font_txt, "Are you sure you want to quit?", 160, 100, game->render->color_opt, 70 );
+
+    int height = game->render->font_opt->height;
+    scale_for_resolution_inverse( game->render, &height, NULL );
+    height += 2;
+
+    int ypos = 145 - height - 7;
+
+    bool no = false;
+    bool yes = false;
+    if( mouse_y >= ypos && mouse_y <= ypos + height ) {
+        if( mouse_x >= 130 && mouse_x <= 130 + 25 ) {
+            no = true;
+        } else if( mouse_x >= 165 && mouse_x <= 165 + 25 ) {
+            yes = true;
+        }
+    }
+
+    frame( game->render, 130, ypos, 25, height, no ? game->render->color_opt : game->render->color_background, 
+        no ? game->render->color_background : game->render->color_opt );
+    center_wrap( game->render, game->render->font_opt, "No", 142, ypos + 1, 
+        no ? game->render->color_background : game->render->color_opt, 25 );
+
+    frame2( game->render, 165, ypos, 25, height, yes ? game->render->color_opt : game->render->color_background, 
+        yes ? game->render->color_background : game->render->color_opt );
+    center_wrap( game->render, game->render->font_opt, "Yes", 177, ypos + 1, 
+        yes ? game->render->color_background : game->render->color_opt, 25 );
+
+    bool clicked = was_key_pressed( game, APP_KEY_LBUTTON );
+    if( was_key_pressed( game, APP_KEY_ESCAPE ) || ( clicked && no ) ) {
+        game->exit_dialog = false;
+    } else if( was_key_pressed( game, APP_KEY_RETURN ) || ( clicked && yes ) ) {
+        game->exit_dialog = false;
+        game->exit_confirmed = true;
     }
 }
 
