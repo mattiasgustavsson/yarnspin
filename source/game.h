@@ -183,6 +183,9 @@ bool state_data_read( state_data_t* data, buffer_t* buffer ) {
 
 typedef struct savegame_t {
     uint32_t version;
+    bool fullscreen;
+    int sound_level;
+    int display_filter;
     int thumb_width;
     int thumb_height;
     uint8_t* thumb;
@@ -196,6 +199,9 @@ typedef struct game_t {
     float delta_time;
     int blink_count;
     int blink_wait;
+    int sound_level;
+    int display_filter_index;
+    bool fullscreen;
     bool blink_visible;
     bool exit_flag;
     bool exit_requested;
@@ -209,6 +215,7 @@ typedef struct game_t {
     bool ingame_menu;
     bool savegame_menu;
     bool loadgame_menu;
+    bool settings_menu;
     int transition_counter;
     render_t* render;
     audiosys_t* audiosys;
@@ -348,11 +355,13 @@ void game_init( game_t* game, yarn_t* yarn, render_t* render, input_t* input, au
     game->exit_requested = false;
     game->exit_dialog = false;
     game->exit_confirmed = false;
+    game->sound_level = 3;
     game->render = render;
     game->audiosys = audiosys;
     game->rnd = rnd;
     game->input = input;
     game->yarn = yarn;
+    game->display_filter_index = 0;
 
     game->blink_count = 0;
     game->blink_wait = 100;
@@ -965,6 +974,9 @@ void save_game( game_t* game, int slot ) {
     int version_len = (int) strlen( game->yarn->globals.version );
     buffer_write_i32( buffer, &version_len, 1 );
     buffer_write_char( buffer, game->yarn->globals.version, version_len );
+    buffer_write_bool( buffer, &game->fullscreen, 1 );
+    buffer_write_i32( buffer, &game->sound_level, 1 );
+    buffer_write_i32( buffer, &game->display_filter_index, 1 );
     buffer_write_i32( buffer, &thumb_width, 1 );
     buffer_write_i32( buffer, &thumb_height, 1 );
     
@@ -1009,6 +1021,11 @@ void load_game( game_t* game, int slot ) {
     }
     savegame_t* savegame = &game->savegames[ slot - 1 ];
     if( savegame->thumb_width && savegame->thumb_height ) {
+        game->sound_level = savegame->sound_level < 0 ? 0 : savegame->sound_level > 3 ? 3 : savegame->sound_level;
+        float volumes[] = { 0.0f, 0.33f, 0.66f, 1.0f };
+        audiosys_master_volume_set( game->audiosys, volumes[ game->sound_level ] );
+        game->display_filter_index = savegame->display_filter < 0 ? 0 : savegame->display_filter >= game->yarn->globals.display_filters->count ? game->yarn->globals.display_filters->count - 1 : savegame->display_filter;
+        game->fullscreen = savegame->fullscreen;
         game_load_state( game, &savegame->state );   
         game->ingame_menu = false;
         game->loadgame_menu = false;
@@ -1049,6 +1066,10 @@ void load_savegames( game_t* game ) {
                 continue;
             }
             free( version );
+            buffer_read_bool( buffer, &savegame->fullscreen, 1 );
+            buffer_read_i32( buffer, &savegame->sound_level, 1 );
+            buffer_read_i32( buffer, &savegame->display_filter, 1 );
+
             buffer_read_i32( buffer, &savegame->thumb_width, 1 );
             buffer_read_i32( buffer, &savegame->thumb_height, 1 );
             if( savegame->thumb_width != thumb_width || savegame->thumb_height != thumb_height ) {
@@ -1294,6 +1315,136 @@ void loadgame_menu_update( game_t* game ) {
 }
 
 
+bool button( render_t* render, int x, int y, int w, int h, pixelfont_t* font, char const* text, int background, int color, bool selected, int mouse_x, int mouse_y ) {
+    bool hover = !selected && mouse_x >= x && mouse_y >= y && mouse_x <= x + w && mouse_y <= y + h;
+    if( selected ) {
+        frame2( render, x, y, w, h, hover ? color : background, hover ? background : color );
+    } else {
+        frame( render, x, y, w, h, hover ? color : background, hover ? background : color );
+    }
+    center( render, font, text, x + w / 2, y + 1, hover ? background : color );
+    return hover;
+}
+
+
+void settings_menu_update( game_t* game ) {
+    int mouse_x = input_get_mouse_x( game->input );
+    int mouse_y = input_get_mouse_y( game->input );
+    scale_for_resolution_inverse( game->render, &mouse_x, &mouse_y );
+
+    frame( game->render, 99, 39, 124, 164, game->render->color_background, game->render->color_opt );
+
+    int name_height = game->render->font_name->height;
+    int opt_height = game->render->font_opt->height;
+    scale_for_resolution_inverse( game->render, &name_height, &opt_height );
+
+    int ypos = 50;
+    center( game->render, game->render->font_name, "SETTINGS", 160, ypos, game->render->color_opt );
+    ypos += name_height + 10;
+
+    text( game->render, game->render->font_name, "SOUND", 110, ypos, game->render->color_opt );
+    ypos += name_height + 2;
+
+    int w = 110 / 4 - 5;
+    int xpos = 110;
+    bool sound_off = button( game->render, xpos, ypos, w, opt_height + 2, game->render->font_opt, "OFF", game->render->color_background, game->render->color_opt, game->sound_level == 0, mouse_x, mouse_y );
+    xpos += w + 5;
+    bool sound_low = button( game->render, xpos, ypos, w, opt_height + 2, game->render->font_opt, "LOW", game->render->color_background, game->render->color_opt, game->sound_level == 1, mouse_x, mouse_y );
+    xpos += w + 5;
+    bool sound_mid = button( game->render, xpos, ypos, w, opt_height + 2, game->render->font_opt, "MID", game->render->color_background, game->render->color_opt, game->sound_level == 2, mouse_x, mouse_y );
+    xpos += w + 5;
+    bool sound_max = button( game->render, xpos, ypos, w, opt_height + 2, game->render->font_opt, "MAX", game->render->color_background, game->render->color_opt, game->sound_level == 3, mouse_x, mouse_y );
+
+    ypos += opt_height + 2 + 10;
+
+    text( game->render, game->render->font_name, "SCREEN MODE", 110, ypos, game->render->color_opt );
+    ypos += name_height + 2;
+
+    w = 107 / 2 - 5;
+    xpos = 110;
+    bool screen_window = button( game->render, xpos, ypos, w, opt_height + 2, game->render->font_opt, "WINDOW", game->render->color_background, game->render->color_opt, !game->fullscreen, mouse_x, mouse_y );
+    xpos += w + 5;
+    bool screen_full = button( game->render, xpos, ypos, w, opt_height + 2, game->render->font_opt, "FULL", game->render->color_background, game->render->color_opt, game->fullscreen, mouse_x, mouse_y );
+
+    ypos += opt_height + 2 + 10;
+
+    text( game->render, game->render->font_name, "DISPLAY FILTER", 110, ypos, game->render->color_opt );
+    ypos += name_height + 2;
+
+    char const* filters[ 4 ] = { NULL };
+    for( int i = 0; i < game->yarn->globals.display_filters->count; ++i ) {
+        yarn_display_filter_t filter = game->yarn->globals.display_filters->items[ i ];
+        switch( filter ) {
+            case YARN_DISPLAY_FILTER_NONE: {
+                filters[ i ] = "OFF";
+            } break;
+            case YARN_DISPLAY_FILTER_TV: {
+                filters[ i ] = "TV";
+            } break;
+            case YARN_DISPLAY_FILTER_PC: {
+                filters[ i ] = "PC";
+            } break;
+            case YARN_DISPLAY_FILTER_LITE: {
+                filters[ i ] = "LITE";
+            } break;
+        }
+    }
+
+    bool filter_hover[ 4 ] = { false };
+    w = 110 / 4 - 4;
+    xpos = 110 + ( w + 4 ) * game->display_filter_index;
+    filter_hover[ game->display_filter_index ] = button( game->render, xpos, ypos, w, opt_height + 2, game->render->font_opt, filters[ game->display_filter_index ], game->render->color_background, game->render->color_opt, true, mouse_x, mouse_y );
+    xpos = 110;
+    for( int i = 0; i < 4; ++i ) {
+        if( filters[ i ] && i != game->display_filter_index ) {
+            filter_hover[ i ] = button( game->render, xpos, ypos, w, opt_height + 2, game->render->font_opt, filters[ i ], game->render->color_background, game->render->color_opt, false, mouse_x, mouse_y );
+        }
+        xpos += w + 4;
+    }
+
+    ypos += opt_height + 2 + 15;
+
+    bool done_hover = mouse_x >= 100 && mouse_y <= 224 && mouse_y >= ypos - 2 && mouse_y <= ypos + name_height;
+    if( done_hover ) {
+        box( game->render, 110, ypos - 2, 100, name_height + 4, done_hover ? game->render->color_opt : game->render->color_background );
+    }
+    center( game->render, game->render->font_name, "DONE", 160, ypos, done_hover ? game->render->color_background : game->render->color_opt );
+    
+    if( was_key_pressed( game, APP_KEY_ESCAPE ) || ( done_hover && was_key_pressed( game, APP_KEY_LBUTTON ) ) ) {
+        game->settings_menu = false;
+    }
+    if( was_key_pressed( game, APP_KEY_LBUTTON ) ) {
+        if( sound_off ) {
+            game->sound_level = 0;
+            audiosys_master_volume_set( game->audiosys, 0.0f );
+        }
+        if( sound_low ) {
+            game->sound_level = 1;
+            audiosys_master_volume_set( game->audiosys, 0.33f );
+        }
+        if( sound_mid ) {
+            game->sound_level = 2;
+            audiosys_master_volume_set( game->audiosys, 0.66f );
+        }
+        if( sound_max ) {
+            game->sound_level = 3;
+            audiosys_master_volume_set( game->audiosys, 1.0f );
+        }
+        if( screen_window ) {
+            game->fullscreen = false;
+        }
+        if( screen_full ) {
+            game->fullscreen = true;
+        }
+        for( int i = 0; i < 4; ++i ) {
+            if( filter_hover[ i ] ) {
+                game->display_filter_index = i;
+            }
+        }
+    }
+}
+
+
 void ingame_menu_update( game_t* game ) {
     if( game->savegame_menu ) {
         savegame_menu_update( game );
@@ -1303,16 +1454,19 @@ void ingame_menu_update( game_t* game ) {
         loadgame_menu_update( game );
         return;
     }
+    if( game->settings_menu ) {
+        settings_menu_update( game );
+        return;
+    }
     int mouse_x = input_get_mouse_x( game->input );
     int mouse_y = input_get_mouse_y( game->input );
     scale_for_resolution_inverse( game->render, &mouse_x, &mouse_y );
-
 
     int spacing = game->render->font_name->height * 2;
     scale_for_resolution_inverse( game->render, &spacing, NULL );
     int ypos = 40 + ( 160 - ( 6 * spacing ) ) / 2;
     int option = ( mouse_y - ypos ) / spacing;
-    if( option > 5 || option == 3 || mouse_y < ypos ) {
+    if( option > 5 || mouse_y < ypos ) {
         option = -1;
     }
 
@@ -1326,6 +1480,7 @@ void ingame_menu_update( game_t* game ) {
         game->loadgame_menu = true;
         load_savegames( game );
     } else if( was_key_pressed( game, APP_KEY_4 ) || ( clicked && option == 3 ) ) {
+        game->settings_menu = true;
     } else if( was_key_pressed( game, APP_KEY_5 ) || ( clicked && option == 4 ) ) {
         game->restart_requested = true;    
         game->ingame_menu = false;
@@ -1343,7 +1498,7 @@ void ingame_menu_update( game_t* game ) {
     center( game->render, game->render->font_name, "RESUME", 160, offs + ( ypos+=spacing ), option == 0 ? game->render->color_background : color_opt );
     center( game->render, game->render->font_name, "SAVE GAME", 160, offs + ( ypos+=spacing ), option == 1 ? game->render->color_background : color_opt );
     center( game->render, game->render->font_name, "LOAD GAME", 160, offs + ( ypos+=spacing ), option == 2 ? game->render->color_background : color_opt );
-    center( game->render, game->render->font_name, "OPTION", 160, offs + ( ypos+=spacing ), option == 3 ? game->render->color_background : game->render->color_disabled );
+    center( game->render, game->render->font_name, "SETTINGS", 160, offs + ( ypos+=spacing ), option == 3 ? game->render->color_background : color_opt );
     center( game->render, game->render->font_name, "RESTART", 160, offs + ( ypos+=spacing ), option == 4 ? game->render->color_background : color_opt );
     center( game->render, game->render->font_name, "QUIT", 160, offs + ( ypos+=spacing ), option == 5 ? game->render->color_background : color_opt );
 }

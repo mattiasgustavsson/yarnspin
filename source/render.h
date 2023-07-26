@@ -976,10 +976,10 @@ void frame2( render_t* render, int x, int y, int w, int h, int bg, int fg ) {
     scale_for_resolution( render, &x, &y );
     scale_for_resolution( render, &w, &h );
     int s = render->screen_width >= 1280 ? 6 : render->screen_width >= 640 ? 4 : 2;
-    x -= 2 * s;
-    y -= 2 * s;
-    w += 4 * s;
-    h += 4 * s;
+    x -= 1 * s + ( 1 * ( s / 2 ) );
+    y -= 1 * s + ( 1 * ( s / 2 ) );
+    w += 2 * s + ( 2 * ( s / 2 ) );
+    h += 2 * s + ( 2 * ( s / 2 ) );
     if( render->screen ) {
         for( int i = 0; i < 3; ++i ) {
             for( int iy = 0; iy <= h; ++iy ) {
@@ -991,10 +991,10 @@ void frame2( render_t* render, int x, int y, int w, int h, int bg, int fg ) {
                     }
                 }
             }
-            x += 1 * s;
-            y += 1 * s;
-            w -= 2 * s;
-            h -= 2 * s;
+            x += 1 * ( i == 0 ? s / 2 : s );
+            y += 1 * ( i == 0 ? s / 2 : s );
+            w -= 2 * ( i == 0 ? s / 2 : s );
+            h -= 2 * ( i == 0 ? s / 2 : s );
             int t = bg;
             bg = fg;
             fg = t;
@@ -1031,10 +1031,10 @@ void frame2( render_t* render, int x, int y, int w, int h, int bg, int fg ) {
             glUniform4f( glGetUniformLocation( render->shader, "col" ), r, g, b, a );
             glDrawArrays( GL_TRIANGLE_FAN, 0, 4 );
             glBindTexture( GL_TEXTURE_2D, 0 );
-            x += 1 * s;
-            y += 1 * s;
-            w -= 2 * s;
-            h -= 2 * s;
+            x += 1 * ( i == 0 ? s / 2 : s );
+            y += 1 * ( i == 0 ? s / 2 : s );
+            w -= 2 * ( i == 0 ? s / 2 : s );
+            h -= 2 * ( i == 0 ? s / 2 : s );
             int t = bg;
             bg = fg;
             fg = t;

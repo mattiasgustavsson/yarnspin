@@ -248,13 +248,7 @@ int app_proc( app_t* app, void* user_data ) {
         app_window_size( app, w, h );
     }
 
-    bool fullscreen = yarn->globals.screenmode == YARN_SCREENMODE_FULLSCREEN;
-    #ifdef __wasm__
-        fullscreen = false;
-    #endif
-
     app_interpolation( app, yarn->globals.resolution >= YARN_RESOLUTION_FULL || ( yarn->globals.resolution == YARN_RESOLUTION_HIGH && yarn->globals.colormode == YARN_COLORMODE_RGB ) ? APP_INTERPOLATION_LINEAR : APP_INTERPOLATION_NONE );
-    app_screenmode( app, fullscreen ? APP_SCREENMODE_FULLSCREEN : APP_SCREENMODE_WINDOW );
     app_title( app, yarn->globals.title );
 
     int frame_pc_width = 0;
@@ -274,9 +268,6 @@ int app_proc( app_t* app, void* user_data ) {
         frame_tv_pixels = (CRTEMU_U32*) stbi_load_from_memory( (stbi_uc*) yarn->assets.frame_tv,
             yarn->assets.frame_tv_size, &frame_tv_width, &frame_tv_height, &c, 4 );
     }
-
-    int display_filter_index = 0;
-    yarn_display_filter_t display_filter = yarn->globals.display_filters->items[ display_filter_index ];
 
     frametimer_t* frametimer = frametimer_create( NULL );
     frametimer_lock_rate( frametimer, 60 );
@@ -318,6 +309,14 @@ int app_proc( app_t* app, void* user_data ) {
     // run game
     game_t game;
     game_init( &game, yarn, &render, &input, audiosys, &rnd );
+
+    game.fullscreen = yarn->globals.screenmode == YARN_SCREENMODE_FULLSCREEN;
+    #ifdef __wasm__
+        game.fullscreen = false;
+    #endif
+    app_screenmode( app, game.fullscreen ? APP_SCREENMODE_FULLSCREEN : APP_SCREENMODE_WINDOW );
+
+    yarn_display_filter_t display_filter = yarn->globals.display_filters->items[ game.display_filter_index ];
 
     thread_mutex_init( &g_sound_mutex );
     if( !g_disable_sound ) {
@@ -378,14 +377,15 @@ int app_proc( app_t* app, void* user_data ) {
         }
 
         if( input_was_key_pressed( &input, APP_KEY_F11 ) ) {
-            fullscreen = !fullscreen;
-            app_screenmode( app, fullscreen ? APP_SCREENMODE_FULLSCREEN : APP_SCREENMODE_WINDOW );
+            game.fullscreen = !game.fullscreen;
         }
+        app_screenmode( app, game.fullscreen ? APP_SCREENMODE_FULLSCREEN : APP_SCREENMODE_WINDOW );
 
         if( input_was_key_pressed( &input, APP_KEY_F9 ) ) {
-            display_filter_index = ( display_filter_index + 1 ) % yarn->globals.display_filters->count;
-            display_filter = yarn->globals.display_filters->items[ display_filter_index ];
+            game.display_filter_index = ( game.display_filter_index + 1 ) % yarn->globals.display_filters->count;
         }
+        display_filter = yarn->globals.display_filters->items[ game.display_filter_index ];
+
 
         APP_U32 transition = (APP_U32)( ( 255 * abs( game.transition_counter ) / 10 ) );
         APP_U32 fade = transition << 16 | transition << 8 | transition;
