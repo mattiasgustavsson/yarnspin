@@ -1469,7 +1469,7 @@ gamestate_t screen_update( game_t* game ) {
     int mouse_y = input_get_mouse_y( game->input );
     scale_for_resolution_inverse( game->render, &mouse_x, &mouse_y );
 
-    bool menu_hover = mouse_y < 13 && mouse_x > 295;
+    bool menu_hover = mouse_y < 15 && mouse_x > 285;
     if( menu_hover ) {
         box( game->render, 308, 0, 10, 6, game->render->color_opt );
     }
@@ -1570,7 +1570,7 @@ gamestate_t location_update( game_t* game ) {
         draw( game->render, yarn->globals.background_location, 0, 0 );
     }
 
-    bool menu_hover = mouse_y < 13 && mouse_x > 295;
+    bool menu_hover = mouse_y < 15 && mouse_x > 285;
     if( menu_hover ) {
         box( game->render, 308, 0, 10, 6, game->render->color_opt );
     }
@@ -1606,7 +1606,7 @@ gamestate_t location_update( game_t* game ) {
                 game->state.current_screen = game->queued_screen;
                 return GAMESTATE_SCREEN;
             }
-        } else if( game->queued_location >= 0 && ( was_key_pressed( game, APP_KEY_LBUTTON ) || was_key_pressed( game, APP_KEY_SPACE ) ) ) {
+        } else if( game->queued_location >= 0 && ( ( was_key_pressed( game, APP_KEY_LBUTTON ) && !menu_hover ) || was_key_pressed( game, APP_KEY_SPACE ) ) ) {
             game->state.current_location = game->queued_location;
             game->state.current_dialog = -1;
             game->state.current_screen = -1;
@@ -1902,7 +1902,7 @@ gamestate_t dialog_update( game_t* game ) {
         draw( game->render, yarn->globals.background_dialog, 0, 0 );
     }
 
-    bool menu_hover = mouse_y < 8 && mouse_x > 300;
+    bool menu_hover = mouse_y < 15 && mouse_x > 285;
     if( menu_hover ) {
         box( game->render, 308, 0, 10, 6, game->render->color_opt );
     }
@@ -1933,14 +1933,14 @@ gamestate_t dialog_update( game_t* game ) {
     if( game->yarn->globals.dialog_print_speed == 0 ) {
         game->limit = game->dialog.phrase_len + 1;
     }
-    if( game->limit > game->dialog.phrase_len && ( was_key_pressed( game, APP_KEY_LBUTTON) || was_key_pressed( game, APP_KEY_SPACE ) ) ) {
+    if( game->limit > game->dialog.phrase_len && ( ( was_key_pressed( game, APP_KEY_LBUTTON) && !menu_hover ) || was_key_pressed( game, APP_KEY_SPACE ) ) ) {
         if( game->dialog.phrase_index < phrase_count - 1 ) {
             ++game->dialog.phrase_index;
             game->limit = -30.0f;
         } else if( game->dialog.enable_options == 0 ) {
             game->dialog.enable_options = 1;
         }
-    } else if( was_key_pressed( game, APP_KEY_LBUTTON) || was_key_pressed( game, APP_KEY_SPACE ) )  {
+    } else if( ( was_key_pressed( game, APP_KEY_LBUTTON) && !menu_hover ) || was_key_pressed( game, APP_KEY_SPACE ) )  {
         game->limit = (float) game->dialog.phrase_len;
         game->dialog.enable_options = 0;
     }
