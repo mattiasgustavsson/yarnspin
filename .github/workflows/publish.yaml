@@ -8,7 +8,32 @@ permissions:
   contents: write
  
 jobs: 
+  build-docs: 
+    runs-on: ubuntu-latest
+    steps: 
+      - uses: actions/checkout@v1 
+      - uses: robinraju/release-downloader@v1.7 
+        with: 
+          repository: "mattiasgustavsson/docgen" 
+          latest: true
+          fileName: "docgen-linux.tar.gz" 
+      - name: build docs 
+        run: | 
+          tar -xzvf docgen-linux.tar.gz
+          ./docgen docs/yarnspin.md docs/yarnspin.html
+      - name: html to pdf
+        uses: LukaszLapaj/html-to-pdf-action@master
+        with:
+          htmlFile: ./docs/yarnspin.html
+          outputFile: ./yarnspin.pdf
+          pdfOptions: '{"format": "A4", "margin": {"top": "10mm", "left": "10mm", "right": "10mm", "bottom": "10mm"}}'
+      - name: upload artifact
+        uses: actions/upload-artifact@master
+        with:
+          name: yarnspin.pdf
+          path: ./yarnspin.pdf
   publish-windows: 
+    needs: build-docs
     runs-on: windows-2019 
     steps: 
       - uses: actions/checkout@v1 
@@ -19,6 +44,10 @@ jobs:
           repository: "mattiasgustavsson/dos-like" 
           tag: "wasm-env" 
           fileName: "dos-like-wasm-build-env-win.zip" 
+      - uses: actions/download-artifact@master
+        with:
+          name: yarnspin.pdf
+          path: .
       - name: install dependencies 
         run: 7z -y x dos-like-wasm-build-env-win.zip 
       - name: build yarnspin 
@@ -33,7 +62,7 @@ jobs:
           copy wasm\wajicup.js build
           move runtime.exe build
           move runtime.wasm build
-          7z a yarnspin-win.zip yarnspin.exe faces fonts images palettes scripts sound build\runtime.exe build\runtime.wasm build\wajicup.js build\node.exe build\template.html build\yarnspin_icon.png
+          7z a yarnspin-win.zip yarnspin.exe yarnspin.pdf faces fonts images palettes scripts sound build\runtime.exe build\runtime.wasm build\wajicup.js build\node.exe build\template.html build\yarnspin_icon.png
       - name: upload artifacts
         uses: softprops/action-gh-release@v1
         with:
@@ -41,6 +70,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   publish-macos: 
+    needs: build-docs
     runs-on: macOS-latest 
     steps: 
       - uses: actions/checkout@v1 
@@ -49,6 +79,10 @@ jobs:
           repository: "mattiasgustavsson/dos-like" 
           tag: "wasm-env" 
           fileName: "dos-like-wasm-build-env-win.zip" 
+      - uses: actions/download-artifact@master
+        with:
+          name: yarnspin.pdf
+          path: .
       - name: install dependencies 
         run: | 
           brew install sdl2 glew llvm binaryen
@@ -69,7 +103,7 @@ jobs:
           mv runtime.wasm build
           cp wasm/wajicup.js build
           cp /usr/local/bin/node build
-          tar -czvf yarnspin-mac.tar.gz yarnspin faces fonts images palettes scripts sound build/runtime build/runtime.wasm build/wajicup.js build/node build/template.html build/yarnspin_icon.png
+          tar -czvf yarnspin-mac.tar.gz yarnspin yarnspin.pdf faces fonts images palettes scripts sound build/runtime build/runtime.wasm build/wajicup.js build/node build/template.html build/yarnspin_icon.png
       - name: upload artifacts
         uses: softprops/action-gh-release@v1
         with:
@@ -77,6 +111,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   publish-linux: 
+    needs: build-docs
     runs-on: ubuntu-latest
     steps: 
       - uses: actions/checkout@v1 
@@ -90,6 +125,10 @@ jobs:
           repository: "mattiasgustavsson/dos-like" 
           tag: "wasm-env" 
           fileName: "dos-like-wasm-build-env-win.zip" 
+      - uses: actions/download-artifact@master
+        with:
+          name: yarnspin.pdf
+          path: .
       - name: install dependencies 
         run: | 
           sudo apt-get update 
@@ -118,10 +157,17 @@ jobs:
           mv runtime.wasm build
           cp wasm/wajicup.js build
           cp /usr/local/bin/node build
-          tar -czvf yarnspin-linux.tar.gz yarnspin faces fonts images palettes scripts sound build/runtime build/runtime.wasm build/wajicup.js build/node build/template.html build/yarnspin_icon.png
+          tar -czvf yarnspin-linux.tar.gz yarnspin yarnspin.pdf faces fonts images palettes scripts sound build/runtime build/runtime.wasm build/wajicup.js build/node build/template.html build/yarnspin_icon.png
       - name: upload artifacts
         uses: softprops/action-gh-release@v1
         with:
           files: yarnspin-linux.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  cleanup: 
+    needs: [publish-windows,publish-macos,publish-linux]
+    runs-on: ubuntu-latest
+    steps: 
+      - uses: geekyeggo/delete-artifact@v2
+        with:
+          name: yarnspin.pdf
