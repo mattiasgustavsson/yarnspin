@@ -36,14 +36,15 @@ body {
     max-width: 1000px;
     padding: 0 5%;
     margin: auto;
-    font-size: 125%;
+    font-size: 150%;
     word-wrap: break-word;
     margin-top: 25%;
+	text-align: justify;
 }
 
 h1 {
     font-weight: 900;
-	font-size: 300%;
+	font-size: 240%;
     text-align: center;
 }
 
