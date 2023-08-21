@@ -5,8 +5,7 @@
 
 ---
 
-1.Introduction
---------------
+## 1.Introduction
 
 Welcome to the world of *Yarnspin*, a friendly and approachable game engine designed to help you create your very own choose-your-own-adventure story games! Drawing inspiration from home computer game development tools from the 1980s and 1990s, Yarnspin aims to provide an accessible and enjoyable experience, whether you're a seasoned developer or just starting out. In this introductory chapter, we'll cover the essential information you need to get started with Yarnspin, including system requirements, how to make the most of this manual, and what you'll find in the Yarnspin package. So, let's dive in!
 
@@ -62,8 +61,7 @@ With Yarnspin, I aim to share my appreciation for game development and empower o
 
 
 
-2. Getting Started
-------------------
+## 2. Getting Started
 
 In this chapter, we'll help you dive into the world of Yarnspin by guiding you through the sample game, understanding the basic concepts of Yarnspin, and creating your very first yarn. By the end of this chapter, you'll have a solid foundation in Yarnspin and be well on your way to creating interactive stories of your own. 
 
@@ -209,8 +207,7 @@ Now that you've created your simple Yarnspin game script, save the "my_first_yar
 Congratulations! You've just created your very first Yarnspin game. As you become more comfortable with the Yarnspin scripting language, you can start to add more locations, dialogs, characters, and interactions to
 
 
-3. Unwinding the sample Yarn
-----------------------------
+## 3. Unwinding the sample Yarn
 
 ### Overview
 
@@ -225,8 +222,7 @@ Congratulations! You've just created your very first Yarnspin game. As you becom
 ### alice.txt
 
 
-4. Spinning a Yarn
-------------------
+## 4. Spinning a Yarn
 
 ### Planning
 
@@ -241,8 +237,7 @@ Congratulations! You've just created your very first Yarnspin game. As you becom
 ### Package and release
 
 
-5. Scripting Reference
-----------------------
+## 5. Scripting Reference
 
 When you run `yarnspin.exe` it will compile all the scripts and assets into a single compressed `yarnspin.dat` file. You can then distribute `yarnspin.exe` and `yarnspin.dat`, and that is the complete game ready for distribution. If there is no `scripts` folder in the same location as `yarnspin.exe`, it won't attempt compilation.
 
@@ -497,8 +492,7 @@ Yarnspin has a built-in editor to make basic adjustment to your images and portr
 ```
 
 
-6. Additional Resources
------------------------
+## 6. Additional Resources
 
 ### Story structure
 
