@@ -1,5 +1,6 @@
 
 
+
 typedef enum gamestate_t {
     GAMESTATE_NO_CHANGE,
     GAMESTATE_BOOT,
@@ -867,6 +868,7 @@ void do_actions( game_t* game, array_param(yarn_act_t)* act_param ) {
             } break;
             case ACTION_TYPE_EXIT: {
                 game->exit_requested = true;
+                game->transition_counter = 0;
             } break;
             case ACTION_TYPE_RETURN: {
                 if( game->state.section_stack->count > 1 ) {
@@ -1510,7 +1512,7 @@ void exit_dialog_update( game_t* game ) {
     scale_for_resolution_inverse( game->render, &mouse_x, &mouse_y );
 
     frame( game->render, 120, 95, 80, 50, game->render->color_background, game->render->color_opt );
-    center_wrap( game->render, game->render->font_txt, "Are you sure you want to quit?", 160, 100, game->render->color_opt, 70 );
+    center_wrap( game->render, game->render->font_txt, "Are you sure you want to quit?", 160, 100, game->render->color_opt, 80 );
 
     int height = game->render->font_opt->height;
     scale_for_resolution_inverse( game->render, &height, NULL );
@@ -1780,12 +1782,13 @@ gamestate_t location_update( game_t* game ) {
     }
 
     // txt:
-    wrap_limit( game->render, game->render->font_txt, txt, 5, 146, game->render->color_txt, 310, game->limit < 0.0f ? 0 : (int)game->limit );
-
     game->limit += game->delta_time * game->yarn->globals.location_print_speed;
     if( game->yarn->globals.location_print_speed == 0 ) {
         game->limit = strlen( txt );
     }
+
+    wrap_limit( game->render, game->render->font_txt, txt, 5, 146, game->render->color_txt, 310, game->limit < 0.0f ? 0 : (int)game->limit );
+
     if( was_key_pressed( game, APP_KEY_LBUTTON) || was_key_pressed( game, APP_KEY_SPACE ) )  {
         game->limit = (float) strlen( txt );
     }
