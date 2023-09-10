@@ -328,7 +328,7 @@ typedef struct yarn_audio_t {
     bool random;
     float crossfade_min;
     float crossfade_max;
-    float delay_min;
+    float delay_min;    
     float delay_max;
     float volume_min;
     float volume_max;

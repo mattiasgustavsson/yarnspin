@@ -1079,7 +1079,7 @@ bool compile_dialog( parser_section_t* section, yarn_t* yarn, compiler_context_t
             yarn_act_t* action = 0;
             if( say ) action = array_add( say->act, empty_act() );
             else if( use ) action = array_add( use->act, empty_act() );
-            else action =array_add( dialog->act, empty_act() );
+            else action = array_add( dialog->act, empty_act() );
             if( cond ) { action->cond = *cond; cond = 0; }
             no_error = no_error && compile_action( decl->data, action, decl->filename, decl->line_number, yarn, context );
         } else if( CMP( decl->keyword, "say" ) ) {

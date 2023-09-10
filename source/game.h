@@ -754,7 +754,9 @@ void do_audio( game_t* game, array_param(yarn_audio_t)* audio_param ) {
                     yarn_audio_t const* mus = &audio->items[ i ];
                     if( mus->stop ) {
                         game->state.current_music = -1;
-                        audiosys_music_stop( game->audiosys, 1.0f );
+                        float fade_time = mus->crossfade_min + ( mus->crossfade_max - mus->crossfade_min ) * rnd_pcg_nextf( game->rnd );
+                        if( fade_time == 0.0f ) fade_time = 1.0f;
+                        audiosys_music_stop( game->audiosys, fade_time < 0.1f ? 0.1f : fade_time );
                     } else {
                         int music_index = mus->audio_index;
                         if( music_index == game->state.current_music ) {
@@ -766,7 +768,12 @@ void do_audio( game_t* game, array_param(yarn_audio_t)* audio_param ) {
                         } else {
                             audiosys_audio_source_t src;
                             if( audio_qoa_source( game, music_index, &src ) ) {
-                                audiosys_music_switch( game->audiosys, src, 0.5f, 0.0f );
+                                float fade_time = mus->crossfade_min + ( mus->crossfade_max - mus->crossfade_min ) * rnd_pcg_nextf( game->rnd );
+                                if( fade_time > 0.0f ) {
+                                    audiosys_music_cross_fade( game->audiosys, src, fade_time < 0.1f ? 0.1f : fade_time );
+                                } else {
+                                    audiosys_music_switch( game->audiosys, src, 0.5f, 0.0f );
+                                }
                                 if( mus->random ) {
                                     float length = audio_qoa_get_length( src.instance );
                                     float r = rnd_pcg_nextf( game->rnd );
@@ -786,7 +793,9 @@ void do_audio( game_t* game, array_param(yarn_audio_t)* audio_param ) {
                     yarn_audio_t const* amb = &audio->items[ i ];
                     if( amb->stop ) {
                         game->state.current_ambience = -1;
-                        audiosys_ambience_stop( game->audiosys, 1.0f );
+                        float fade_time = amb->crossfade_min + ( amb->crossfade_max - amb->crossfade_min ) * rnd_pcg_nextf( game->rnd );
+                        if( fade_time == 0.0f ) fade_time = 1.0f;
+                        audiosys_ambience_stop( game->audiosys, fade_time < 0.1f ? 0.1f : fade_time );
                     } else {
                         int ambience_index = amb->audio_index;
                         if( ambience_index == game->state.current_ambience ) {
@@ -798,7 +807,8 @@ void do_audio( game_t* game, array_param(yarn_audio_t)* audio_param ) {
                         } else {
                             audiosys_audio_source_t src;
                             if( audio_qoa_source( game, ambience_index, &src ) ) {
-                                audiosys_ambience_cross_fade( game->audiosys, src, 0.2f );
+                                float fade_time = amb->crossfade_min + ( amb->crossfade_max - amb->crossfade_min ) * rnd_pcg_nextf( game->rnd );
+                                audiosys_ambience_cross_fade( game->audiosys, src, fade_time < 0.1f ? 0.1f : fade_time );
                                 if( amb->random ) {
                                     float length = audio_qoa_get_length( src.instance );
                                     float r = rnd_pcg_nextf( game->rnd );
@@ -818,7 +828,8 @@ void do_audio( game_t* game, array_param(yarn_audio_t)* audio_param ) {
                     yarn_audio_t const* snd = &audio->items[ i ];
                     for( int j = 0; j < game->sound_state.sounds_count; ++j ) {
                         if( ( snd->stop && snd->audio_index == -1 ) || game->sound_state.sounds[ j ].audio_index == snd->audio_index ) {
-                            audiosys_sound_stop( game->audiosys, game->sound_state.sounds[ j ].handle, 0.1f );
+                            float fade_time = snd->delay_min + ( snd->delay_max - snd->delay_min ) * rnd_pcg_nextf( game->rnd );
+                            audiosys_sound_stop( game->audiosys, game->sound_state.sounds[ j ].handle, fade_time < 0.1f ? 0.1f : fade_time );
                             game->sound_state.sounds[ j-- ] = game->sound_state.sounds[ --game->sound_state.sounds_count ];
                         }
                     }
