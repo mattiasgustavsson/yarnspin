@@ -4588,7 +4588,7 @@ int, app_js_audio_needed, (bool has_focus),
         if (audio_ctx === false) return 0;
         try { (audio_ctx = new (alias(window,"","",'AudioContext'))()).createBuffer(1,1,44100).getChannelData(0); } catch (e) { }
         if (!audio_ctx) { audio_ctx = false; WA.print('Warning: WebAudio not supported\n'); return 0; }
-        for (var i = 0; i != 10; i++) audio_bufs[i] = audio_ctx.createBuffer(2, 512, 44100);
+        for (var i = 0; i != 10; i++) audio_bufs[i] = audio_ctx.createBuffer(2, 2048, 44100);
         if (!start_audio()) { set_start_audio_event('click'); set_start_audio_event('touchstart'); set_start_audio_event('keydown'); }
     }
     if (!start_audio() && !start_audio()) return 0;
@@ -4597,13 +4597,13 @@ int, app_js_audio_needed, (bool has_focus),
     {
         if (has_focus && (audio_miss += 2) > 7)
         {
-            audio_latency += 512;
+            audio_latency += 2048;
             audio_miss = 0;
         }
         audio_done = ct;
     }
     else if (audio_miss > 1) audio_miss--;
-    return ((ct - audio_done) * 44100 + .5 + audio_latency * (has_focus ? 1 : 2) + 511)>>9;
+    return ((ct - audio_done) * 44100 + .5 + audio_latency * (has_focus ? 1 : 2) + 2047)>>11;
 })
 
 WAJIC(int, app_js_audio_push, (APP_S16* sample_pairs, int volume),
@@ -4612,7 +4612,7 @@ WAJIC(int, app_js_audio_push, (APP_S16* sample_pairs, int volume),
     var buf = audio_bufs[audio_bufidx = ((audio_bufidx + 1) % 10)];
     var left = buf.getChannelData(0), right = buf.getChannelData(1);
     var f = (1 / 32768) * (volume / 255);
-    for (var i = 0; i != 512; i++)
+    for (var i = 0; i != 2048; i++)
     {
         left[i] = sample_pairs[i*2] * f;
         right[i] = sample_pairs[i*2+1] * f;
@@ -4621,7 +4621,7 @@ WAJIC(int, app_js_audio_push, (APP_S16* sample_pairs, int volume),
     source.connect(audio_ctx.destination);
     source.buffer = buf;
     source[source.start ? 'start' : 'noteOn'](0.005+audio_done);
-    audio_done += 512/44100;
+    audio_done += 2048/44100;
 })
 
 
@@ -4630,7 +4630,7 @@ void app_present( app_t* app, APP_U32 const* pixels_xbgr, int width, int height,
     if( pixels_xbgr ) app_internal_opengl_present( &app->gl, pixels_xbgr, width, height, mod_xbgr, border_xbgr );
     for( int needed = app_js_audio_needed(app->has_focus); app->sound_callback && needed--;)
         {
-        app->sound_callback(app->sound_buffer, 512, app->sound_user_data);
+        app->sound_callback(app->sound_buffer, 2048, app->sound_user_data);
         app_js_audio_push(app->sound_buffer, app->volume);
         }
     if( app->has_focus )
@@ -4645,7 +4645,7 @@ void app_sound( app_t* app, int sample_pairs_count, void (*sound_callback)( APP_
     app->sound_callback = sound_callback;
     app->sound_user_data = user_data;
     if( sound_callback && !app->sound_buffer )
-        app->sound_buffer = (APP_S16*) APP_MALLOC( app->memctx, sizeof(APP_S16) * 512 * 2 );
+        app->sound_buffer = (APP_S16*) APP_MALLOC( app->memctx, sizeof(APP_S16) * 2048 * 2 );
     else if( !sound_callback && app->sound_buffer )
         APP_FREE( app->memctx, app->sound_buffer );
     }
