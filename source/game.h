@@ -249,164 +249,6 @@ typedef struct game_t {
 } game_t;
 
 
-void game_restart( game_t* game ) {
-    audiosys_stop_all( game->audiosys );
-    state_data_reset( &game->state );
-
-    game->state.current_screen = game->yarn->start_screen;
-    game->state.current_location = game->yarn->start_location;
-    game->state.current_dialog = game->yarn->start_dialog;
-    if( game->yarn->is_debug && game->yarn->debug_start_screen >= 0 ) {
-        game->state.current_screen = game->yarn->debug_start_screen;
-        game->state.current_location = -1;
-        game->state.current_dialog = -1;
-    }
-    if( game->yarn->is_debug && game->yarn->debug_start_location >= 0 ) {
-        game->state.current_screen = -1;
-        game->state.current_location = game->yarn->debug_start_location;
-        game->state.current_dialog = -1;
-    }
-    if( game->yarn->is_debug && game->yarn->debug_start_dialog  >= 0 ) {
-        game->state.current_screen = -1;
-        game->state.current_location = -1;
-        game->state.current_dialog = game->yarn->debug_start_dialog;
-    }
-    for( int i = 0; i < game->yarn->flag_ids->count; ++i ) {
-        bool value = false;
-        if( game->yarn->is_debug ) {
-            for( int j = 0; j < game->yarn->globals.debug_set_flags->count; ++j ) {
-                if( cstr_compare_nocase( game->yarn->flag_ids->items[ i ], game->yarn->globals.debug_set_flags->items[ j ] ) == 0 ) {
-                    value = true;
-                    break;
-                }
-            }
-        }
-        array_add( game->state.flags, &value );
-    }
-
-    for( int i = 0; i < game->yarn->item_ids->count; ++i ) {
-        if( game->yarn->is_debug ) {
-            for( int j = 0; j < game->yarn->globals.debug_get_items->count; ++j ) {
-                if( cstr_compare_nocase( game->yarn->item_ids->items[ i ], game->yarn->globals.debug_get_items->items[ j ] ) == 0 ) {
-                    array_add( game->state.items, &i );
-                    break;
-                }
-            }
-        }
-    }
-
-    if( game->yarn->is_debug ) {
-        for( int i = 0; i < game->yarn->globals.debug_attach_chars->count; ++i ) {
-            for( int j = 0; j < game->yarn->characters->count; ++j ) {
-                if( cstr_compare_nocase( game->yarn->characters->items[ j ].id, game->yarn->globals.debug_attach_chars->items[ i ] ) == 0 ) {
-                    array_add( game->state.chars, &j );
-                    break;
-                }
-            }
-        }
-    }
-
-    game->current_state = GAMESTATE_NO_CHANGE;
-    game->new_state = GAMESTATE_BOOT;
-    game->disable_transition = false;
-    game->transition_counter = 10;
-    game->queued_screen = -1;
-    game->queued_location = -1;
-    game->queued_dialog = -1;
-    game->restart_requested = false;    
-    game->quickload_requested = false;
-}
-
-
-void game_load_state( game_t* game, state_data_t* data ) {
-    game_restart( game );
-
-    state_data_copy( &game->state, data );
-
-    if( game->state.current_screen >= 0 ) {
-        game->new_state = GAMESTATE_SCREEN;
-    } else if( game->state.current_location >= 0 ) {
-        game->new_state = GAMESTATE_LOCATION;
-    } else if( game->state.current_dialog >= 0 ) {
-        game->new_state = GAMESTATE_DIALOG;
-    }
-}
-
-
-void game_save_state( game_t* game, state_data_t* data ) {
-    state_data_copy( data, &game->state );   
-}
-
-
-void game_quicksave( game_t* game ) {
-    game_save_state( game, &game->quicksave );
-}
-
-
-void game_quickload( game_t* game ) {
-    game->quickload_requested = false;
-    game_load_state( game, &game->quicksave );
-}
-
-
-void game_init( game_t* game, yarn_t* yarn, render_t* render, input_t* input, audiosys_t* audiosys, rnd_pcg_t* rnd ) {
-    memset( game, 0, sizeof( *game ) );
-    game->delta_time = 0.0f;
-    game->exit_flag = false;
-    game->exit_requested = false;
-    game->exit_dialog = false;
-    game->exit_confirmed = false;
-    game->sound_level = 3;
-    game->render = render;
-    game->audiosys = audiosys;
-    game->rnd = rnd;
-    game->input = input;
-    game->yarn = yarn;
-    game->display_filter_index = 0;
-
-    game->blink_count = 0;
-    game->blink_wait = 100;
-    game->blink_visible = true;
-
-    game->state.flags = managed_array( bool );
-    game->state.items = managed_array( int );
-    game->state.chars = managed_array( int );
-    game->state.section_stack = managed_array( stack_entry_t );
-
-    game->quicksave.flags = managed_array( bool );
-    game->quicksave.items = managed_array( int );
-    game->quicksave.chars = managed_array( int );
-    game->quicksave.section_stack = managed_array( stack_entry_t );
-
-    game_restart( game );
-
-    game->sound_state.sounds_count = 0;
-    game->sound_state.sounds_capacity = 256;
-    game->sound_state.sounds = ARRAY_CAST( manage_alloc( malloc( sizeof( *game->sound_state.sounds ) * game->sound_state.sounds_capacity ) ) );
-    memset( game->sound_state.sounds, 0, sizeof( *game->sound_state.sounds ) * game->sound_state.sounds_capacity );
-}
-
-bool was_key_pressed( game_t* game, int key ) {
-    return input_was_key_pressed( game->input, key );
-}
-
-
-gamestate_t boot_init( game_t* game );
-gamestate_t boot_update( game_t* game );
-gamestate_t screen_init( game_t* game );
-gamestate_t screen_update( game_t* game );
-gamestate_t location_init( game_t* game );
-gamestate_t location_update( game_t* game );
-gamestate_t dialog_init( game_t* game );
-gamestate_t dialog_update( game_t* game );
-gamestate_t exit_init( game_t* game );
-gamestate_t exit_update( game_t* game );
-gamestate_t terminate_init( game_t* game );
-gamestate_t terminate_update( game_t* game );
-
-void ingame_menu_update( game_t* game );
-void exit_dialog_update( game_t* game );
-
 typedef struct qoa_decode_t {
     qoa_data_t* audio_data;
     qoa_desc desc;
@@ -539,6 +381,193 @@ bool audio_qoa_source( game_t* game, int audio_index, audiosys_audio_source_t* s
     return true;
 }
 
+
+void game_restart( game_t* game ) {
+    audiosys_stop_all( game->audiosys );
+    state_data_reset( &game->state );
+
+    game->state.current_screen = game->yarn->start_screen;
+    game->state.current_location = game->yarn->start_location;
+    game->state.current_dialog = game->yarn->start_dialog;
+    if( game->yarn->is_debug && game->yarn->debug_start_screen >= 0 ) {
+        game->state.current_screen = game->yarn->debug_start_screen;
+        game->state.current_location = -1;
+        game->state.current_dialog = -1;
+    }
+    if( game->yarn->is_debug && game->yarn->debug_start_location >= 0 ) {
+        game->state.current_screen = -1;
+        game->state.current_location = game->yarn->debug_start_location;
+        game->state.current_dialog = -1;
+    }
+    if( game->yarn->is_debug && game->yarn->debug_start_dialog  >= 0 ) {
+        game->state.current_screen = -1;
+        game->state.current_location = -1;
+        game->state.current_dialog = game->yarn->debug_start_dialog;
+    }
+    for( int i = 0; i < game->yarn->flag_ids->count; ++i ) {
+        bool value = false;
+        if( game->yarn->is_debug ) {
+            for( int j = 0; j < game->yarn->globals.debug_set_flags->count; ++j ) {
+                if( cstr_compare_nocase( game->yarn->flag_ids->items[ i ], game->yarn->globals.debug_set_flags->items[ j ] ) == 0 ) {
+                    value = true;
+                    break;
+                }
+            }
+        }
+        array_add( game->state.flags, &value );
+    }
+
+    for( int i = 0; i < game->yarn->item_ids->count; ++i ) {
+        if( game->yarn->is_debug ) {
+            for( int j = 0; j < game->yarn->globals.debug_get_items->count; ++j ) {
+                if( cstr_compare_nocase( game->yarn->item_ids->items[ i ], game->yarn->globals.debug_get_items->items[ j ] ) == 0 ) {
+                    array_add( game->state.items, &i );
+                    break;
+                }
+            }
+        }
+    }
+
+    if( game->yarn->is_debug ) {
+        for( int i = 0; i < game->yarn->globals.debug_attach_chars->count; ++i ) {
+            for( int j = 0; j < game->yarn->characters->count; ++j ) {
+                if( cstr_compare_nocase( game->yarn->characters->items[ j ].id, game->yarn->globals.debug_attach_chars->items[ i ] ) == 0 ) {
+                    array_add( game->state.chars, &j );
+                    break;
+                }
+            }
+        }
+    }
+
+    game->current_state = GAMESTATE_NO_CHANGE;
+    game->new_state = GAMESTATE_BOOT;
+    game->disable_transition = false;
+    game->transition_counter = 10;
+    game->queued_screen = -1;
+    game->queued_location = -1;
+    game->queued_dialog = -1;
+    game->restart_requested = false;    
+    game->quickload_requested = false;
+}
+
+
+void game_load_state( game_t* game, state_data_t* data ) {
+    game_restart( game );
+
+    state_data_copy( &game->state, data );
+
+    if( game->state.current_screen >= 0 ) {
+        game->new_state = GAMESTATE_SCREEN;
+    } else if( game->state.current_location >= 0 ) {
+        game->new_state = GAMESTATE_LOCATION;
+    } else if( game->state.current_dialog >= 0 ) {
+        game->new_state = GAMESTATE_DIALOG;
+    }
+}
+
+
+void game_save_state( game_t* game, state_data_t* data ) {
+    state_data_copy( data, &game->state );   
+    game->quicksave.current_music = game->state.current_music;
+    game->quicksave.current_ambience = game->state.current_ambience;
+}
+
+
+void game_quicksave( game_t* game ) {
+    game_save_state( game, &game->quicksave );
+}
+
+
+void game_quickload( game_t* game ) {
+    game->quickload_requested = false;
+    game_load_state( game, &game->quicksave );
+
+    audiosys_music_stop( game->audiosys, 0.1f );
+    int music_index = game->quicksave.current_music;
+    if( music_index >= 0 ) {
+        audiosys_audio_source_t src;
+        if( audio_qoa_source( game, music_index, &src ) ) {
+            audiosys_music_play( game->audiosys, src, 0.5f );
+        }
+        //audiosys_music_position_set( game->audiosys, length );
+        //audiosys_music_volume_set( game->audiosys, volume );
+        //audiosys_music_loop_set( game->audiosys, mus->loop ? AUDIOSYS_LOOP_ON : AUDIOSYS_LOOP_OFF );
+    }
+    game->state.current_music = music_index;
+        
+    audiosys_ambience_stop( game->audiosys, 0.1f );
+    int ambience_index = game->quicksave.current_ambience;
+    if( ambience_index >= 0 ) {
+        audiosys_audio_source_t src;
+        if( audio_qoa_source( game, ambience_index, &src ) ) {
+            audiosys_ambience_play( game->audiosys, src, 0.5f );
+        }
+        //audiosys_ambience_position_set( game->audiosys, length );
+        //audiosys_ambience_volume_set( game->audiosys, volume );
+        //audiosys_ambience_loop_set( game->audiosys, mus->loop ? AUDIOSYS_LOOP_ON : AUDIOSYS_LOOP_OFF );
+    }
+    game->state.current_ambience = ambience_index;
+}
+
+
+void game_init( game_t* game, yarn_t* yarn, render_t* render, input_t* input, audiosys_t* audiosys, rnd_pcg_t* rnd ) {
+    memset( game, 0, sizeof( *game ) );
+    game->delta_time = 0.0f;
+    game->exit_flag = false;
+    game->exit_requested = false;
+    game->exit_dialog = false;
+    game->exit_confirmed = false;
+    game->sound_level = 3;
+    game->render = render;
+    game->audiosys = audiosys;
+    game->rnd = rnd;
+    game->input = input;
+    game->yarn = yarn;
+    game->display_filter_index = 0;
+
+    game->blink_count = 0;
+    game->blink_wait = 100;
+    game->blink_visible = true;
+
+    game->state.flags = managed_array( bool );
+    game->state.items = managed_array( int );
+    game->state.chars = managed_array( int );
+    game->state.section_stack = managed_array( stack_entry_t );
+
+    game->quicksave.flags = managed_array( bool );
+    game->quicksave.items = managed_array( int );
+    game->quicksave.chars = managed_array( int );
+    game->quicksave.section_stack = managed_array( stack_entry_t );
+
+    game_restart( game );
+
+    game->sound_state.sounds_count = 0;
+    game->sound_state.sounds_capacity = 256;
+    game->sound_state.sounds = ARRAY_CAST( manage_alloc( malloc( sizeof( *game->sound_state.sounds ) * game->sound_state.sounds_capacity ) ) );
+    memset( game->sound_state.sounds, 0, sizeof( *game->sound_state.sounds ) * game->sound_state.sounds_capacity );
+}
+
+bool was_key_pressed( game_t* game, int key ) {
+    return input_was_key_pressed( game->input, key );
+}
+
+
+gamestate_t boot_init( game_t* game );
+gamestate_t boot_update( game_t* game );
+gamestate_t screen_init( game_t* game );
+gamestate_t screen_update( game_t* game );
+gamestate_t location_init( game_t* game );
+gamestate_t location_update( game_t* game );
+gamestate_t dialog_init( game_t* game );
+gamestate_t dialog_update( game_t* game );
+gamestate_t exit_init( game_t* game );
+gamestate_t exit_update( game_t* game );
+gamestate_t terminate_init( game_t* game );
+gamestate_t terminate_update( game_t* game );
+
+void ingame_menu_update( game_t* game );
+void exit_dialog_update( game_t* game );
+
 void enter_menu( game_t* game ) {
     if( game->render->screen ) {
         memcpy( game->render->screenshot, game->render->screen, sizeof( uint8_t ) * game->render->screen_width * game->render->screen_height );
@@ -565,7 +594,7 @@ void enter_menu( game_t* game ) {
 }
 
 
-void game_update( game_t* game, float delta_time ) {
+void game_update( game_t* game, float delta_time ) {    
     if( game->exit_confirmed ) {
         game->new_state = GAMESTATE_TERMINATE;
         game->disable_transition = true;
@@ -614,6 +643,11 @@ void game_update( game_t* game, float delta_time ) {
             game->transition_counter = -10;
         }
         game->disable_transition = false;
+        if( game->current_state == GAMESTATE_DIALOG && game->new_state == GAMESTATE_DIALOG ) {
+            game->limit = -30.0f;
+            game->dialog.enable_options = 0;
+            dialog_update( game );
+        }
         game->current_state = game->new_state;
         gamestate_t new_state = GAMESTATE_NO_CHANGE;
         switch( game->current_state ) {
@@ -694,6 +728,15 @@ void game_update( game_t* game, float delta_time ) {
     }
     game->new_state = new_state;
     if( game->exit_requested ) {
+        if( game->render->screen ) {
+            memcpy( game->render->screenshot, game->render->screen, sizeof( uint8_t ) * game->render->screen_width * game->render->screen_height );
+        } else {
+            glFlush();
+
+            GLint viewport[ 4 ];
+            glGetIntegerv( GL_VIEWPORT, viewport );
+            glReadPixels( viewport[ 0 ], viewport[ 1 ], viewport[ 2 ], viewport[ 3 ], GL_RGBA, GL_UNSIGNED_BYTE, game->render->screenshot_rgb );
+        }
         game->new_state = GAMESTATE_EXIT;
         game->disable_transition = true;
         game->exit_requested = false;
@@ -1040,6 +1083,33 @@ void load_game( game_t* game, int slot ) {
         game->display_filter_index = savegame->display_filter < 0 ? 0 : savegame->display_filter >= game->yarn->globals.display_filters->count ? game->yarn->globals.display_filters->count - 1 : savegame->display_filter;
         game->fullscreen = savegame->fullscreen;
         game_load_state( game, &savegame->state );   
+        
+        audiosys_music_stop( game->audiosys, 0.1f );
+        int music_index = savegame->state.current_music;
+        if( music_index >= 0 ) {
+            audiosys_audio_source_t src;
+            if( audio_qoa_source( game, music_index, &src ) ) {
+                audiosys_music_play( game->audiosys, src, 0.5f );
+            }
+            //audiosys_music_position_set( game->audiosys, length );
+            //audiosys_music_volume_set( game->audiosys, volume );
+            //audiosys_music_loop_set( game->audiosys, mus->loop ? AUDIOSYS_LOOP_ON : AUDIOSYS_LOOP_OFF );
+        }
+        game->state.current_music = music_index;
+        
+        audiosys_ambience_stop( game->audiosys, 0.1f );
+        int ambience_index = savegame->state.current_ambience;
+        if( ambience_index >= 0 ) {
+            audiosys_audio_source_t src;
+            if( audio_qoa_source( game, ambience_index, &src ) ) {
+                audiosys_ambience_play( game->audiosys, src, 0.5f );
+            }
+            //audiosys_ambience_position_set( game->audiosys, length );
+            //audiosys_ambience_volume_set( game->audiosys, volume );
+            //audiosys_ambience_loop_set( game->audiosys, mus->loop ? AUDIOSYS_LOOP_ON : AUDIOSYS_LOOP_OFF );
+        }
+        game->state.current_ambience = ambience_index;
+        
         game->ingame_menu = false;
         game->loadgame_menu = false;
     }
@@ -2090,7 +2160,12 @@ gamestate_t dialog_update( game_t* game ) {
             }
             game->dialog.phrase_len = (int) cstr_len( txt );
             if( dialog->phrase->items[ i ].character_index >= 0 ) {
-                wrap_limit( game->render, game->render->font_txt, txt, 5, 136, game->render->color_txt, 310, game->limit < 0.0f ? 0 : (int)game->limit );
+                pixelfont_bounds_t bounds = text_bounds( game->render, game->render->font_txt, txt );
+                if( bounds.width < 310 ) {
+                    center_limit( game->render, game->render->font_txt, txt, 160, 136, game->render->color_txt, game->limit < 0.0f ? 0 : (int)game->limit );
+                } else {
+                    wrap_limit( game->render, game->render->font_txt, txt, 5, 136, game->render->color_txt, 310, game->limit < 0.0f ? 0 : (int)game->limit );
+                }                    
             } else {
                 wrap_limit( game->render, game->render->font_opt, txt, 5, 197, game->render->color_txt, 310, game->limit < 0.0f ? 0 : (int)game->limit );
             }
@@ -2273,12 +2348,13 @@ gamestate_t dialog_update( game_t* game ) {
 
 
 gamestate_t exit_init( game_t* game ) {
-    (void) game;
+    draw_screenshot( game->render );
     return GAMESTATE_NO_CHANGE;
 }
 
 
 gamestate_t exit_update( game_t* game ) {
+    draw_screenshot( game->render ); 
     if( was_key_pressed( game, APP_KEY_LBUTTON ) || was_key_pressed( game, APP_KEY_SPACE ) || was_key_pressed( game, APP_KEY_ESCAPE ) ) {
         return GAMESTATE_TERMINATE;
     }
@@ -2288,11 +2364,13 @@ gamestate_t exit_update( game_t* game ) {
 
 gamestate_t terminate_init( game_t* game ) {
     (void) game;
+    draw_screenshot( game->render ); 
     return GAMESTATE_NO_CHANGE;
 }
 
 
 gamestate_t terminate_update( game_t* game ) {
+    draw_screenshot( game->render ); 
     game->exit_flag = true;
     return GAMESTATE_NO_CHANGE;
 }

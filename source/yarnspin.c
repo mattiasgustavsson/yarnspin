@@ -375,6 +375,10 @@ int app_proc( app_t* app, void* user_data ) {
             }
 
         }
+        
+        if( game.exit_flag ) {
+            cls( game.render );
+        }
 
         if( input_was_key_pressed( &input, APP_KEY_F11 ) ) {
             game.fullscreen = !game.fullscreen;
@@ -544,6 +548,11 @@ int app_proc( app_t* app, void* user_data ) {
             gladLoaderUnloadGL();
         }
     #endif
+
+    #ifdef __wasm__
+        app_screenmode( app, APP_SCREENMODE_WINDOW );
+    #endif
+        
     return EXIT_SUCCESS;
 }
 

@@ -735,6 +735,48 @@ void draw( render_t* render, int bitmap_index, int x, int y ) {
 }
 
 
+void draw_screenshot( render_t* render ) {
+    if( render->screen ) {
+        memcpy( render->screen, render->screenshot, sizeof( uint8_t ) * render->screen_width * render->screen_height );
+    } else {
+        glActiveTexture( GL_TEXTURE0 );
+        glBindTexture( GL_TEXTURE_2D, render->savegame_tex[ 0 ] );
+        glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, render->screen_width, render->screen_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, render->screenshot_rgb );
+        glBindTexture( GL_TEXTURE_2D, 0 );
+        float width = render->screen_width;
+        float height = render->screen_height;
+        float x1 = 0.0f;
+        float y1 = 0.0f;
+        float x2 = 1.0f;
+        float y2 = 1.0f;
+
+        GLfloat vertices[] = {
+            2.0f * x1 - 1.0f, 2.0f * y1 - 1.0f, 0.0f, 0.0f,
+            2.0f * x2 - 1.0f, 2.0f * y1 - 1.0f, 1.0f, 0.0f,
+            2.0f * x2 - 1.0f, 2.0f * y2 - 1.0f, 1.0f, 1.0f,
+            2.0f * x1 - 1.0f, 2.0f * y2 - 1.0f, 0.0f, 1.0f,
+        };
+        glBindBuffer( GL_ARRAY_BUFFER, render->vertexbuffer );
+        glEnableVertexAttribArray( 0 );
+        glVertexAttribPointer( 0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof( GLfloat ), 0 );
+        glBufferData( GL_ARRAY_BUFFER, 4 * 4 * sizeof( GLfloat ), vertices, GL_STATIC_DRAW );
+
+        uint32_t color = 0xffffffff;
+        float a = ( ( color >> 24 ) & 0xff ) / 255.0f;
+        float r = ( ( color >> 16 ) & 0xff ) / 255.0f;
+        float g = ( ( color >> 8  ) & 0xff ) / 255.0f;
+        float b = ( ( color       ) & 0xff ) / 255.0f;
+        glUseProgram( render->shader );
+        glActiveTexture( GL_TEXTURE0 );
+        glBindTexture( GL_TEXTURE_2D, render->savegame_tex[ 0 ] );
+        glUniform1i( glGetUniformLocation( render->shader, "tex0" ), 0 );
+        glUniform4f( glGetUniformLocation( render->shader, "col" ), r, g, b, a );
+        glDrawArrays( GL_TRIANGLE_FAN, 0, 4 );
+        glBindTexture( GL_TEXTURE_2D, 0 );
+    }
+}
+
+
 void draw_savegame_thumb( render_t* render, int x, int y, uint8_t* pixels, int w, int h, int bg, int fg ) {
     scale_for_resolution( render, &x, &y );
     int s = render->screen_width >= 1280 ? 3 : render->screen_width >= 640 ? 2 : 1;
@@ -1213,6 +1255,21 @@ pixelfont_bounds_t center( render_t* render, pixelfont_t* font, string str, int 
 }
 
 
+pixelfont_bounds_t center_limit( render_t* render, pixelfont_t* font, string str, int x, int y, int color, int limit ) {
+    scale_for_resolution( render, &x, &y );
+    pixelfont_bounds_t bounds;
+    if( render->screen ) {
+        pixelfont_blit( font, x, y, str, (uint8_t)color, render->screen, render->screen_width, render->screen_height,
+            PIXELFONT_ALIGN_CENTER, 0, 0, 0, limit, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, &bounds );
+    } else {
+        font_blit_rgb( render, (bitmapfont_t*)font, x, y, str, color, render->screen_width, render->screen_height,
+            PIXELFONT_ALIGN_CENTER, 0, 0, 0, limit, &bounds );
+    }
+    scale_for_resolution_inverse( render, &bounds.width, &bounds.height );
+    return bounds;
+}
+
+
 pixelfont_bounds_t center_wrap( render_t* render, pixelfont_t* font, string str, int x, int y, int color, int wrap_width ) {
     scale_for_resolution( render, &x, &y );
     scale_for_resolution( render, &wrap_width, NULL );
@@ -1277,6 +1334,20 @@ void wrap_limit( render_t* render, pixelfont_t* font, string str, int x, int y, 
             PIXELFONT_ALIGN_LEFT, wrap_width, 0, 0, limit, NULL );
     }
 }
+
+pixelfont_bounds_t text_bounds( render_t* render, pixelfont_t* font, string str ) {
+    pixelfont_bounds_t bounds;
+    if( render->screen ) {
+        pixelfont_blit( font, 0, 0, str, 0, NULL, 0, 0,
+            PIXELFONT_ALIGN_LEFT, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, &bounds );
+    } else {
+        font_blit_rgb( NULL, (bitmapfont_t*)font, 0, 0, str, 0, 0, 0,
+            PIXELFONT_ALIGN_LEFT, 0, 0, 0, -1, &bounds );
+    }
+    scale_for_resolution_inverse( render, &bounds.width, &bounds.height );
+    return bounds;
+}
+
 
 
 int font_height( render_t* render, int height ) {
