@@ -146,7 +146,7 @@ void PIXELFONT_FUNC_NAME( pixelfont_t const* font, int x, int y, char const* tex
         char const* tstr = str;
         while( *tstr != '\n' && *tstr != '\0' && ( wrap_width <= 0 || line_width <= wrap_width  ) )
             {
-            if( *tstr <= ' ' )
+            if( *tstr <= ' ' || ( tstr > str && tstr[-1] == '-' ) )
                 {
                 last_space_char_count = line_char_count;
                 last_space_width = line_width;

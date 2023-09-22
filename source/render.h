@@ -459,7 +459,7 @@ void font_blit_rgb( render_t* render, bitmapfont_t const* font, int x, int y, ch
         float last_space_width = 0;
         char const* tstr = str;
         while( *tstr != '\n' && *tstr != '\0' && ( wrap_width <= 0 || line_width <= wrap_width  ) ) {
-            if( *tstr <= ' ' ) {
+            if( *tstr <= ' ' || ( tstr > str && tstr[-1] == '-' ) ) {
                 last_space_char_count = line_char_count;
                 last_space_width = line_width;
             }

@@ -1820,7 +1820,11 @@ gamestate_t location_update( game_t* game ) {
         if( !test_cond( game, &location->txt->items[ i ].cond ) ) {
             continue;
         }
-        txt = cstr_cat( txt, cstr_cat( location->txt->items[ i ].text, "\n" ) );
+        if( *location->txt->items[ i ].text ) {
+            txt = cstr_cat( txt, cstr_cat( location->txt->items[ i ].text, " " ) );
+        } else {
+            txt = cstr_cat( txt, cstr_cat( location->txt->items[ i ].text, "\n" ) );
+        }
     }
 
     if( game->yarn->globals.location_print_speed == 0 || game->limit >= strlen( txt ) ) {
