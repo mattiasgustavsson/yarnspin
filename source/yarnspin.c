@@ -362,15 +362,15 @@ int app_proc( app_t* app, void* user_data ) {
             char const* dbgstr = "debug";
             if( render.screen ) {
                 pixelfont_bounds_t bounds;
-                pixelfont_blit( render.yarn->assets.font_description, 0, 0, dbgstr, 0, NULL, render.screen_width, render.screen_height,
+                pixelfont_blit( render.yarn->assets.font_txt, 0, 0, dbgstr, 0, NULL, render.screen_width, render.screen_height,
                         PIXELFONT_ALIGN_LEFT, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, &bounds );            
-                pixelfont_blit( render.yarn->assets.font_description, render.screen_width - bounds.width - 1, render.screen_height - bounds.height, dbgstr, (uint8_t)render.color_disabled, render.screen, render.screen_width, render.screen_height,
+                pixelfont_blit( render.yarn->assets.font_txt, render.screen_width - bounds.width - 1, render.screen_height - bounds.height, dbgstr, (uint8_t)render.color_disabled, render.screen, render.screen_width, render.screen_height,
                     PIXELFONT_ALIGN_LEFT, 0, 0, 0, -1, PIXELFONT_BOLD_OFF, PIXELFONT_ITALIC_OFF, PIXELFONT_UNDERLINE_OFF, NULL );
             } else {
                 pixelfont_bounds_t bounds;
-                font_blit_rgb( NULL, (bitmapfont_t*)render.yarn->assets.font_description, 0, 0, dbgstr, 0xff707070, render.screen_width, render.screen_height,
+                font_blit_rgb( NULL, (bitmapfont_t*)render.yarn->assets.font_txt, 0, 0, dbgstr, 0xff707070, render.screen_width, render.screen_height,
                     PIXELFONT_ALIGN_LEFT, 0, 0, 0, -1, &bounds );
-                font_blit_rgb( &render, (bitmapfont_t*)render.yarn->assets.font_description, render.screen_width - bounds.width - 1, render.screen_height - bounds.height, dbgstr, 0xff707070, render.screen_width, render.screen_height,
+                font_blit_rgb( &render, (bitmapfont_t*)render.yarn->assets.font_txt, render.screen_width - bounds.width - 1, render.screen_height - bounds.height, dbgstr, 0xff707070, render.screen_width, render.screen_height,
                     PIXELFONT_ALIGN_LEFT, 0, 0, 0, -1, NULL );
             }
 

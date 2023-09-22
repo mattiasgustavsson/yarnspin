@@ -19,6 +19,9 @@ typedef struct render_t {
     int color_name;
     pixelfont_t* font_txt;
     pixelfont_t* font_opt;
+    pixelfont_t* font_dialog;
+    pixelfont_t* font_say;
+    pixelfont_t* font_response;
     pixelfont_t* font_chr;
     pixelfont_t* font_use;
     pixelfont_t* font_name;
@@ -27,6 +30,9 @@ typedef struct render_t {
     GLuint* textures;
     GLuint fontmap_txt;
     GLuint fontmap_opt;
+    GLuint fontmap_dialog;
+    GLuint fontmap_say;
+    GLuint fontmap_response;
     GLuint fontmap_chr;
     GLuint fontmap_use;
     GLuint fontmap_name;
@@ -51,10 +57,13 @@ bool render_init( render_t* render, yarn_t* yarn, uint8_t* screen, int width, in
     render->screenshot = render->screen ? (uint8_t*) manage_alloc( malloc( width * height * sizeof( uint8_t ) ) ) : NULL;
     render->screenshot_rgb = !render->screen ? (uint32_t*) manage_alloc( malloc( width * height * sizeof( uint32_t ) ) ) : NULL;
 
-    render->font_txt = yarn->assets.font_description;
-    render->font_opt = yarn->assets.font_options;
-    render->font_chr = yarn->assets.font_characters;
-    render->font_use = yarn->assets.font_items;
+    render->font_txt = yarn->assets.font_txt;
+    render->font_opt = yarn->assets.font_opt;
+    render->font_dialog = yarn->assets.font_dialog;
+    render->font_say = yarn->assets.font_say;
+    render->font_response = yarn->assets.font_response;
+    render->font_chr = yarn->assets.font_chr;
+    render->font_use = yarn->assets.font_use;
     render->font_name = yarn->assets.font_name;
     render->color_background = yarn->globals.color_background;
     render->color_disabled = yarn->globals.color_disabled;
@@ -177,6 +186,27 @@ bool render_init( render_t* render, yarn_t* yarn, uint8_t* screen, int width, in
         glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
         glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
         render->font_opt->size_in_bytes = render->fontmap_opt;
+
+        glGenTextures( 1, &render->fontmap_dialog );
+        glBindTexture( GL_TEXTURE_2D, render->fontmap_dialog );
+        glTexImage2D( GL_TEXTURE_2D, 0, GL_LUMINANCE, ( (bitmapfont_t*)( render->font_dialog ) )->width, ( (bitmapfont_t*)( render->font_dialog ) )->height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, ( (bitmapfont_t*)( render->font_dialog ) )->pixels );
+        glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+        glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+        render->font_dialog->size_in_bytes = render->fontmap_dialog;
+
+        glGenTextures( 1, &render->fontmap_say );
+        glBindTexture( GL_TEXTURE_2D, render->fontmap_say );
+        glTexImage2D( GL_TEXTURE_2D, 0, GL_LUMINANCE, ( (bitmapfont_t*)( render->font_say ) )->width, ( (bitmapfont_t*)( render->font_say ) )->height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, ( (bitmapfont_t*)( render->font_say ) )->pixels );
+        glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+        glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+        render->font_say->size_in_bytes = render->fontmap_say;
+
+        glGenTextures( 1, &render->fontmap_response );
+        glBindTexture( GL_TEXTURE_2D, render->fontmap_response );
+        glTexImage2D( GL_TEXTURE_2D, 0, GL_LUMINANCE, ( (bitmapfont_t*)( render->font_response ) )->width, ( (bitmapfont_t*)( render->font_response ) )->height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, ( (bitmapfont_t*)( render->font_response ) )->pixels );
+        glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+        glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+        render->font_response->size_in_bytes = render->fontmap_response;
 
         glGenTextures( 1, &render->fontmap_chr );
         glBindTexture( GL_TEXTURE_2D, render->fontmap_chr );

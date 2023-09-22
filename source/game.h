@@ -1893,7 +1893,7 @@ gamestate_t location_update( game_t* game ) {
             vmargin = game->yarn->globals.vmargin_opt;
             int ypos = 197 + vmargin + font_height( game->render, game->render->font_opt->height ) * c;
             pixelfont_bounds_t b = text( game->render, game->render->font_opt, location->opt->items[ i ].text, 5 + hmargin, ypos, game->render->color_opt );
-            if( mouse_y >= ypos && mouse_y < ypos + b.height ) {
+            if( mouse_x >= hmargin && mouse_x <= 320 - hmargin && mouse_y >= ypos && mouse_y < ypos + b.height ) {
                 box( game->render, 4 + hmargin, ypos - 1, 315 - hmargin * 2, b.height + 1, game->render->color_opt );
                 text( game->render, game->render->font_opt, location->opt->items[ i ].text, 5 + hmargin, ypos, game->render->color_background );
                 if( was_key_pressed( game, APP_KEY_LBUTTON ) ) {
@@ -1927,11 +1927,13 @@ gamestate_t location_update( game_t* game ) {
                 }
             }
         }
-        int ypos = 4 + ( ( 117 - ( game->state.items->count * font_height( game->render, game->render->font_use->height ) ) ) / 2 ) + c * font_height( game->render, game->render->font_use->height );
-        pixelfont_bounds_t b = center( game->render, game->render->font_use, usetxt, 287, ypos, color );
-        if( enabled && mouse_y >= ypos && mouse_y < ypos + b.height && mouse_x > 259 ) {
-            box( game->render, 260, ypos - 1, 56, b.height + 1, game->render->color_use );
-            center( game->render, game->render->font_use, usetxt, 287, ypos, game->render->color_background );
+        hmargin = game->yarn->globals.hmargin_use;
+        vmargin = game->yarn->globals.vmargin_use;
+        int ypos = 4 + vmargin + ( ( 117 - ( game->state.items->count * font_height( game->render, game->render->font_use->height ) ) ) / 2 ) + c * font_height( game->render, game->render->font_use->height );
+        pixelfont_bounds_t b = center( game->render, game->render->font_use, usetxt, 287 + hmargin, ypos, color );
+        if( enabled && mouse_y >= ypos && mouse_y < ypos + b.height && mouse_x > 259 + hmargin ) {
+            box( game->render, 260 + hmargin, ypos - 1, 56, b.height + 1, game->render->color_use );
+            center( game->render, game->render->font_use, usetxt, 287 + hmargin, ypos, game->render->color_background );
             if( was_key_pressed( game, APP_KEY_LBUTTON ) ) {
                 use = c;
             }
@@ -1940,8 +1942,10 @@ gamestate_t location_update( game_t* game ) {
     }
 
     if( c == 0 ) {
-        int ypos = 4 + ( ( 117 - ( 2 * font_height( game->render, game->render->font_use->height ) ) ) / 2 );
-        center_wrap( game->render,  game->render->font_use, yarn->globals.nothing_text, 287, ypos, game->render->color_disabled, 56 );
+        hmargin = game->yarn->globals.hmargin_use;
+        vmargin = game->yarn->globals.vmargin_use;
+        int ypos = 4 + vmargin + ( ( 117 - ( 2 * font_height( game->render, game->render->font_use->height ) ) ) / 2 );
+        center_wrap( game->render,  game->render->font_use, yarn->globals.nothing_text, 287 + hmargin, ypos, game->render->color_disabled, 56 );
     }
 
 
@@ -1973,7 +1977,9 @@ gamestate_t location_update( game_t* game ) {
         if( !test_cond( game, &location->chr->items[ i ].cond ) ) {
             continue;
         }
-        int ypos = 4 + ( ( 117 - ( chr_count * font_height( game->render, game->render->font_chr->height ) ) ) / 2 ) + c * font_height( game->render, game->render->font_chr->height );
+        hmargin = game->yarn->globals.hmargin_chr;
+        vmargin = game->yarn->globals.vmargin_chr;
+        int ypos = 4 + vmargin + ( ( 117 - ( chr_count * font_height( game->render, game->render->font_chr->height ) ) ) / 2 ) + c * font_height( game->render, game->render->font_chr->height );
         int color = game->render->color_chr;
         if( game->queued_dialog >= 0 || game->queued_location >= 0 || game->queued_screen >= 0) {
             color = game->render->color_disabled;
@@ -1982,11 +1988,11 @@ gamestate_t location_update( game_t* game ) {
         }
 
 
-        pixelfont_bounds_t b = center( game->render,  game->render->font_chr, game->yarn->characters->items[ location->chr->items[ i ].chr_indices->items[ 0 ] ].short_name, 32, ypos, color );
+        pixelfont_bounds_t b = center( game->render,  game->render->font_chr, game->yarn->characters->items[ location->chr->items[ i ].chr_indices->items[ 0 ] ].short_name, 32 + hmargin, ypos, color );
         if( game->queued_dialog < 0 && game->queued_location < 0 && game->queued_screen < 0 ) {
-            if( mouse_y >= ypos && mouse_y < ypos + b.height && mouse_x < 60 ) {
+            if( mouse_y >= ypos && mouse_y < ypos + b.height && mouse_x < hmargin + 60 ) {
                 box( game->render, 4, ypos - 1, 56, b.height + 1, game->render->color_chr );
-                center( game->render,  game->render->font_chr, game->yarn->characters->items[ location->chr->items[ i ].chr_indices->items[ 0 ] ].short_name, 32, ypos, game->render->color_background );
+                center( game->render,  game->render->font_chr, game->yarn->characters->items[ location->chr->items[ i ].chr_indices->items[ 0 ] ].short_name, 32 + hmargin, ypos, game->render->color_background );
                 if( was_key_pressed( game, APP_KEY_LBUTTON ) ) {
                     chr = c;
                 }
@@ -2006,16 +2012,20 @@ gamestate_t location_update( game_t* game ) {
         }
 
         if( !found ) {
-            int ypos = 4 + ( ( 117 - ( chr_count * font_height( game->render, game->render->font_chr->height ) ) ) / 2 ) + c * font_height( game->render, game->render->font_chr->height );
+            hmargin = game->yarn->globals.hmargin_chr;
+            vmargin = game->yarn->globals.vmargin_chr;
+            int ypos = 4 + vmargin + ( ( 117 - ( chr_count * font_height( game->render, game->render->font_chr->height ) ) ) / 2 ) + c * font_height( game->render, game->render->font_chr->height );
             int color = game->render->color_disabled;
-            pixelfont_bounds_t b = center( game->render,  game->render->font_chr, game->yarn->characters->items[ game->state.chars->items[ i ] ].short_name, 32, ypos, color );
+            pixelfont_bounds_t b = center( game->render,  game->render->font_chr, game->yarn->characters->items[ game->state.chars->items[ i ] ].short_name, 32 + hmargin, ypos, color );
             ++c;
         }
     }
 
     if( c == 0 ) {
-        int ypos = 4 + ( ( 117 - ( 2 * font_height( game->render, game->render->font_chr->height ) ) ) / 2 );
-        center_wrap( game->render,  game->render->font_chr, yarn->globals.alone_text, 32, ypos, game->render->color_disabled, 56 );
+        hmargin = game->yarn->globals.hmargin_use;
+        vmargin = game->yarn->globals.vmargin_use;
+        int ypos = 4 + vmargin + ( ( 117 - ( 2 * font_height( game->render, game->render->font_chr->height ) ) ) / 2 );
+        center_wrap( game->render,  game->render->font_chr, yarn->globals.alone_text, 32 + hmargin, ypos, game->render->color_disabled, 56 );
     }
 
     if( menu_hover && was_key_pressed( game, APP_KEY_LBUTTON ) ) {
@@ -2182,16 +2192,16 @@ gamestate_t dialog_update( game_t* game ) {
             if( dialog->phrase->items[ i ].character_index >= 0 ) {
                 int hmargin = game->yarn->globals.hmargin_dialog;
                 int vmargin = game->yarn->globals.vmargin_dialog;   
-                //pixelfont_bounds_t bounds = text_bounds( game->render, game->render->font_txt, txt );
+                //pixelfont_bounds_t bounds = text_bounds( game->render, game->render->font_dialog, txt );
                 //if( bounds.width < 310 ) {
-                //    center_limit( game->render, game->render->font_txt, txt, 160, 136, game->render->color_dialog, game->limit < 0.0f ? 0 : (int)game->limit );
+                //    center_limit( game->render, game->render->font_dialog, txt, 160, 136, game->render->color_dialog, game->limit < 0.0f ? 0 : (int)game->limit );
                 //} else {
-                    wrap_limit( game->render, game->render->font_txt, txt, 5 + hmargin, 136 + vmargin, game->render->color_dialog, 310 - hmargin * 2, game->limit < 0.0f ? 0 : (int)game->limit );
+                    wrap_limit( game->render, game->render->font_dialog, txt, 5 + hmargin, 136 + vmargin, game->render->color_dialog, 310 - hmargin * 2, game->limit < 0.0f ? 0 : (int)game->limit );
                 //}                    
             } else {
                 int hmargin = game->yarn->globals.hmargin_response;
                 int vmargin = game->yarn->globals.vmargin_response;    
-                wrap_limit( game->render, game->render->font_opt, txt, 5 + hmargin, 197 + vmargin, game->render->color_response, 310 - hmargin * 2, game->limit < 0.0f ? 0 : (int)game->limit );
+                wrap_limit( game->render, game->render->font_response, txt, 5 + hmargin, 197 + vmargin, game->render->color_response, 310 - hmargin * 2, game->limit < 0.0f ? 0 : (int)game->limit );
             }
         }
         ++phrase_count;
@@ -2219,10 +2229,12 @@ gamestate_t dialog_update( game_t* game ) {
 
     if( game->dialog.chr_index >= 0 ) {
         yarn_character_t* character = &game->yarn->characters->items[ game->dialog.chr_index ];
-        center( game->render, game->render->font_name, character->name, 160, 6, game->render->color_name );
         if( character->face_index >= 0 ) {
             draw( game->render, character->face_index, 104, 18 );
         }
+        int hmargin = game->yarn->globals.hmargin_name;
+        int vmargin = game->yarn->globals.vmargin_name;
+        center( game->render, game->render->font_name, character->name, 160 + hmargin, 6 + vmargin, game->render->color_name );
     }
     
     // say:
@@ -2242,12 +2254,12 @@ gamestate_t dialog_update( game_t* game ) {
             }
             int hmargin = game->yarn->globals.hmargin_say;
             int vmargin = game->yarn->globals.vmargin_say;
-            int ypos = 197 + vmargin + font_height( game->render, game->render->font_opt->height ) * c;
-            pixelfont_bounds_t b = text( game->render, game->render->font_opt, dialog->say->items[ i ].text, 5 + hmargin, ypos, game->render->color_say );
+            int ypos = 197 + vmargin + font_height( game->render, game->render->font_say->height ) * c;
+            pixelfont_bounds_t b = text( game->render, game->render->font_say, dialog->say->items[ i ].text, 5 + hmargin, ypos, game->render->color_say );
             if( game->queued_dialog < 0 && game->queued_location < 0 && game->queued_screen < 0 ) {
-                if( mouse_y >= ypos && mouse_y < ypos + b.height && mouse_x < 277 ) {
+                if( mouse_x >= hmargin && mouse_x <= 320 - hmargin && mouse_y >= ypos && mouse_y < ypos + b.height && mouse_x < 277 ) {
                     box( game->render, 4 + hmargin, ypos - 1, 315 - hmargin * 2, b.height + 1, game->render->color_say );
-                    text( game->render, game->render->font_opt, dialog->say->items[ i ].text, 5 + hmargin, ypos, game->render->color_background );
+                    text( game->render, game->render->font_say, dialog->say->items[ i ].text, 5 + hmargin, ypos, game->render->color_background );
                     if( was_key_pressed( game, APP_KEY_LBUTTON ) ) {
                         say = c;
                     }
@@ -2279,11 +2291,13 @@ gamestate_t dialog_update( game_t* game ) {
                 }
             }
         }
-        int ypos = 4 + ( ( 117 - ( game->state.items->count * font_height( game->render, game->render->font_use->height ) ) ) / 2 ) + c * font_height( game->render, game->render->font_use->height );
-        pixelfont_bounds_t b = center( game->render, game->render->font_use, txt, 287, ypos, color );
-        if( enabled && mouse_y >= ypos && mouse_y < ypos + b.height && mouse_x > 259 ) {
-            box( game->render, 260, ypos - 1, 56, b.height + 1, game->render->color_use );
-            center( game->render, game->render->font_use, txt, 287, ypos, game->render->color_background );
+        int hmargin = game->yarn->globals.hmargin_use;
+        int vmargin = game->yarn->globals.vmargin_use;   
+        int ypos = 4 + vmargin + ( ( 117 - ( game->state.items->count * font_height( game->render, game->render->font_use->height ) ) ) / 2 ) + c * font_height( game->render, game->render->font_use->height );
+        pixelfont_bounds_t b = center( game->render, game->render->font_use, txt, 287 + hmargin, ypos, color );
+        if( enabled && mouse_y >= ypos && mouse_y < ypos + b.height && mouse_x > 259 + hmargin ) {
+            box( game->render, 260 + hmargin, ypos - 1, 56, b.height + 1, game->render->color_use );
+            center( game->render, game->render->font_use, txt, 287 + hmargin, ypos, game->render->color_background );
             if( was_key_pressed( game, APP_KEY_LBUTTON ) ) {
                 use = c;
             }
@@ -2292,8 +2306,10 @@ gamestate_t dialog_update( game_t* game ) {
     }
 
     if( c == 0 ) {
-        int ypos = 4 + ( ( 117 - ( 2 * font_height( game->render, game->render->font_use->height ) ) ) / 2 );
-        center_wrap( game->render,  game->render->font_use, yarn->globals.nothing_text, 287, ypos, game->render->color_disabled, 56 );
+        int hmargin = game->yarn->globals.hmargin_use;
+        int vmargin = game->yarn->globals.vmargin_use;   
+        int ypos = 4 + vmargin + ( ( 117 - ( 2 * font_height( game->render, game->render->font_use->height ) ) ) / 2 );
+        center_wrap( game->render,  game->render->font_use, yarn->globals.nothing_text, 287 + hmargin, ypos, game->render->color_disabled, 56 );
     }
 
     if( menu_hover && was_key_pressed( game, APP_KEY_LBUTTON ) ) {

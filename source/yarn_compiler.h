@@ -1339,64 +1339,109 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
                 printf( "%s(%d): invalid nothing_text declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
                 no_error = false;
             }
-        } else if( CMP( global->keyword, "font_description" ) ) {
+        } else if( CMP( global->keyword, "font_txt" ) ) {
             if( ( global->data->count >= 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) && ( global->data->count < 2 || atoi( global->data->items[ 1 ] ) > 0 ) ) {
-                yarn->globals.font_description = cstr_cat( "fonts/", cstr_trim( global->data->items[ 0 ] ) );
-                if( !file_exists( yarn->globals.font_description ) ) {
-                    printf( "%s(%d): font file not found '%s'\n", global->filename, global->line_number, yarn->globals.font_description );
+                yarn->globals.font_txt = cstr_cat( "fonts/", cstr_trim( global->data->items[ 0 ] ) );
+                if( !file_exists( yarn->globals.font_txt ) ) {
+                    printf( "%s(%d): font file not found '%s'\n", global->filename, global->line_number, yarn->globals.font_txt );
                 }
                 if( global->data->count == 2 ) {
-                    yarn->globals.font_description_size = atoi( global->data->items[ 1 ] );
+                    yarn->globals.font_txt_size = atoi( global->data->items[ 1 ] );
                 } else {
-                    yarn->globals.font_description_size = 0;
+                    yarn->globals.font_txt_size = 0;
                 }
             } else {
-                printf( "%s(%d): invalid font_description declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
+                printf( "%s(%d): invalid font_txt declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
                 no_error = false;
             }
-        } else if( CMP( global->keyword, "font_options" ) ) {
+        } else if( CMP( global->keyword, "font_opt" ) ) {
             if( ( global->data->count >= 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) && ( global->data->count < 2 || atoi( global->data->items[ 1 ] ) > 0 ) ) {
-                yarn->globals.font_options = cstr_cat( "fonts/", cstr_trim( global->data->items[ 0 ] ) );
-                if( !file_exists( yarn->globals.font_options ) ) {
-                    printf( "%s(%d): font file not found '%s'\n", global->filename, global->line_number, yarn->globals.font_options );
+                yarn->globals.font_opt = cstr_cat( "fonts/", cstr_trim( global->data->items[ 0 ] ) );
+                if( !file_exists( yarn->globals.font_opt ) ) {
+                    printf( "%s(%d): font file not found '%s'\n", global->filename, global->line_number, yarn->globals.font_opt );
                 }
                 if( global->data->count == 2 ) {
-                    yarn->globals.font_options_size = atoi( global->data->items[ 1 ] );
+                    yarn->globals.font_opt_size = atoi( global->data->items[ 1 ] );
                 } else {
-                    yarn->globals.font_options_size = 0;
+                    yarn->globals.font_opt_size = 0;
                 }
             } else {
-                printf( "%s(%d): invalid font_options declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
+                printf( "%s(%d): invalid font_opt declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
                 no_error = false;
             }
-        } else if( CMP( global->keyword, "font_characters" ) ) {
+        } else if( CMP( global->keyword, "font_dialog" ) ) {
             if( ( global->data->count >= 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) && ( global->data->count < 2 || atoi( global->data->items[ 1 ] ) > 0 ) ) {
-                yarn->globals.font_characters = cstr_cat( "fonts/", cstr_trim( global->data->items[ 0 ] ) );
-                if( !file_exists( yarn->globals.font_characters ) ) {
-                    printf( "%s(%d): font file not found '%s'\n", global->filename, global->line_number, yarn->globals.font_characters );
+                yarn->globals.font_dialog = cstr_cat( "fonts/", cstr_trim( global->data->items[ 0 ] ) );
+                if( !file_exists( yarn->globals.font_dialog ) ) {
+                    printf( "%s(%d): font file not found '%s'\n", global->filename, global->line_number, yarn->globals.font_dialog );
                 }
                 if( global->data->count == 2 ) {
-                    yarn->globals.font_characters_size = atoi( global->data->items[ 1 ] );
+                    yarn->globals.font_dialog_size = atoi( global->data->items[ 1 ] );
                 } else {
-                    yarn->globals.font_characters_size = 0;
+                    yarn->globals.font_dialog_size = 0;
                 }
             } else {
-                printf( "%s(%d): invalid font_characters declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
+                printf( "%s(%d): invalid font_dialog declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
                 no_error = false;
             }
-        } else if( CMP( global->keyword, "font_items" ) ) {
+        } else if( CMP( global->keyword, "font_say" ) ) {
             if( ( global->data->count >= 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) && ( global->data->count < 2 || atoi( global->data->items[ 1 ] ) > 0 ) ) {
-                yarn->globals.font_items = cstr_cat( "fonts/", cstr_trim( global->data->items[ 0 ] ) );
-                if( !file_exists( yarn->globals.font_items ) ) {
-                    printf( "%s(%d): font file not found '%s'\n", global->filename, global->line_number, yarn->globals.font_items );
+                yarn->globals.font_say = cstr_cat( "fonts/", cstr_trim( global->data->items[ 0 ] ) );
+                if( !file_exists( yarn->globals.font_say ) ) {
+                    printf( "%s(%d): font file not found '%s'\n", global->filename, global->line_number, yarn->globals.font_say );
                 }
                 if( global->data->count == 2 ) {
-                    yarn->globals.font_items_size = atoi( global->data->items[ 1 ] );
+                    yarn->globals.font_say_size = atoi( global->data->items[ 1 ] );
                 } else {
-                    yarn->globals.font_items_size = 0;
+                    yarn->globals.font_say_size = 0;
                 }
             } else {
-                printf( "%s(%d): invalid font_items declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
+                printf( "%s(%d): invalid font_say declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
+                no_error = false;
+            }
+        } else if( CMP( global->keyword, "font_response" ) ) {
+            if( ( global->data->count >= 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) && ( global->data->count < 2 || atoi( global->data->items[ 1 ] ) > 0 ) ) {
+                yarn->globals.font_response = cstr_cat( "fonts/", cstr_trim( global->data->items[ 0 ] ) );
+                if( !file_exists( yarn->globals.font_response ) ) {
+                    printf( "%s(%d): font file not found '%s'\n", global->filename, global->line_number, yarn->globals.font_response );
+                }
+                if( global->data->count == 2 ) {
+                    yarn->globals.font_response_size = atoi( global->data->items[ 1 ] );
+                } else {
+                    yarn->globals.font_response_size = 0;
+                }
+            } else {
+                printf( "%s(%d): invalid font_response declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
+                no_error = false;
+            }
+        } else if( CMP( global->keyword, "font_chr" ) ) {
+            if( ( global->data->count >= 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) && ( global->data->count < 2 || atoi( global->data->items[ 1 ] ) > 0 ) ) {
+                yarn->globals.font_chr = cstr_cat( "fonts/", cstr_trim( global->data->items[ 0 ] ) );
+                if( !file_exists( yarn->globals.font_chr ) ) {
+                    printf( "%s(%d): font file not found '%s'\n", global->filename, global->line_number, yarn->globals.font_chr );
+                }
+                if( global->data->count == 2 ) {
+                    yarn->globals.font_chr_size = atoi( global->data->items[ 1 ] );
+                } else {
+                    yarn->globals.font_chr_size = 0;
+                }
+            } else {
+                printf( "%s(%d): invalid font_chr declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
+                no_error = false;
+            }
+        } else if( CMP( global->keyword, "font_use" ) ) {
+            if( ( global->data->count >= 1 && cstr_len( cstr_trim( global->data->items[ 0 ] ) ) > 0 ) && ( global->data->count < 2 || atoi( global->data->items[ 1 ] ) > 0 ) ) {
+                yarn->globals.font_use = cstr_cat( "fonts/", cstr_trim( global->data->items[ 0 ] ) );
+                if( !file_exists( yarn->globals.font_use ) ) {
+                    printf( "%s(%d): font file not found '%s'\n", global->filename, global->line_number, yarn->globals.font_use );
+                }
+                if( global->data->count == 2 ) {
+                    yarn->globals.font_use_size = atoi( global->data->items[ 1 ] );
+                } else {
+                    yarn->globals.font_use_size = 0;
+                }
+            } else {
+                printf( "%s(%d): invalid font_use declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
                 no_error = false;
             }
         } else if( CMP( global->keyword, "font_name" ) ) {
@@ -1642,6 +1687,18 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
             no_error &= compile_value( global, &yarn->globals.hmargin_response );
         } else if( CMP( global->keyword, "vmargin_response" ) ) {
             no_error &= compile_value( global, &yarn->globals.vmargin_response );
+        } else if( CMP( global->keyword, "hmargin_chr" ) ) {
+            no_error &= compile_value( global, &yarn->globals.hmargin_chr );
+        } else if( CMP( global->keyword, "vmargin_chr" ) ) {
+            no_error &= compile_value( global, &yarn->globals.vmargin_chr );
+        } else if( CMP( global->keyword, "hmargin_use" ) ) {
+            no_error &= compile_value( global, &yarn->globals.hmargin_use );
+        } else if( CMP( global->keyword, "vmargin_use" ) ) {
+            no_error &= compile_value( global, &yarn->globals.vmargin_use );
+        } else if( CMP( global->keyword, "hmargin_name" ) ) {
+            no_error &= compile_value( global, &yarn->globals.hmargin_name );
+        } else if( CMP( global->keyword, "vmargin_name" ) ) {
+            no_error &= compile_value( global, &yarn->globals.vmargin_name );
         } else if( CMP( global->keyword, "?" ) ) {
             printf( "%s(%d): conditionals not allowed for global declarations\n", global->filename, global->line_number );
             no_error = false;
@@ -1828,119 +1885,206 @@ bool yarn_compiler( array_param(parser_global_t)* parser_globals_param, array_pa
         }
     }
 
-    if( !yarn->globals.font_description ) {
+    if( !yarn->globals.font_txt ) {
         switch( yarn->globals.resolution ) {
             case YARN_RESOLUTION_RETRO: {
-                yarn->globals.font_description = cstr( "fonts/Berkelium64.ttf" );
-                yarn->globals.font_description_size = 0;
+                yarn->globals.font_txt = cstr( "fonts/Berkelium64.ttf" );
+                yarn->globals.font_txt_size = 0;
             } break;   
             case YARN_RESOLUTION_LOW: {
-                yarn->globals.font_description = cstr( "fonts/scifont004.fnt" );
-                yarn->globals.font_description_size = 0;
+                yarn->globals.font_txt = cstr( "fonts/scifont004.fnt" );
+                yarn->globals.font_txt_size = 0;
             } break;   
             case YARN_RESOLUTION_MEDIUM: {
-                yarn->globals.font_description = cstr( "fonts/scifont004.fnt" );
-                yarn->globals.font_description_size = 0;
+                yarn->globals.font_txt = cstr( "fonts/scifont004.fnt" );
+                yarn->globals.font_txt_size = 0;
             } break;   
             case YARN_RESOLUTION_HIGH: {
                 if( yarn->globals.colormode == YARN_COLORMODE_PALETTE ) {
-                    yarn->globals.font_description = cstr( "fonts/scifont001.fnt" );
-                    yarn->globals.font_description_size = 0;
+                    yarn->globals.font_txt = cstr( "fonts/scifont001.fnt" );
+                    yarn->globals.font_txt_size = 0;
                 } else {
-                    yarn->globals.font_description = cstr( "fonts/AlegreyaSans-Medium.ttf" );
-                    yarn->globals.font_description_size = 20;
+                    yarn->globals.font_txt = cstr( "fonts/AlegreyaSans-Medium.ttf" );
+                    yarn->globals.font_txt_size = 20;
                 }
             } break;   
             case YARN_RESOLUTION_FULL: {
-                yarn->globals.font_description = cstr( "fonts/AlegreyaSans-Medium.ttf" );
-                yarn->globals.font_description_size = 40;
+                yarn->globals.font_txt = cstr( "fonts/AlegreyaSans-Medium.ttf" );
+                yarn->globals.font_txt_size = 40;
             } break;
         }
     }
-    if( !yarn->globals.font_options ) {
+    if( !yarn->globals.font_opt ) {
         switch( yarn->globals.resolution ) {
             case YARN_RESOLUTION_RETRO: {
-                yarn->globals.font_options = cstr( "fonts/Sierra-SCI-Menu-Font.ttf" );
-                yarn->globals.font_options_size = 0;
+                yarn->globals.font_opt = cstr( "fonts/Sierra-SCI-Menu-Font.ttf" );
+                yarn->globals.font_opt_size = 0;
             } break;   
             case YARN_RESOLUTION_LOW: {
-                yarn->globals.font_options = cstr( "fonts/Sierra-SCI-Menu-Font.ttf" );
-                yarn->globals.font_options_size = 0;
+                yarn->globals.font_opt = cstr( "fonts/Sierra-SCI-Menu-Font.ttf" );
+                yarn->globals.font_opt_size = 0;
             } break;   
             case YARN_RESOLUTION_MEDIUM: {
-                yarn->globals.font_options = cstr( "fonts/Sierra-SCI-Menu-Font.ttf" );
-                yarn->globals.font_options_size = 0;
+                yarn->globals.font_opt = cstr( "fonts/Sierra-SCI-Menu-Font.ttf" );
+                yarn->globals.font_opt_size = 0;
             } break;   
             case YARN_RESOLUTION_HIGH: {
                 if( yarn->globals.colormode == YARN_COLORMODE_PALETTE ) {
-                    yarn->globals.font_options = cstr( "fonts/RPGSystem.ttf" );
-                    yarn->globals.font_options_size = 0;
+                    yarn->globals.font_opt = cstr( "fonts/RPGSystem.ttf" );
+                    yarn->globals.font_opt_size = 0;
                 } else {
-                    yarn->globals.font_options = cstr( "fonts/AlegreyaSans-Bold.ttf" );
-                    yarn->globals.font_options_size = 22;
+                    yarn->globals.font_opt = cstr( "fonts/AlegreyaSans-Bold.ttf" );
+                    yarn->globals.font_opt_size = 22;
                 }
             } break;   
             case YARN_RESOLUTION_FULL: {
-                yarn->globals.font_options = cstr( "fonts/AlegreyaSans-Bold.ttf" );
-                yarn->globals.font_options_size = 44;
+                yarn->globals.font_opt = cstr( "fonts/AlegreyaSans-Bold.ttf" );
+                yarn->globals.font_opt_size = 44;
             } break;
         }
     }
-    if( !yarn->globals.font_characters ) {
+    if( !yarn->globals.font_dialog ) {
         switch( yarn->globals.resolution ) {
             case YARN_RESOLUTION_RETRO: {
-                yarn->globals.font_characters = cstr( "fonts/Berkelium64.ttf" );
-                yarn->globals.font_characters_size = 0;
+                yarn->globals.font_dialog = cstr( "fonts/Berkelium64.ttf" );
+                yarn->globals.font_dialog_size = 0;
             } break;   
             case YARN_RESOLUTION_LOW: {
-                yarn->globals.font_characters = cstr( "fonts/scifont003.fnt" );
-                yarn->globals.font_characters_size = 0;
+                yarn->globals.font_dialog = cstr( "fonts/scifont004.fnt" );
+                yarn->globals.font_dialog_size = 0;
             } break;   
             case YARN_RESOLUTION_MEDIUM: {
-                yarn->globals.font_characters = cstr( "fonts/scifont003.fnt" );
-                yarn->globals.font_characters_size = 0;
+                yarn->globals.font_dialog = cstr( "fonts/scifont004.fnt" );
+                yarn->globals.font_dialog_size = 0;
             } break;   
             case YARN_RESOLUTION_HIGH: {
                 if( yarn->globals.colormode == YARN_COLORMODE_PALETTE ) {
-                    yarn->globals.font_characters = cstr( "fonts/scifont002.fnt" );
-                    yarn->globals.font_characters_size = 0;
+                    yarn->globals.font_dialog = cstr( "fonts/scifont001.fnt" );
+                    yarn->globals.font_dialog_size = 0;
                 } else {
-                    yarn->globals.font_characters = cstr( "fonts/AlegreyaSans-Bold.ttf" );
-                    yarn->globals.font_characters_size = 21;
+                    yarn->globals.font_dialog = cstr( "fonts/AlegreyaSans-Medium.ttf" );
+                    yarn->globals.font_dialog_size = 20;
                 }
             } break;   
             case YARN_RESOLUTION_FULL: {
-                yarn->globals.font_characters = cstr( "fonts/AlegreyaSans-Bold.ttf" );
-                yarn->globals.font_characters_size = 42;
+                yarn->globals.font_dialog = cstr( "fonts/AlegreyaSans-Medium.ttf" );
+                yarn->globals.font_dialog_size = 40;
             } break;
         }
     }
-    if( !yarn->globals.font_items ) {
+    if( !yarn->globals.font_say ) {
         switch( yarn->globals.resolution ) {
             case YARN_RESOLUTION_RETRO: {
-                yarn->globals.font_items = cstr( "fonts/Berkelium64.ttf" );
-                yarn->globals.font_items_size = 0;
+                yarn->globals.font_say = cstr( "fonts/Sierra-SCI-Menu-Font.ttf" );
+                yarn->globals.font_say_size = 0;
             } break;   
             case YARN_RESOLUTION_LOW: {
-                yarn->globals.font_items = cstr( "fonts/scifont003.fnt" );
-                yarn->globals.font_items_size = 0;
+                yarn->globals.font_say = cstr( "fonts/Sierra-SCI-Menu-Font.ttf" );
+                yarn->globals.font_say_size = 0;
             } break;   
             case YARN_RESOLUTION_MEDIUM: {
-                yarn->globals.font_items = cstr( "fonts/scifont003.fnt" );
-                yarn->globals.font_items_size = 0;
+                yarn->globals.font_say = cstr( "fonts/Sierra-SCI-Menu-Font.ttf" );
+                yarn->globals.font_say_size = 0;
             } break;   
             case YARN_RESOLUTION_HIGH: {
                 if( yarn->globals.colormode == YARN_COLORMODE_PALETTE ) {
-                    yarn->globals.font_items = cstr( "fonts/scifont002.fnt" );
-                    yarn->globals.font_items_size = 0;
+                    yarn->globals.font_say = cstr( "fonts/RPGSystem.ttf" );
+                    yarn->globals.font_say_size = 0;
                 } else {
-                    yarn->globals.font_items = cstr( "fonts/AlegreyaSans-Bold.ttf" );
-                    yarn->globals.font_items_size = 21;
+                    yarn->globals.font_say = cstr( "fonts/AlegreyaSans-Bold.ttf" );
+                    yarn->globals.font_say_size = 22;
                 }
             } break;   
             case YARN_RESOLUTION_FULL: {
-                yarn->globals.font_items = cstr( "fonts/AlegreyaSans-Bold.ttf" );
-                yarn->globals.font_items_size = 42;
+                yarn->globals.font_say = cstr( "fonts/AlegreyaSans-Bold.ttf" );
+                yarn->globals.font_say_size = 44;
+            } break;
+        }
+    }
+    if( !yarn->globals.font_response ) {
+        switch( yarn->globals.resolution ) {
+            case YARN_RESOLUTION_RETRO: {
+                yarn->globals.font_response = cstr( "fonts/Sierra-SCI-Menu-Font.ttf" );
+                yarn->globals.font_response_size = 0;
+            } break;   
+            case YARN_RESOLUTION_LOW: {
+                yarn->globals.font_response = cstr( "fonts/Sierra-SCI-Menu-Font.ttf" );
+                yarn->globals.font_response_size = 0;
+            } break;   
+            case YARN_RESOLUTION_MEDIUM: {
+                yarn->globals.font_response = cstr( "fonts/Sierra-SCI-Menu-Font.ttf" );
+                yarn->globals.font_response_size = 0;
+            } break;   
+            case YARN_RESOLUTION_HIGH: {
+                if( yarn->globals.colormode == YARN_COLORMODE_PALETTE ) {
+                    yarn->globals.font_response = cstr( "fonts/RPGSystem.ttf" );
+                    yarn->globals.font_response_size = 0;
+                } else {
+                    yarn->globals.font_response = cstr( "fonts/AlegreyaSans-Bold.ttf" );
+                    yarn->globals.font_response_size = 22;
+                }
+            } break;   
+            case YARN_RESOLUTION_FULL: {
+                yarn->globals.font_response = cstr( "fonts/AlegreyaSans-Bold.ttf" );
+                yarn->globals.font_response_size = 44;
+            } break;
+        }
+    }
+    if( !yarn->globals.font_chr ) {
+        switch( yarn->globals.resolution ) {
+            case YARN_RESOLUTION_RETRO: {
+                yarn->globals.font_chr = cstr( "fonts/Berkelium64.ttf" );
+                yarn->globals.font_chr_size = 0;
+            } break;   
+            case YARN_RESOLUTION_LOW: {
+                yarn->globals.font_chr = cstr( "fonts/scifont003.fnt" );
+                yarn->globals.font_chr_size = 0;
+            } break;   
+            case YARN_RESOLUTION_MEDIUM: {
+                yarn->globals.font_chr = cstr( "fonts/scifont003.fnt" );
+                yarn->globals.font_chr_size = 0;
+            } break;   
+            case YARN_RESOLUTION_HIGH: {
+                if( yarn->globals.colormode == YARN_COLORMODE_PALETTE ) {
+                    yarn->globals.font_chr = cstr( "fonts/scifont002.fnt" );
+                    yarn->globals.font_chr_size = 0;
+                } else {
+                    yarn->globals.font_chr = cstr( "fonts/AlegreyaSans-Bold.ttf" );
+                    yarn->globals.font_chr_size = 21;
+                }
+            } break;   
+            case YARN_RESOLUTION_FULL: {
+                yarn->globals.font_chr = cstr( "fonts/AlegreyaSans-Bold.ttf" );
+                yarn->globals.font_chr_size = 42;
+            } break;
+        }
+    }
+    if( !yarn->globals.font_use ) {
+        switch( yarn->globals.resolution ) {
+            case YARN_RESOLUTION_RETRO: {
+                yarn->globals.font_use = cstr( "fonts/Berkelium64.ttf" );
+                yarn->globals.font_use_size = 0;
+            } break;   
+            case YARN_RESOLUTION_LOW: {
+                yarn->globals.font_use = cstr( "fonts/scifont003.fnt" );
+                yarn->globals.font_use_size = 0;
+            } break;   
+            case YARN_RESOLUTION_MEDIUM: {
+                yarn->globals.font_use = cstr( "fonts/scifont003.fnt" );
+                yarn->globals.font_use_size = 0;
+            } break;   
+            case YARN_RESOLUTION_HIGH: {
+                if( yarn->globals.colormode == YARN_COLORMODE_PALETTE ) {
+                    yarn->globals.font_use = cstr( "fonts/scifont002.fnt" );
+                    yarn->globals.font_use_size = 0;
+                } else {
+                    yarn->globals.font_use = cstr( "fonts/AlegreyaSans-Bold.ttf" );
+                    yarn->globals.font_use_size = 21;
+                }
+            } break;   
+            case YARN_RESOLUTION_FULL: {
+                yarn->globals.font_use = cstr( "fonts/AlegreyaSans-Bold.ttf" );
+                yarn->globals.font_use_size = 42;
             } break;
         }
     }

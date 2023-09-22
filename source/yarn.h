@@ -880,14 +880,20 @@ typedef struct yarn_globals_t {
     string palette;
     string alone_text;
     string nothing_text;
-    string font_description;
-    int font_description_size;
-    string font_options;
-    int font_options_size;
-    string font_characters;
-    int font_characters_size;
-    string font_items;
-    int font_items_size;
+    string font_txt;
+    int font_txt_size;
+    string font_opt;
+    int font_opt_size;
+    string font_dialog;
+    int font_dialog_size;
+    string font_say;
+    int font_say_size;
+    string font_response;
+    int font_response_size;
+    string font_chr;
+    int font_chr_size;
+    string font_use;
+    int font_use_size;
     string font_name;
     int font_name_size;
     yarn_resolution_t resolution;
@@ -918,6 +924,12 @@ typedef struct yarn_globals_t {
     int vmargin_say;
     int hmargin_response;
     int vmargin_response;
+    int hmargin_chr;
+    int vmargin_chr;
+    int hmargin_use;
+    int vmargin_use;
+    int hmargin_name;
+    int vmargin_name;
 
     bool explicit_flags;
     array(string_id)* flags;
@@ -941,14 +953,20 @@ yarn_globals_t* empty_globals( void ) {
     globals.palette = NULL;
     globals.alone_text = cstr( "You are alone." );
     globals.nothing_text = cstr( "You have nothing." );
-    globals.font_description = NULL;
-    globals.font_description_size = 0;
-    globals.font_options = NULL;
-    globals.font_options_size = 0;
-    globals.font_characters =  NULL;
-    globals.font_characters_size = 0;
-    globals.font_items = NULL;
-    globals.font_items_size = 0;
+    globals.font_txt = NULL;
+    globals.font_txt_size = 0;
+    globals.font_opt = NULL;
+    globals.font_opt_size = 0;
+    globals.font_dialog = NULL;
+    globals.font_dialog_size = 0;
+    globals.font_say = NULL;
+    globals.font_say_size = 0;
+    globals.font_response = NULL;
+    globals.font_response_size = 0;
+    globals.font_chr =  NULL;
+    globals.font_chr_size = 0;
+    globals.font_use = NULL;
+    globals.font_use_size = 0;
     globals.font_name = NULL;
     globals.font_name_size = 0;
     globals.resolution = YARN_RESOLUTION_RETRO;
@@ -979,6 +997,12 @@ yarn_globals_t* empty_globals( void ) {
     globals.vmargin_say = 0;
     globals.hmargin_response = 0;
     globals.vmargin_response = 0;
+    globals.hmargin_chr = 0;
+    globals.vmargin_chr = 0;
+    globals.hmargin_use = 0;
+    globals.vmargin_use = 0;
+    globals.hmargin_name = 0;
+    globals.vmargin_name = 0;
     globals.explicit_flags = false;
     globals.flags = managed_array(string_id);
     globals.explicit_items = false;
@@ -999,14 +1023,20 @@ void save_globals( buffer_t* out, yarn_globals_t* globals ) {
     buffer_write_string( out, &globals->palette, 1 );
     buffer_write_string( out, &globals->alone_text, 1 );
     buffer_write_string( out, &globals->nothing_text, 1 );
-    buffer_write_string( out, &globals->font_description, 1 );
-    buffer_write_i32( out, &globals->font_description_size, 1 );
-    buffer_write_string( out, &globals->font_options, 1 );
-    buffer_write_i32( out, &globals->font_options_size, 1 );
-    buffer_write_string( out, &globals->font_characters, 1 );
-    buffer_write_i32( out, &globals->font_characters_size, 1 );
-    buffer_write_string( out, &globals->font_items, 1 );
-    buffer_write_i32( out, &globals->font_items_size, 1 );
+    buffer_write_string( out, &globals->font_txt, 1 );
+    buffer_write_i32( out, &globals->font_txt_size, 1 );
+    buffer_write_string( out, &globals->font_opt, 1 );
+    buffer_write_i32( out, &globals->font_opt_size, 1 );
+    buffer_write_string( out, &globals->font_dialog, 1 );
+    buffer_write_i32( out, &globals->font_dialog_size, 1 );
+    buffer_write_string( out, &globals->font_say, 1 );
+    buffer_write_i32( out, &globals->font_say_size, 1 );
+    buffer_write_string( out, &globals->font_response, 1 );
+    buffer_write_i32( out, &globals->font_response_size, 1 );
+    buffer_write_string( out, &globals->font_chr, 1 );
+    buffer_write_i32( out, &globals->font_chr_size, 1 );
+    buffer_write_string( out, &globals->font_use, 1 );
+    buffer_write_i32( out, &globals->font_use_size, 1 );
     buffer_write_string( out, &globals->font_name, 1 );
     buffer_write_i32( out, &globals->font_name_size, 1 );
     int resolution = (int) globals->resolution;
@@ -1046,6 +1076,12 @@ void save_globals( buffer_t* out, yarn_globals_t* globals ) {
     buffer_write_i32( out, &globals->vmargin_say, 1 );
     buffer_write_i32( out, &globals->hmargin_response, 1 );
     buffer_write_i32( out, &globals->vmargin_response, 1 );
+    buffer_write_i32( out, &globals->hmargin_chr, 1 );
+    buffer_write_i32( out, &globals->vmargin_chr, 1 );
+    buffer_write_i32( out, &globals->hmargin_use, 1 );
+    buffer_write_i32( out, &globals->vmargin_use, 1 );
+    buffer_write_i32( out, &globals->hmargin_name, 1 );
+    buffer_write_i32( out, &globals->vmargin_name, 1 );
 
     buffer_write_bool( out, &globals->explicit_flags, 1 );
     buffer_write_i32( out, &globals->flags->count, 1 );
@@ -1075,14 +1111,20 @@ void load_globals( buffer_t* in, yarn_globals_t* globals ) {
     globals->palette = read_string( in );
     globals->alone_text = read_string( in );
     globals->nothing_text = read_string( in );
-    globals->font_description = read_string( in );
-    globals->font_description_size = read_int( in );
-    globals->font_options = read_string( in );
-    globals->font_options_size = read_int( in );
-    globals->font_characters = read_string( in );
-    globals->font_characters_size = read_int( in );
-    globals->font_items = read_string( in );
-    globals->font_items_size = read_int( in );
+    globals->font_txt = read_string( in );
+    globals->font_txt_size = read_int( in );
+    globals->font_opt = read_string( in );
+    globals->font_opt_size = read_int( in );
+    globals->font_dialog = read_string( in );
+    globals->font_dialog_size = read_int( in );
+    globals->font_say = read_string( in );
+    globals->font_say_size = read_int( in );
+    globals->font_response = read_string( in );
+    globals->font_response_size = read_int( in );
+    globals->font_chr = read_string( in );
+    globals->font_chr_size = read_int( in );
+    globals->font_use = read_string( in );
+    globals->font_use_size = read_int( in );
     globals->font_name = read_string( in );
     globals->font_name_size = read_int( in );
     globals->resolution = (yarn_resolution_t) read_int( in );
@@ -1120,6 +1162,12 @@ void load_globals( buffer_t* in, yarn_globals_t* globals ) {
     globals->vmargin_say = read_int( in );
     globals->hmargin_response = read_int( in );
     globals->vmargin_response = read_int( in );
+    globals->hmargin_chr = read_int( in );
+    globals->vmargin_chr = read_int( in );
+    globals->hmargin_use = read_int( in );
+    globals->vmargin_use = read_int( in );
+    globals->hmargin_name = read_int( in );
+    globals->vmargin_name = read_int( in );
 
     globals->explicit_flags = read_bool( in );
     globals->flags = managed_array(string_id);
@@ -1143,10 +1191,13 @@ typedef struct yarn_assets_t {
     int palette_count;
     uint32_t palette[ 256 ];
 
-    pixelfont_t* font_description;
-    pixelfont_t* font_options;
-    pixelfont_t* font_characters;
-    pixelfont_t* font_items;
+    pixelfont_t* font_txt;
+    pixelfont_t* font_opt;
+    pixelfont_t* font_dialog;
+    pixelfont_t* font_say;
+    pixelfont_t* font_response;
+    pixelfont_t* font_chr;
+    pixelfont_t* font_use;
     pixelfont_t* font_name;
 
     array(palrle_data_t*)* bitmaps;
@@ -1166,10 +1217,13 @@ yarn_assets_t* empty_assets( void ) {
     assets.palette_count = 0;
     memset( assets.palette, 0, sizeof( assets.palette ) );
 
-    assets.font_description = NULL;
-    assets.font_options = NULL;
-    assets.font_characters = NULL;
-    assets.font_items = NULL;
+    assets.font_txt = NULL;
+    assets.font_opt = NULL;
+    assets.font_dialog = NULL;
+    assets.font_say = NULL;
+    assets.font_response = NULL;
+    assets.font_chr = NULL;
+    assets.font_use = NULL;
     assets.font_name = NULL;
 
     assets.bitmaps = managed_array(palrle_data_t*);
@@ -1189,17 +1243,26 @@ void save_assets( buffer_t* out, yarn_assets_t* assets, yarn_colormode_t colormo
     buffer_write_i32( out, &assets->palette_count, 1 );
     buffer_write_u32( out, assets->palette, assets->palette_count );
 
-    buffer_write_u32( out, &assets->font_description->size_in_bytes, 1 );
-    buffer_write_u8( out, (uint8_t*) assets->font_description, assets->font_description->size_in_bytes );
+    buffer_write_u32( out, &assets->font_txt->size_in_bytes, 1 );
+    buffer_write_u8( out, (uint8_t*) assets->font_txt, assets->font_txt->size_in_bytes );
 
-    buffer_write_u32( out, &assets->font_options->size_in_bytes, 1 );
-    buffer_write_u8( out, (uint8_t*) assets->font_options, assets->font_options->size_in_bytes );
+    buffer_write_u32( out, &assets->font_opt->size_in_bytes, 1 );
+    buffer_write_u8( out, (uint8_t*) assets->font_opt, assets->font_opt->size_in_bytes );
 
-    buffer_write_u32( out, &assets->font_characters->size_in_bytes, 1 );
-    buffer_write_u8( out, (uint8_t*) assets->font_characters, assets->font_characters->size_in_bytes );
+    buffer_write_u32( out, &assets->font_dialog->size_in_bytes, 1 );
+    buffer_write_u8( out, (uint8_t*) assets->font_dialog, assets->font_dialog->size_in_bytes );
 
-    buffer_write_u32( out, &assets->font_items->size_in_bytes, 1 );
-    buffer_write_u8( out, (uint8_t*) assets->font_items, assets->font_items->size_in_bytes );
+    buffer_write_u32( out, &assets->font_say->size_in_bytes, 1 );
+    buffer_write_u8( out, (uint8_t*) assets->font_say, assets->font_say->size_in_bytes );
+
+    buffer_write_u32( out, &assets->font_response->size_in_bytes, 1 );
+    buffer_write_u8( out, (uint8_t*) assets->font_response, assets->font_response->size_in_bytes );
+
+    buffer_write_u32( out, &assets->font_chr->size_in_bytes, 1 );
+    buffer_write_u8( out, (uint8_t*) assets->font_chr, assets->font_chr->size_in_bytes );
+
+    buffer_write_u32( out, &assets->font_use->size_in_bytes, 1 );
+    buffer_write_u8( out, (uint8_t*) assets->font_use, assets->font_use->size_in_bytes );
 
     buffer_write_u32( out, &assets->font_name->size_in_bytes, 1 );
     buffer_write_u8( out, (uint8_t*) assets->font_name, assets->font_name->size_in_bytes );
@@ -1238,25 +1301,40 @@ void load_assets( buffer_t* in, yarn_assets_t* assets, yarn_colormode_t colormod
     assets->palette_count = read_int( in );
     buffer_read_u32( in, assets->palette, assets->palette_count );
 
-    uint32_t font_description_size;
-    buffer_read_u32( in, &font_description_size, 1 );
-    assets->font_description = manage_pixelfont( malloc( font_description_size ) );
-    buffer_read_u8( in, (uint8_t*) assets->font_description, font_description_size );
+    uint32_t font_txt;
+    buffer_read_u32( in, &font_txt, 1 );
+    assets->font_txt = manage_pixelfont( malloc( font_txt ) );
+    buffer_read_u8( in, (uint8_t*) assets->font_txt, font_txt );
 
-    uint32_t font_options_size;
-    buffer_read_u32( in, &font_options_size, 1 );
-    assets->font_options = manage_pixelfont( malloc( font_options_size ) );
-    buffer_read_u8( in, (uint8_t*) assets->font_options, font_options_size );
+    uint32_t font_opt_size;
+    buffer_read_u32( in, &font_opt_size, 1 );
+    assets->font_opt = manage_pixelfont( malloc( font_opt_size ) );
+    buffer_read_u8( in, (uint8_t*) assets->font_opt, font_opt_size );
 
-    uint32_t font_characters_size;
-    buffer_read_u32( in, &font_characters_size, 1 );
-    assets->font_characters = manage_pixelfont( malloc( font_characters_size ) );
-    buffer_read_u8( in, (uint8_t*) assets->font_characters, font_characters_size );
+    uint32_t font_dialog_size;
+    buffer_read_u32( in, &font_dialog_size, 1 );
+    assets->font_dialog = manage_pixelfont( malloc( font_dialog_size ) );
+    buffer_read_u8( in, (uint8_t*) assets->font_dialog, font_dialog_size );
 
-    uint32_t font_items_size;
-    buffer_read_u32( in, &font_items_size, 1 );
-    assets->font_items = manage_pixelfont( malloc( font_items_size ) );
-    buffer_read_u8( in, (uint8_t*) assets->font_items, font_items_size );
+    uint32_t font_say_size;
+    buffer_read_u32( in, &font_say_size, 1 );
+    assets->font_say = manage_pixelfont( malloc( font_say_size ) );
+    buffer_read_u8( in, (uint8_t*) assets->font_say, font_say_size );
+
+    uint32_t font_response_size;
+    buffer_read_u32( in, &font_response_size, 1 );
+    assets->font_response = manage_pixelfont( malloc( font_response_size ) );
+    buffer_read_u8( in, (uint8_t*) assets->font_response, font_response_size );
+
+    uint32_t font_chr_size;
+    buffer_read_u32( in, &font_chr_size, 1 );
+    assets->font_chr = manage_pixelfont( malloc( font_chr_size ) );
+    buffer_read_u8( in, (uint8_t*) assets->font_chr, font_chr_size );
+
+    uint32_t font_use_size;
+    buffer_read_u32( in, &font_use_size, 1 );
+    assets->font_use = manage_pixelfont( malloc( font_use_size ) );
+    buffer_read_u8( in, (uint8_t*) assets->font_use, font_use_size );
 
     uint32_t font_name_size;
     buffer_read_u32( in, &font_name_size, 1 );
@@ -1571,24 +1649,39 @@ buffer_t* yarn_compile( char const* path ) {
     }
 
     printf( "Processing fonts\n" );
-    yarn.assets.font_description = manage_pixelfont( convert_font( yarn.globals.font_description, yarn.globals.font_description_size, palette_mode ) );
-    if( !yarn.assets.font_description ) {
-        printf( "Failed to load font: %s\n", yarn.globals.font_description );
+    yarn.assets.font_txt = manage_pixelfont( convert_font( yarn.globals.font_txt, yarn.globals.font_txt_size, palette_mode ) );
+    if( !yarn.assets.font_txt ) {
+        printf( "Failed to load font: %s\n", yarn.globals.font_txt );
         no_error = false;
     }
-    yarn.assets.font_options = manage_pixelfont( convert_font( yarn.globals.font_options, yarn.globals.font_options_size, palette_mode ) );
-    if( !yarn.assets.font_options ) {
-        printf( "Failed to load font: %s\n", yarn.globals.font_options );
+    yarn.assets.font_opt = manage_pixelfont( convert_font( yarn.globals.font_opt, yarn.globals.font_opt_size, palette_mode ) );
+    if( !yarn.assets.font_opt ) {
+        printf( "Failed to load font: %s\n", yarn.globals.font_opt );
         no_error = false;
     }
-    yarn.assets.font_characters = manage_pixelfont( convert_font( yarn.globals.font_characters, yarn.globals.font_characters_size, palette_mode ) );
-    if( !yarn.assets.font_characters ) {
-        printf( "Failed to load font: %s\n", yarn.globals.font_characters );
+        yarn.assets.font_dialog = manage_pixelfont( convert_font( yarn.globals.font_dialog, yarn.globals.font_dialog_size, palette_mode ) );
+    if( !yarn.assets.font_dialog ) {
+        printf( "Failed to load font: %s\n", yarn.globals.font_dialog );
         no_error = false;
     }
-    yarn.assets.font_items = manage_pixelfont( convert_font( yarn.globals.font_items, yarn.globals.font_items_size, palette_mode ) );
-    if( !yarn.assets.font_items ) {
-        printf( "Failed to load font: %s\n", yarn.globals.font_items );
+    yarn.assets.font_say = manage_pixelfont( convert_font( yarn.globals.font_say, yarn.globals.font_say_size, palette_mode ) );
+    if( !yarn.assets.font_say ) {
+        printf( "Failed to load font: %s\n", yarn.globals.font_say );
+        no_error = false;
+    }
+    yarn.assets.font_response = manage_pixelfont( convert_font( yarn.globals.font_response, yarn.globals.font_response_size, palette_mode ) );
+    if( !yarn.assets.font_response ) {
+        printf( "Failed to load font: %s\n", yarn.globals.font_response );
+        no_error = false;
+    }
+    yarn.assets.font_chr = manage_pixelfont( convert_font( yarn.globals.font_chr, yarn.globals.font_chr_size, palette_mode ) );
+    if( !yarn.assets.font_chr ) {
+        printf( "Failed to load font: %s\n", yarn.globals.font_chr );
+        no_error = false;
+    }
+    yarn.assets.font_use = manage_pixelfont( convert_font( yarn.globals.font_use, yarn.globals.font_use_size, palette_mode ) );
+    if( !yarn.assets.font_use ) {
+        printf( "Failed to load font: %s\n", yarn.globals.font_use );
         no_error = false;
     }
     yarn.assets.font_name = manage_pixelfont( convert_font( yarn.globals.font_name, yarn.globals.font_name_size, palette_mode ) );

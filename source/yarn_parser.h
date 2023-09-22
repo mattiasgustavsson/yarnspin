@@ -37,7 +37,7 @@ typedef struct parser_section_t {
 bool is_multi_item_keyword( string keyword ) {
     char const* multi_item_keywords[] = { 
         "display_filters", "flags", "items",
-        "font_description", "font_options", "font_characters", "font_items", "font_name",
+        "font_txt", "font_opt", "font_dialog", "font_say", "font_response", "font_chr", "font_use", "font_name",
         "debug_set_flags", "debug_get_items", "debug_attach_chars", "mus", "amb", "snd", 
     };
     for( int i = 0; i < ARRAY_COUNT( multi_item_keywords ); ++i ) {
@@ -54,12 +54,13 @@ bool is_global_keyword( string keyword ) {
     char const* global_keywords[] = {
         "title", "author", "version", "start", "items", "flags",
         "palette", "resolution", "colormode", "screenmode", "display_filters", "alone_text", "nothing_text",
-        "font_description", "font_options", "font_characters", "font_items", "font_name",
+        "font_txt", "font_opt", "font_dialog", "font_say", "font_response", "font_chr", "font_use", "font_name",
         "background_location", "background_dialog", "location_print_speed", "dialog_print_speed",
         "color_background", "color_disabled", "color_txt", "color_opt", "color_dialog", "color_say", "color_response",        
         "color_chr", "color_use", "color_name",
         "hmargin_txt", "vmargin_txt", "hmargin_opt", "vmargin_opt", "hmargin_dialog", "vmargin_dialog", 
         "hmargin_say", "vmargin_say", "hmargin_response", "vmargin_response",
+        "hmargin_chr", "vmargin_chr", "hmargin_use", "vmargin_use", "hmargin_name", "vmargin_name", 
         "debug_start", "debug_set_flags", "debug_get_items", "debug_attach_chars",
     };
     for( int i = 0; i < ARRAY_COUNT( global_keywords ); ++i ) {
