@@ -868,15 +868,22 @@ void do_audio( game_t* game, array_param(yarn_audio_t)* audio_param ) {
                     }
                 } break;
                 case YARN_AUDIO_TYPE_SOUND: {
+                    bool already_playing_in_loop = false;
                     yarn_audio_t const* snd = &audio->items[ i ];
                     for( int j = 0; j < game->sound_state.sounds_count; ++j ) {
                         if( ( snd->stop && snd->audio_index == -1 ) || game->sound_state.sounds[ j ].audio_index == snd->audio_index ) {
+                            if( !snd->stop && snd->audio_index != -1 && audiosys_sound_loop( game->audiosys, game->sound_state.sounds[ j ].handle ) ) {
+                                already_playing_in_loop = true;
+                                float volume = snd->volume_min + ( snd->volume_max - snd->volume_min ) * rnd_pcg_nextf( game->rnd );
+                                audiosys_sound_volume_set( game->audiosys, game->sound_state.sounds[ j ].handle, volume );
+                                break;
+                            }
                             float fade_time = snd->delay_min + ( snd->delay_max - snd->delay_min ) * rnd_pcg_nextf( game->rnd );
                             audiosys_sound_stop( game->audiosys, game->sound_state.sounds[ j ].handle, fade_time < 0.1f ? 0.1f : fade_time );
                             game->sound_state.sounds[ j-- ] = game->sound_state.sounds[ --game->sound_state.sounds_count ];
                         }
                     }
-                    if( !snd->stop ) {
+                    if( !already_playing_in_loop && !snd->stop ) {
                         audiosys_audio_source_t src;
                         if( audio_qoa_source( game, snd->audio_index, &src ) ) {
                             AUDIOSYS_U64 handle = audiosys_sound_play( game->audiosys, src, 0.0f, 0.0f );
