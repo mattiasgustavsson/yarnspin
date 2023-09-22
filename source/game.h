@@ -1868,7 +1868,9 @@ gamestate_t location_update( game_t* game ) {
         game->limit = strlen( txt );
     }
 
-    wrap_limit( game->render, game->render->font_txt, txt, 5, 146, game->render->color_txt, 310, game->limit < 0.0f ? 0 : (int)game->limit );
+    int hmargin = game->yarn->globals.hmargin_txt;
+    int vmargin = game->yarn->globals.vmargin_txt;
+    wrap_limit( game->render, game->render->font_txt, txt, 5 + hmargin, 146 + vmargin, game->render->color_txt, 310 - hmargin * 2, game->limit < 0.0f ? 0 : (int)game->limit );
 
     if( was_key_pressed( game, APP_KEY_LBUTTON) || was_key_pressed( game, APP_KEY_SPACE ) )  {
         game->limit = (float) strlen( txt );
@@ -1887,11 +1889,13 @@ gamestate_t location_update( game_t* game ) {
             if( !test_cond( game, &location->opt->items[ i ].cond ) ) {
                 continue;
             }
-            int ypos = 197 + font_height( game->render, game->render->font_opt->height ) * c;
-            pixelfont_bounds_t b = text( game->render, game->render->font_opt, location->opt->items[ i ].text, 5, ypos, game->render->color_opt );
+            hmargin = game->yarn->globals.hmargin_opt;
+            vmargin = game->yarn->globals.vmargin_opt;
+            int ypos = 197 + vmargin + font_height( game->render, game->render->font_opt->height ) * c;
+            pixelfont_bounds_t b = text( game->render, game->render->font_opt, location->opt->items[ i ].text, 5 + hmargin, ypos, game->render->color_opt );
             if( mouse_y >= ypos && mouse_y < ypos + b.height ) {
-                box( game->render, 4, ypos - 1, 315, b.height + 1, game->render->color_opt );
-                text( game->render, game->render->font_opt, location->opt->items[ i ].text, 5, ypos, game->render->color_background );
+                box( game->render, 4 + hmargin, ypos - 1, 315 - hmargin * 2, b.height + 1, game->render->color_opt );
+                text( game->render, game->render->font_opt, location->opt->items[ i ].text, 5 + hmargin, ypos, game->render->color_background );
                 if( was_key_pressed( game, APP_KEY_LBUTTON ) ) {
                     opt = c;
                 }
@@ -1949,6 +1953,20 @@ gamestate_t location_update( game_t* game ) {
         }
         ++chr_count;
     }
+    for( int i = 0; i < game->state.chars->count; ++i ) {
+        bool found = false;
+        for( int j = 0; j < location->chr->count; ++j ) {
+            if( game->state.chars->items[ i ] == location->chr->items[ j ].chr_indices->items[ 0 ] && test_cond( game, &location->chr->items[ j ].cond ) ) {
+                found = true;
+                break;
+            }
+        }
+
+        if( !found ) {
+            ++chr_count;
+        }
+    }
+    
     int chr = -1;
     c = 0;
     for( int i = 0; i < location->chr->count; ++i ) {
@@ -1976,10 +1994,6 @@ gamestate_t location_update( game_t* game ) {
         }
         ++c;
     }
-    if( c == 0 ) {
-        int ypos = 4 + ( ( 117 - ( 2 * font_height( game->render, game->render->font_chr->height ) ) ) / 2 );
-        center_wrap( game->render,  game->render->font_chr, yarn->globals.alone_text, 32, ypos, game->render->color_disabled, 56 );
-    }
 
     // companions
     for( int i = 0; i < game->state.chars->count; ++i ) {
@@ -1997,6 +2011,11 @@ gamestate_t location_update( game_t* game ) {
             pixelfont_bounds_t b = center( game->render,  game->render->font_chr, game->yarn->characters->items[ game->state.chars->items[ i ] ].short_name, 32, ypos, color );
             ++c;
         }
+    }
+
+    if( c == 0 ) {
+        int ypos = 4 + ( ( 117 - ( 2 * font_height( game->render, game->render->font_chr->height ) ) ) / 2 );
+        center_wrap( game->render,  game->render->font_chr, yarn->globals.alone_text, 32, ypos, game->render->color_disabled, 56 );
     }
 
     if( menu_hover && was_key_pressed( game, APP_KEY_LBUTTON ) ) {
@@ -2147,6 +2166,7 @@ gamestate_t dialog_update( game_t* game ) {
     }
     menu_icon( game->render, 309, 1, menu_hover ? game->render->color_background : game->render->color_opt );    
 
+    
     // phrase:
     int phrase_count = 0;
     for( int i = 0; i < dialog->phrase->count; ++i ) {
@@ -2160,14 +2180,18 @@ gamestate_t dialog_update( game_t* game ) {
             }
             game->dialog.phrase_len = (int) cstr_len( txt );
             if( dialog->phrase->items[ i ].character_index >= 0 ) {
-                pixelfont_bounds_t bounds = text_bounds( game->render, game->render->font_txt, txt );
-                if( bounds.width < 310 ) {
-                    center_limit( game->render, game->render->font_txt, txt, 160, 136, game->render->color_txt, game->limit < 0.0f ? 0 : (int)game->limit );
-                } else {
-                    wrap_limit( game->render, game->render->font_txt, txt, 5, 136, game->render->color_txt, 310, game->limit < 0.0f ? 0 : (int)game->limit );
-                }                    
+                int hmargin = game->yarn->globals.hmargin_dialog;
+                int vmargin = game->yarn->globals.vmargin_dialog;   
+                //pixelfont_bounds_t bounds = text_bounds( game->render, game->render->font_txt, txt );
+                //if( bounds.width < 310 ) {
+                //    center_limit( game->render, game->render->font_txt, txt, 160, 136, game->render->color_dialog, game->limit < 0.0f ? 0 : (int)game->limit );
+                //} else {
+                    wrap_limit( game->render, game->render->font_txt, txt, 5 + hmargin, 136 + vmargin, game->render->color_dialog, 310 - hmargin * 2, game->limit < 0.0f ? 0 : (int)game->limit );
+                //}                    
             } else {
-                wrap_limit( game->render, game->render->font_opt, txt, 5, 197, game->render->color_txt, 310, game->limit < 0.0f ? 0 : (int)game->limit );
+                int hmargin = game->yarn->globals.hmargin_response;
+                int vmargin = game->yarn->globals.vmargin_response;    
+                wrap_limit( game->render, game->render->font_opt, txt, 5 + hmargin, 197 + vmargin, game->render->color_response, 310 - hmargin * 2, game->limit < 0.0f ? 0 : (int)game->limit );
             }
         }
         ++phrase_count;
@@ -2216,12 +2240,14 @@ gamestate_t dialog_update( game_t* game ) {
             if( !test_cond( game, &dialog->say->items[ i ].cond ) ) {
                 continue;
             }
-            int ypos = 197 + font_height( game->render, game->render->font_opt->height ) * c;
-            pixelfont_bounds_t b = text( game->render, game->render->font_opt, dialog->say->items[ i ].text, 5, ypos, game->render->color_opt );
+            int hmargin = game->yarn->globals.hmargin_say;
+            int vmargin = game->yarn->globals.vmargin_say;
+            int ypos = 197 + vmargin + font_height( game->render, game->render->font_opt->height ) * c;
+            pixelfont_bounds_t b = text( game->render, game->render->font_opt, dialog->say->items[ i ].text, 5 + hmargin, ypos, game->render->color_say );
             if( game->queued_dialog < 0 && game->queued_location < 0 && game->queued_screen < 0 ) {
                 if( mouse_y >= ypos && mouse_y < ypos + b.height && mouse_x < 277 ) {
-                    box( game->render, 4, ypos - 1, 315, b.height + 1, game->render->color_opt );
-                    text( game->render, game->render->font_opt, dialog->say->items[ i ].text, 5, ypos, game->render->color_background );
+                    box( game->render, 4 + hmargin, ypos - 1, 315 - hmargin * 2, b.height + 1, game->render->color_say );
+                    text( game->render, game->render->font_opt, dialog->say->items[ i ].text, 5 + hmargin, ypos, game->render->color_background );
                     if( was_key_pressed( game, APP_KEY_LBUTTON ) ) {
                         say = c;
                     }
@@ -2263,6 +2289,11 @@ gamestate_t dialog_update( game_t* game ) {
             }
         }
         ++c;
+    }
+
+    if( c == 0 ) {
+        int ypos = 4 + ( ( 117 - ( 2 * font_height( game->render, game->render->font_use->height ) ) ) / 2 );
+        center_wrap( game->render,  game->render->font_use, yarn->globals.nothing_text, 287, ypos, game->render->color_disabled, 56 );
     }
 
     if( menu_hover && was_key_pressed( game, APP_KEY_LBUTTON ) ) {

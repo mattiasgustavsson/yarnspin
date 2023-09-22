@@ -11,6 +11,9 @@ typedef struct render_t {
     int color_disabled;
     int color_txt;
     int color_opt;
+    int color_dialog;
+    int color_say;
+    int color_response;
     int color_chr;
     int color_use;
     int color_name;
@@ -57,6 +60,9 @@ bool render_init( render_t* render, yarn_t* yarn, uint8_t* screen, int width, in
     render->color_disabled = yarn->globals.color_disabled;
     render->color_txt = yarn->globals.color_txt;
     render->color_opt = yarn->globals.color_opt;
+    render->color_dialog = yarn->globals.color_dialog;
+    render->color_say = yarn->globals.color_say;
+    render->color_response = yarn->globals.color_response;
     render->color_chr = yarn->globals.color_chr;
     render->color_use = yarn->globals.color_use;
     render->color_name = yarn->globals.color_name;
@@ -99,6 +105,9 @@ bool render_init( render_t* render, yarn_t* yarn, uint8_t* screen, int width, in
         if( render->color_disabled < 0 ) render->color_disabled = (uint8_t)disabled_index;
         if( render->color_txt < 0 ) render->color_txt = (uint8_t)brightest_index;
         if( render->color_opt < 0 ) render->color_opt = (uint8_t)brightest_index;
+        if( render->color_dialog < 0 ) render->color_dialog = (uint8_t)brightest_index;
+        if( render->color_response < 0 ) render->color_response = (uint8_t)brightest_index;
+        if( render->color_say < 0 ) render->color_say = (uint8_t)brightest_index;
         if( render->color_chr < 0 ) render->color_chr = (uint8_t)brightest_index;
         if( render->color_use < 0 ) render->color_use = (uint8_t)brightest_index;
         if( render->color_name < 0 ) render->color_name = (uint8_t)brightest_index;

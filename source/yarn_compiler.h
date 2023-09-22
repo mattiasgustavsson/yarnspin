@@ -1222,6 +1222,24 @@ bool compile_color( parser_global_t* global, bool rgbmode, int* out_color ) {
 }
 
 
+bool compile_value( parser_global_t* global, int* out_value ) {
+    if( global->data->count != 1 || cstr_len( cstr_trim( global->data->items[ 0 ] ) ) <= 0 ) {
+        printf( "%s(%d): invalid value declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
+        return false;
+    }
+    cstr_t str = cstr_trim( global->data->items[ 0 ] );
+    int len = (int)cstr_len( str );
+    for( int i = 0; i < len; ++i ) {
+        if( ( str[ i ] < '0' || str[ i ] > '9' ) && str[ i ] != '-' ) {
+            printf( "%s(%d): invalid value declaration '%s: %s'\n", global->filename, global->line_number, global->keyword, concat_data( global->data ) );
+            return false;
+        }
+    }
+    int value = atoi( str );
+    *out_value = value;
+    return true;
+}
+
 
 bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn )    {
     array(parser_global_t)* globals = ARRAY_CAST( globals_param);
@@ -1251,6 +1269,9 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
     yarn->globals.color_disabled = rgbmode ? 0xff707070 : -1;
     yarn->globals.color_txt = rgbmode ? 0xffffffff : -1;
     yarn->globals.color_opt = rgbmode ? 0xffffffff : -1;
+    yarn->globals.color_dialog = rgbmode ? 0xffffffff : -1;
+    yarn->globals.color_say = rgbmode ? 0xffffffff : -1;
+    yarn->globals.color_response = rgbmode ? 0xffffffff : -1;
     yarn->globals.color_chr = rgbmode ? 0xffffffff : -1;
     yarn->globals.color_use = rgbmode ? 0xffffffff : -1;
     yarn->globals.color_name = rgbmode ? 0xffffffff : -1;
@@ -1589,12 +1610,38 @@ bool compile_globals( array_param(parser_global_t)* globals_param, yarn_t* yarn 
             no_error &= compile_color( global, rgbmode, &yarn->globals.color_txt );
         } else if( CMP( global->keyword, "color_opt" ) ) {
             no_error &= compile_color( global, rgbmode, &yarn->globals.color_opt );
+        } else if( CMP( global->keyword, "color_dialog" ) ) {
+            no_error &= compile_color( global, rgbmode, &yarn->globals.color_dialog );
+        } else if( CMP( global->keyword, "color_say" ) ) {
+            no_error &= compile_color( global, rgbmode, &yarn->globals.color_say );
+        } else if( CMP( global->keyword, "color_response" ) ) {
+            no_error &= compile_color( global, rgbmode, &yarn->globals.color_response );
         } else if( CMP( global->keyword, "color_chr" ) ) {
             no_error &= compile_color( global, rgbmode, &yarn->globals.color_chr );
         } else if( CMP( global->keyword, "color_use" ) ) {
             no_error &= compile_color( global, rgbmode, &yarn->globals.color_use );
         } else if( CMP( global->keyword, "color_name" ) ) {
             no_error &= compile_color( global, rgbmode, &yarn->globals.color_name );
+        } else if( CMP( global->keyword, "hmargin_txt" ) ) {
+            no_error &= compile_value( global, &yarn->globals.hmargin_txt );
+        } else if( CMP( global->keyword, "vmargin_txt" ) ) {
+            no_error &= compile_value( global, &yarn->globals.vmargin_txt );
+        } else if( CMP( global->keyword, "hmargin_opt" ) ) {
+            no_error &= compile_value( global, &yarn->globals.hmargin_opt );
+        } else if( CMP( global->keyword, "vmargin_opt" ) ) {
+            no_error &= compile_value( global, &yarn->globals.vmargin_opt );
+        } else if( CMP( global->keyword, "hmargin_dialog" ) ) {
+            no_error &= compile_value( global, &yarn->globals.hmargin_dialog );
+        } else if( CMP( global->keyword, "vmargin_dialog" ) ) {
+            no_error &= compile_value( global, &yarn->globals.vmargin_dialog );
+        } else if( CMP( global->keyword, "hmargin_say" ) ) {
+            no_error &= compile_value( global, &yarn->globals.hmargin_say );
+        } else if( CMP( global->keyword, "vmargin_say" ) ) {
+            no_error &= compile_value( global, &yarn->globals.vmargin_say );
+        } else if( CMP( global->keyword, "hmargin_response" ) ) {
+            no_error &= compile_value( global, &yarn->globals.hmargin_response );
+        } else if( CMP( global->keyword, "vmargin_response" ) ) {
+            no_error &= compile_value( global, &yarn->globals.vmargin_response );
         } else if( CMP( global->keyword, "?" ) ) {
             printf( "%s(%d): conditionals not allowed for global declarations\n", global->filename, global->line_number );
             no_error = false;
