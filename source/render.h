@@ -7,6 +7,7 @@ typedef struct render_t {
     int screen_height;
     uint8_t* screenshot;
     uint32_t* screenshot_rgb;
+    int background_index;
     int color_background;
     int color_disabled;
     int color_txt;
@@ -56,6 +57,7 @@ bool render_init( render_t* render, yarn_t* yarn, uint8_t* screen, int width, in
     render->screen_height = height;
     render->screenshot = render->screen ? (uint8_t*) manage_alloc( malloc( width * height * sizeof( uint8_t ) ) ) : NULL;
     render->screenshot_rgb = !render->screen ? (uint32_t*) manage_alloc( malloc( width * height * sizeof( uint32_t ) ) ) : NULL;
+    render->background_index = -1;
 
     render->font_txt = yarn->assets.font_txt;
     render->font_opt = yarn->assets.font_opt;
@@ -612,7 +614,7 @@ void render_new_frame( render_t* render, int hborder, int vborder ) {
         glFramebufferTexture2D( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, render->frametexture, 0 );
         glViewport( hborder, vborder, render->screen_width, render->screen_height);
         glEnable( GL_BLEND );
-        glBlendFuncSeparate( GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO );
+        glBlendFuncSeparate( GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE );
     }
 }
 
@@ -628,7 +630,7 @@ void render_bind_framebuffer( render_t* render, int width, int height ) {
 }
 
 
-void render_present( render_t* render, int width, int height ) {
+void render_present( render_t* render, int width, int height, uint32_t fade ) {
     
     if( render->screen ) {
         return;
@@ -638,16 +640,13 @@ void render_present( render_t* render, int width, int height ) {
     glBindFramebuffer( GL_FRAMEBUFFER, 0 );
 
     glViewport(0, 0, width, height);
-    glClearColor( 0.0f, 0.0f, 0.0f, 0.0f );
+    glClearColor( 0.0f, 0.0f,0.0f, 0.0f );
     glClear( GL_COLOR_BUFFER_BIT );
 
     float view_width = (float)width;
     float view_height = (float)height;
 
-    glDisable( GL_BLEND );
-
     float x1, y1, x2, y2;
-
     if( render->yarn->globals.resolution == YARN_RESOLUTION_FULL || render->yarn->globals.resolution == YARN_RESOLUTION_HIGH ) {
         float hscale = view_width / (float) render->screen_width;
         float vscale = view_height / (float) render->screen_height;
@@ -673,6 +672,20 @@ void render_present( render_t* render, int width, int height ) {
         y2 = y1 + (float) ( pixel_scale * render->screen_height );
     }
 
+    glScissor( x1, y1, x2 - x1, y2 - y1 );
+    glEnable( GL_SCISSOR_TEST );
+    float ba = ( ( render->yarn->globals.color_background >> 24 ) & 0xff ) / 255.0f;
+    float br = ( ( render->yarn->globals.color_background >> 16 ) & 0xff ) / 255.0f;
+    float bg = ( ( render->yarn->globals.color_background >> 8  ) & 0xff ) / 255.0f;
+    float bb = ( ( render->yarn->globals.color_background       ) & 0xff ) / 255.0f;
+    glClearColor( ba, br, bg, bb );
+    glClear( GL_COLOR_BUFFER_BIT );
+    glDisable( GL_SCISSOR_TEST );
+
+    glViewport(0, 0, width, height);
+    glEnable( GL_BLEND );
+    glBlendFuncSeparate( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE );
+
     x1 = ( x1 / view_width );
     x2 = ( x2 / view_width );
     y1 = ( y1 / view_height );
@@ -689,18 +702,32 @@ void render_present( render_t* render, int width, int height ) {
     glVertexAttribPointer( 0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof( GLfloat ), 0 );
     glBufferData( GL_ARRAY_BUFFER, 4 * 4 * sizeof( GLfloat ), vertices, GL_STATIC_DRAW );
 
-    uint32_t color = 0xffffffff;
+    uint32_t color = 0x00ffffff | ( ( fade & 0xff ) << 24 );
     float a = ( ( color >> 24 ) & 0xff ) / 255.0f;
     float r = ( ( color >> 16 ) & 0xff ) / 255.0f;
     float g = ( ( color >> 8  ) & 0xff ) / 255.0f;
     float b = ( ( color       ) & 0xff ) / 255.0f;
     glUseProgram( render->shader );
 
-    glActiveTexture( GL_TEXTURE0 );
-    glBindTexture( GL_TEXTURE_2D, render->frametexture);
+    if( render->background_index >= 0 ) {
+        glUniform1i( glGetUniformLocation( render->shader, "tex0" ), 0 );
+        glUniform4f( glGetUniformLocation( render->shader, "col" ), 1.0f, 1.0f, 1.0f, 1.0f );
+        glActiveTexture( GL_TEXTURE0 );
+        glBindTexture( GL_TEXTURE_2D, render->textures[ render->background_index ] );
+        if( render->yarn->globals.resolution == YARN_RESOLUTION_FULL || render->yarn->globals.resolution == YARN_RESOLUTION_HIGH ) {
+            glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+            glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+        } else {
+            glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
+            glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
+        }
+        glDrawArrays( GL_TRIANGLE_FAN, 0, 4 );
+    }
+    
     glUniform1i( glGetUniformLocation( render->shader, "tex0" ), 0 );
     glUniform4f( glGetUniformLocation( render->shader, "col" ), r, g, b, a );
     glActiveTexture( GL_TEXTURE0 );
+    glBindTexture( GL_TEXTURE_2D, render->frametexture);
     if( render->yarn->globals.resolution == YARN_RESOLUTION_FULL || render->yarn->globals.resolution == YARN_RESOLUTION_HIGH ) {
         glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
         glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
@@ -709,7 +736,10 @@ void render_present( render_t* render, int width, int height ) {
         glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
     }
     glDrawArrays( GL_TRIANGLE_FAN, 0, 4 );
+    
     glBindTexture( GL_TEXTURE_2D, 0 );    
+
+    glBlendFuncSeparate( GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO );
 }
 
 
@@ -773,6 +803,43 @@ void draw( render_t* render, int bitmap_index, int x, int y ) {
     }
 }
 
+void draw_flip( render_t* render, int bitmap_index, int x, int y ) {
+    scale_for_resolution( render, &x, &y );
+    if( render->screen ) {
+        palrle_blit( render->yarn->assets.bitmaps->items[ bitmap_index ], x, y, render->screen, render->screen_width, render->screen_height );
+    } else {
+        float width = render->screen_width;
+        float height = render->screen_height;
+        float x1 = x / width;
+        float y1 = y / height;
+        float x2 = x1 + render->bitmap_width[ bitmap_index ] / width;
+        float y2 = y1 + render->bitmap_height[ bitmap_index ] / height;
+
+        GLfloat vertices[] = {
+            2.0f * x1 - 1.0f, 2.0f * y1 - 1.0f, 0.0f, 1.0f,
+            2.0f * x2 - 1.0f, 2.0f * y1 - 1.0f, 1.0f, 1.0f,
+            2.0f * x2 - 1.0f, 2.0f * y2 - 1.0f, 1.0f, 0.0f,
+            2.0f * x1 - 1.0f, 2.0f * y2 - 1.0f, 0.0f, 0.0f,
+        };
+        glBindBuffer( GL_ARRAY_BUFFER, render->vertexbuffer );
+        glEnableVertexAttribArray( 0 );
+        glVertexAttribPointer( 0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof( GLfloat ), 0 );
+        glBufferData( GL_ARRAY_BUFFER, 4 * 4 * sizeof( GLfloat ), vertices, GL_STATIC_DRAW );
+
+        uint32_t color = 0xffffffff;
+        float a = ( ( color >> 24 ) & 0xff ) / 255.0f;
+        float r = ( ( color >> 16 ) & 0xff ) / 255.0f;
+        float g = ( ( color >> 8  ) & 0xff ) / 255.0f;
+        float b = ( ( color       ) & 0xff ) / 255.0f;
+        glUseProgram( render->shader );
+        glActiveTexture( GL_TEXTURE0 );
+        glBindTexture( GL_TEXTURE_2D, render->textures[ bitmap_index ] );
+        glUniform1i( glGetUniformLocation( render->shader, "tex0" ), 0 );
+        glUniform4f( glGetUniformLocation( render->shader, "col" ), r, g, b, a );
+        glDrawArrays( GL_TRIANGLE_FAN, 0, 4 );
+        glBindTexture( GL_TEXTURE_2D, 0 );
+    }
+}
 
 void draw_screenshot( render_t* render ) {
     if( render->screen ) {

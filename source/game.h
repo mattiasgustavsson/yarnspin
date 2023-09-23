@@ -595,6 +595,14 @@ void enter_menu( game_t* game ) {
 
 
 void game_update( game_t* game, float delta_time ) {    
+    if( game->current_state == GAMESTATE_LOCATION ) {
+        game->render->background_index = game->yarn->globals.background_location;
+    } else if( game->current_state == GAMESTATE_DIALOG ) {
+        game->render->background_index = game->yarn->globals.background_dialog;
+    } else {
+        game->render->background_index = -1;
+    }
+
     if( game->exit_confirmed ) {
         game->new_state = GAMESTATE_TERMINATE;
         game->disable_transition = true;
@@ -1769,7 +1777,7 @@ gamestate_t screen_update( game_t* game ) {
 
 
 // location
-gamestate_t location_init( game_t* game ) {
+gamestate_t location_init( game_t* game ) {    
     stack_entry_t entry;
     entry.type = STACK_ENTRY_LOCATION;
     entry.index = game->state.current_location;

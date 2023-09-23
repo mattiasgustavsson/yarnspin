@@ -506,7 +506,7 @@ int app_proc( app_t* app, void* user_data ) {
                 }
                 app_present( app, screen, screen_width, screen_height, fade, bg );
             } else {
-                render_present( &render, app_window_width( app ), app_window_height( app ) );
+                render_present( &render, app_window_width( app ), app_window_height( app ), fade );
                 app_present( app, NULL, 1, 1, 0xffffff, 0x000000 );
             }
         }
