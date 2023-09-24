@@ -412,7 +412,7 @@ pixelfont_t* pixelfont_builder_font( pixelfont_builder_t* builder )
 
     PIXELFONT_U32 offsets[ 256 ];
     memset( offsets, 0, sizeof( offsets ) );
-    int current_offset = 0;
+    int current_offset = 1;
     int total_width = 0;
     int glyph_count = 0;
     for( int i = 0; i < sizeof( builder->glyphs ) / sizeof( *builder->glyphs ); ++i )
@@ -427,6 +427,7 @@ pixelfont_t* pixelfont_builder_font( pixelfont_builder_t* builder )
         }
 
     size_t size_in_bytes = sizeof( pixelfont_t ) - sizeof( PIXELFONT_U8 ); // base size excluding final placeholder byte
+	size_in_bytes += 1; // skip first slot in array, as we use 0 for "no glyph" marker
     size_in_bytes += glyph_count + 2 * builder->kernings_count; // kerning pair count for each glyph + all kerning data
     size_in_bytes += 3 * glyph_count; // lead, trail and width for each glyph
     size_in_bytes += total_width * builder->height; // pixel data for all glyphs

@@ -78,7 +78,7 @@ img_rgba_t img_rgba_saturate( img_rgba_t a ) {
 }
 
 
-bitmapfont_t* generate_bitmap_font( uint8_t* ttf_data, int font_size ) {
+bitmapfont_t* generate_bitmap_font( uint8_t* ttf_data, int font_size, int padding ) {
     stbtt_fontinfo font;
     if( !stbtt_InitFont( &font, ttf_data, stbtt_GetFontOffsetForIndex( ttf_data, 0) ) ) {
         return NULL;
@@ -124,7 +124,7 @@ bitmapfont_t* generate_bitmap_font( uint8_t* ttf_data, int font_size ) {
     while( retry && width <= 8192 && height <= 8192 ) {
         memset( pixels, 0, sizeof( uint8_t ) * width * height );
         stbtt_pack_context spc;
-        stbtt_PackBegin( &spc, pixels, width, height, 0, 1, NULL );
+        stbtt_PackBegin( &spc, pixels, width, height, 0, padding, NULL );
         stbtt_PackSetOversampling( &spc, 1, 1 );
         stbtt_pack_range range;
         range.font_size = font_size;
@@ -257,7 +257,6 @@ bitmapfont_t* bitmap_font_from_pixel_font( pixelfont_t* pixelfont ) {
         bitmapfont->glyphs[ r->id ].u2 = ( r->x + 1 + r->w - 2 ) / (float) width;
         bitmapfont->glyphs[ r->id ].v2 = ( r->y + 1 + r->h - 2 ) / (float) height;
     }
-    stbi_write_png( "test.png", width, height, 1, bitmapfont->pixels, width );
     return bitmapfont;
 }
 
@@ -1635,10 +1634,15 @@ pixelfont_t* convert_font( string font_filename, int font_size, bool palette_mod
             file_save_data( font, font->size_in_bytes, processed_filename, FILE_MODE_BINARY );
             free( font );
         } else {
-            bitmapfont_t* font = generate_bitmap_font( (uint8_t*) font_file->data, font_size );
-            create_path( processed_filename, 0 );
-            file_save_data( font, font->size_in_bytes, processed_filename, FILE_MODE_BINARY );
-            free( font );
+            if( cstr_compare_nocase( cextname( font_filename ), ".bmf" ) == 0 ) {
+                create_path( processed_filename, 0 );
+                file_save( font_file, processed_filename, FILE_MODE_BINARY );
+            } else {
+                bitmapfont_t* font = generate_bitmap_font( (uint8_t*) font_file->data, font_size, 1 );
+                create_path( processed_filename, 0 );
+                file_save_data( font, font->size_in_bytes, processed_filename, FILE_MODE_BINARY );
+                free( font );
+            }
         }
         file_destroy( font_file );
     }
