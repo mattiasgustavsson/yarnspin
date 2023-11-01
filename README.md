@@ -1,4 +1,4 @@
-![build](https://github.com/mattiasgustavsson/yarnspin/workflows/build/badge.svg)
+![build](https://github.com/mattiasgustavsson/yarnspin/actions/workflows/main.yml/badge.svg)
 ---
 ![yarnspin](images/yarnspin_logo.png)
 
