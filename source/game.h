@@ -184,9 +184,6 @@ bool state_data_read( state_data_t* data, buffer_t* buffer ) {
 
 typedef struct savegame_t {
     uint32_t version;
-    bool fullscreen;
-    int sound_level;
-    int display_filter;
     int thumb_width;
     int thumb_height;
     uint8_t* thumb;
@@ -248,6 +245,8 @@ typedef struct game_t {
     } sound_state;
 } game_t;
 
+void game_save_settings( game_t* game );
+void game_load_settings( game_t* game );
 
 typedef struct qoa_decode_t {
     qoa_data_t* audio_data;
@@ -1024,6 +1023,62 @@ void do_actions( game_t* game, array_param(yarn_act_t)* act_param ) {
 }
 
 
+void game_save_settings( game_t* game ) {
+    buffer_t* buffer = buffer_create();
+
+    int version_len = (int) strlen( game->yarn->globals.version );
+    buffer_write_i32( buffer, &version_len, 1 );
+    buffer_write_char( buffer, game->yarn->globals.version, version_len );
+    buffer_write_bool( buffer, &game->fullscreen, 1 );
+    buffer_write_i32( buffer, &game->sound_level, 1 );
+    buffer_write_i32( buffer, &game->display_filter_index, 1 );
+    
+    save_data( game->yarn->globals.author, game->yarn->globals.title, "settings.cfg", buffer_data( buffer ), buffer_size( buffer ) );
+    buffer_destroy( buffer );
+}
+
+
+void game_load_settings( game_t* game ) {
+    size_t size = 0;
+    void* data = load_data( game->yarn->globals.author, game->yarn->globals.title, "settings.cfg", &size );
+    if( data ) {
+        buffer_t* buffer = buffer_map( data, size );
+        int version_len = 0;
+        buffer_read_i32( buffer, &version_len, 1 );
+        if( version_len >= 256 ) {
+            buffer_destroy( buffer );
+            free( data );
+            return;
+        }
+        char* version = (char*) malloc( version_len + 1 );
+        buffer_read_char( buffer, version, version_len );
+        version[version_len] = 0;
+        if( cstr_compare( cstr_trim( game->yarn->globals.version ), cstr_trim( version ) ) != 0 ) {
+            free( version );
+            buffer_destroy( buffer );
+            free( data );
+            return;
+        }
+        free( version );
+
+        bool fullscreen = game->fullscreen;
+        int sound_level = game->sound_level;
+        int display_filter = game->display_filter_index;
+        buffer_read_bool( buffer, &fullscreen, 1 );
+        buffer_read_i32( buffer, &sound_level, 1 );
+        buffer_read_i32( buffer, &display_filter, 1 );
+
+        game->sound_level = sound_level < 0 ? 0 : sound_level > 3 ? 3 : sound_level;
+        float volumes[] = { 0.0f, 0.33f, 0.66f, 1.0f };
+        audiosys_master_volume_set( game->audiosys, volumes[ game->sound_level ] );
+        game->display_filter_index = display_filter < 0 ? 0 : display_filter >= game->yarn->globals.display_filters->count ? game->yarn->globals.display_filters->count - 1 : display_filter;
+        game->fullscreen = fullscreen;
+
+        buffer_destroy( buffer );
+        free( data );
+    }
+}
+
 
 static char const* savegame_names[] = { "savegame.001", "savegame.002", "savegame.003", "savegame.004", "savegame.005", 
     "savegame.006", "savegame.007", "savegame.008", "savegame.009",  };
@@ -1045,9 +1100,6 @@ void save_game( game_t* game, int slot ) {
     int version_len = (int) strlen( game->yarn->globals.version );
     buffer_write_i32( buffer, &version_len, 1 );
     buffer_write_char( buffer, game->yarn->globals.version, version_len );
-    buffer_write_bool( buffer, &game->fullscreen, 1 );
-    buffer_write_i32( buffer, &game->sound_level, 1 );
-    buffer_write_i32( buffer, &game->display_filter_index, 1 );
     buffer_write_i32( buffer, &thumb_width, 1 );
     buffer_write_i32( buffer, &thumb_height, 1 );
     
@@ -1069,7 +1121,7 @@ void save_game( game_t* game, int slot ) {
 
     char const* name = savegame_names[ slot - 1 ];
 
-    bool success = save_data( game->yarn->globals.title, name, buffer_data( buffer ), buffer_size( buffer ) );
+    bool success = save_data( game->yarn->globals.author, game->yarn->globals.title, name, buffer_data( buffer ), buffer_size( buffer ) );
     if( success ) {
         game->ingame_menu = false;
         game->savegame_menu = false;
@@ -1092,11 +1144,6 @@ void load_game( game_t* game, int slot ) {
     }
     savegame_t* savegame = &game->savegames[ slot - 1 ];
     if( savegame->thumb_width && savegame->thumb_height ) {
-        game->sound_level = savegame->sound_level < 0 ? 0 : savegame->sound_level > 3 ? 3 : savegame->sound_level;
-        float volumes[] = { 0.0f, 0.33f, 0.66f, 1.0f };
-        audiosys_master_volume_set( game->audiosys, volumes[ game->sound_level ] );
-        game->display_filter_index = savegame->display_filter < 0 ? 0 : savegame->display_filter >= game->yarn->globals.display_filters->count ? game->yarn->globals.display_filters->count - 1 : savegame->display_filter;
-        game->fullscreen = savegame->fullscreen;
         game_load_state( game, &savegame->state );   
         
         audiosys_music_stop( game->audiosys, 0.1f );
@@ -1140,7 +1187,7 @@ void load_savegames( game_t* game ) {
     for( int i = 0; i < 9; ++i ) {
         savegame_t* savegame = &game->savegames[ i ];
         size_t size = 0;
-        void* data = load_data( game->yarn->globals.title, savegame_names[ i ], &size );
+        void* data = load_data( game->yarn->globals.author, game->yarn->globals.title, savegame_names[ i ], &size );
         if( data ) {
             buffer_t* buffer = buffer_map( data, size );
             int version_len = 0;
@@ -1164,9 +1211,6 @@ void load_savegames( game_t* game ) {
                 continue;
             }
             free( version );
-            buffer_read_bool( buffer, &savegame->fullscreen, 1 );
-            buffer_read_i32( buffer, &savegame->sound_level, 1 );
-            buffer_read_i32( buffer, &savegame->display_filter, 1 );
 
             buffer_read_i32( buffer, &savegame->thumb_width, 1 );
             buffer_read_i32( buffer, &savegame->thumb_height, 1 );
@@ -1510,6 +1554,7 @@ void settings_menu_update( game_t* game ) {
     
     if( was_key_pressed( game, APP_KEY_ESCAPE ) || ( done_hover && was_key_pressed( game, APP_KEY_LBUTTON ) ) ) {
         game->settings_menu = false;
+        game_save_settings( game );
     }
     if( was_key_pressed( game, APP_KEY_LBUTTON ) ) {
         if( sound_off ) {

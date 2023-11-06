@@ -106,8 +106,8 @@ int folder_exists( char const* filename );
 size_t decompress_lzma( void* compressed_data, size_t compressed_size, void* buffer, size_t size );
 char const* get_executable_filename( void );
 
-bool save_data( char const* title, char const* name, void* data, size_t size );
-void* load_data( char const* title, char const* name, size_t* out_size );
+bool save_data( char const* author, char const* title, char const* name, void* data, size_t size );
+void* load_data( char const* author, char const* title, char const* name, size_t* out_size );
 
 typedef struct datetime_t {
     int day;
@@ -311,6 +311,7 @@ int app_proc( app_t* app, void* user_data ) {
     game_init( &game, yarn, &render, &input, audiosys, &rnd );
 
     game.fullscreen = yarn->globals.screenmode == YARN_SCREENMODE_FULLSCREEN;
+    game_load_settings( &game );
     #ifdef __wasm__
         game.fullscreen = false;
     #endif
@@ -1603,16 +1604,16 @@ void ensure_console_open( void ) {
         return MStrPut( value );
     })
 
-    bool save_data( char const* title, char const* name, void* data, size_t size ) {
-        cstr_t fullname = cstr_cat( title, name );
+    bool save_data( char const* author, char const* title, char const* name, void* data, size_t size ) {
+        cstr_t fullname = cstr_cat( cstr_cat( author, "." ), cstr_cat( cstr_cat( title, "." ), name ) );
         char* str = base64enc( data, size, NULL );
         bool result = web_storage_save( fullname, str );
         free( str );
         return result;
     }
 
-    void* load_data( char const* title, char const* name, size_t* out_size ) {        
-        cstr_t fullname = cstr_cat( title, name );
+    void* load_data( char const* author, char const* title, char const* name, size_t* out_size ) {        
+        cstr_t fullname = cstr_cat( cstr_cat( author, "." ), cstr_cat( cstr_cat( title, "." ), name ) );
         char* value = web_storage_load( fullname );
         if( !value ) {
             return NULL;
@@ -1641,7 +1642,7 @@ void ensure_console_open( void ) {
     }
 
 
-    bool save_data( char const* title, char const* name, void* data, size_t size ) {
+    bool save_data( char const* author, char const* title, char const* name, void* data, size_t size ) {
         if( !folder_exists( "savegame" ) ) {
             makedir( "savegame" );
         }
@@ -1659,7 +1660,7 @@ void ensure_console_open( void ) {
     }
 
 
-    void* load_data( char const* title, char const* name, size_t* out_size ) {      
+    void* load_data( char const* author, char const* title, char const* name, size_t* out_size ) {      
         if( !folder_exists( "savegame" ) ) {
             return NULL;
         }
