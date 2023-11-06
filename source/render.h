@@ -678,7 +678,7 @@ void render_present( render_t* render, int width, int height, uint32_t fade ) {
     float br = ( ( render->yarn->globals.color_background >> 16 ) & 0xff ) / 255.0f;
     float bg = ( ( render->yarn->globals.color_background >> 8  ) & 0xff ) / 255.0f;
     float bb = ( ( render->yarn->globals.color_background       ) & 0xff ) / 255.0f;
-    glClearColor( ba, br, bg, bb );
+    glClearColor( br, bg, bb, ba );
     glClear( GL_COLOR_BUFFER_BIT );
     glDisable( GL_SCISSOR_TEST );
 
