@@ -1775,7 +1775,7 @@ buffer_t* yarn_compile( char const* path ) {
     printf( "Processing frames\n" );
     for( int i = 0; i < yarn.globals.display_filters->count; ++i ) {
         if( yarn.globals.display_filters->items[ i ] == YARN_DISPLAY_FILTER_PC ) {
-            file_t* file = file_load( "images/crtframe_pc.png", FILE_MODE_BINARY, NULL );
+            file_t* file = file_load( "display/crtframe_pc.png", FILE_MODE_BINARY, NULL );
             yarn.assets.frame_pc_size = file ? (uint32_t) file->size : 0;
             if( yarn.assets.frame_pc_size ) {
                 yarn.assets.frame_pc = manage_alloc( malloc( yarn.assets.frame_pc_size ) );
@@ -1786,7 +1786,7 @@ buffer_t* yarn_compile( char const* path ) {
             file_destroy( file );
         }
         if( yarn.globals.display_filters->items[ i ] == YARN_DISPLAY_FILTER_TV ) {
-            file_t* file = file_load( "images/crtframe_tv.png", FILE_MODE_BINARY, NULL );
+            file_t* file = file_load( "display/crtframe_tv.png", FILE_MODE_BINARY, NULL );
             yarn.assets.frame_tv_size = file ? (uint32_t) file->size : 0;
             if( yarn.assets.frame_tv_size ) {
                 yarn.assets.frame_tv = manage_alloc( malloc( yarn.assets.frame_tv_size ) );
