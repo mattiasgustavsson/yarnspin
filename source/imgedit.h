@@ -12,6 +12,7 @@ typedef struct imgedit_image_t {
     uint32_t* prev_processed;
     bool use_individual_settings;
     process_settings_t settings;
+    bool failed;
 } imgedit_image_t;
 
 
@@ -64,6 +65,7 @@ void imgedit_load_img( imgedit_image_t* img ) {
         img->use_individual_settings = load_settings( &img->settings, ini_filename );
     } else {
         printf( "Failed to load image '%s'\n", img->filename );
+        img->failed = true;
     }
 }
 
@@ -83,11 +85,24 @@ void imgedit_list_images( array_param(imgedit_image_t)* images, cstr_t folder, f
             if( cstr_is_equal( name, "settings.ini" ) ) {
                 continue;
             }
-            #ifdef _WIN32
-            if( strrchr( name, '.' ) == NULL || stricmp( strrchr( name, '.' ), ".ini" ) == 0 ) {
-            #else
-            if( strrchr( name, '.' ) == NULL || strcasecmp( strrchr( name, '.' ), ".ini" ) == 0 ) {
-            #endif
+            char const* ext = strrchr( name, '.' );
+            if( ext ) {
+                char const* imgexts[] = { ".jpeg", ".jpg", ".png", ".tga", ".bmp", ".psd", ".gif", ".hdr", ".pic", ".pnm", };
+                bool found = false;
+                for( int i = 0; i < sizeof( imgexts ) / sizeof( *imgexts ); ++i ) {
+                    #ifdef _WIN32
+                    if( stricmp( ext, imgexts[ i ] ) == 0 ) {
+                    #else
+                    if( strcasecmp( ext, imgexts[ i ] ) == 0 ) {
+                    #endif
+                        found = true;
+                        break;
+                    }
+                }
+                if( !found ) {
+                    continue;
+                }
+            } else {
                 continue;
             }
             cstr_t filename = cstr_cat( cstr_cat( folder, "/" ), name ); // TODO: cstr_join
@@ -429,37 +444,24 @@ int imgedit_process_thread( void* user_data ) {
         bool found = false;
         imgedit_image_t image = { NULL };
         if( single_image >= 0 ) {
-            if( !imglist[ single_image ].orig_pixels || !imglist[ single_image ].sized_pixels || !imglist[ single_image ].processed ) {
-                image = imglist[ single_image ];
-                found = true;
+            if( !imglist[ single_image ].failed ) {
+                if( !imglist[ single_image ].orig_pixels || !imglist[ single_image ].sized_pixels || !imglist[ single_image ].processed ) {
+                    image = imglist[ single_image ];
+                    found = true;
+                }
             }
         } else if( single_face >= 0 ) {
-            if( !imglist[ single_face ].orig_pixels || !imglist[ single_face ].sized_pixels || !imglist[ single_face ].processed ) {
-                image = imglist[ single_face ];
-                found = true;
+            if( !imglist[ single_face ].failed ) {
+                if( !imglist[ single_face ].orig_pixels || !imglist[ single_face ].sized_pixels || !imglist[ single_face ].processed ) {
+                    image = imglist[ single_face ];
+                    found = true;
+                }
             }
         } else {       
             for( int i = 0; i < imglist_count; ++i ) {
                 int idx = ( i + first_image ) % imglist_count;
-                if( show_processed ) {
-                    if( !imglist[ idx ].orig_pixels || !imglist[ idx ].processed ) {
-                        image = imglist[ idx ];
-                        found = true;
-                        break;
-                    }
-                } else {
-                    if( !imglist[ idx ].orig_pixels || !imglist[ idx ].sized_pixels ) {
-                        image = imglist[ idx ];
-                        found = true;
-                        break;
-                    }
-                }
-            }
-
-            if( !found ) {
-                for( int i = 0; i < imglist_count; ++i ) {
-                    int idx = ( i + first_image ) % imglist_count;
-                    if( !show_processed ) {
+                if( !imglist[ idx ].failed ) {
+                    if( show_processed ) {
                         if( !imglist[ idx ].orig_pixels || !imglist[ idx ].processed ) {
                             image = imglist[ idx ];
                             found = true;
@@ -476,16 +478,39 @@ int imgedit_process_thread( void* user_data ) {
             }
 
             if( !found ) {
+                for( int i = 0; i < imglist_count; ++i ) {
+                    int idx = ( i + first_image ) % imglist_count;
+                    if( !imglist[ idx ].failed ) {
+                        if( !show_processed ) {
+                            if( !imglist[ idx ].orig_pixels || !imglist[ idx ].processed ) {
+                                image = imglist[ idx ];
+                                found = true;
+                                break;
+                            }
+                        } else {
+                            if( !imglist[ idx ].orig_pixels || !imglist[ idx ].sized_pixels ) {
+                                image = imglist[ idx ];
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if( !found ) {
                 is_image = mode_faces;
                 imglist = !mode_faces ? faces : images;
                 imglist_count = !mode_faces ? faces_count : images_count;
 
                 for( int i = 0; i < imglist_count; ++i ) {
                     int idx = ( i + first_image ) % imglist_count;
-                    if( !imglist[ idx ].orig_pixels || !imglist[ idx ].sized_pixels || !imglist[ idx ].processed ) {
-                        image = imglist[ idx ];
-                        found = true;
-                        break;
+                    if( !imglist[ idx ].failed ) {
+                        if( !imglist[ idx ].orig_pixels || !imglist[ idx ].sized_pixels || !imglist[ idx ].processed ) {
+                            image = imglist[ idx ];
+                            found = true;
+                            break;
+                        }
                     }
                 }
             }
@@ -494,52 +519,57 @@ int imgedit_process_thread( void* user_data ) {
         if( found ) {
             if( !image.orig_pixels ) {
                 imgedit_load_img( &image );
+                if( !image.orig_pixels ) {
+                    image.failed = true;
+                }
             }
-            if( ( !show_processed || image.processed ) && !image.sized_pixels ) {
-                imgedit_resize( &image );
-            } else if( !image.processed ) {
-                int outw =image.sized_width;
-                int outh =image.sized_height;
-                uint8_t* pixels = (uint8_t*) malloc( 2 * outw * outh );
+            if( image.orig_pixels ) {
+                if( ( !show_processed || image.processed ) && !image.sized_pixels ) {
+                    imgedit_resize( &image );
+                } else if( !image.processed ) {
+                    int outw =image.sized_width;
+                    int outh =image.sized_height;
+                    uint8_t* pixels = (uint8_t*) malloc( 2 * outw * outh );
 
-                uint32_t* img = (uint32_t*) malloc( sizeof( uint32_t ) * max( image.orig_width, outw ) * max( image.orig_height, outh ) );
-                memcpy( img, image.orig_pixels, sizeof( uint32_t ) * image.orig_width *image.orig_height );
-                if( is_image ) {
-                    if( settings[ single_image >= 0 ? IMGEDIT_MODE_SINGLE : IMGEDIT_MODE_IMAGES ].use_portrait_processor ) {
-                        process_face( img, image.orig_width, image.orig_height, pixels, outw, outh, palette, image.use_individual_settings ? &image.settings : &settings[ IMGEDIT_MODE_IMAGES ] );
+                    uint32_t* img = (uint32_t*) malloc( sizeof( uint32_t ) * max( image.orig_width, outw ) * max( image.orig_height, outh ) );
+                    memcpy( img, image.orig_pixels, sizeof( uint32_t ) * image.orig_width *image.orig_height );
+                    if( is_image ) {
+                        if( settings[ single_image >= 0 ? IMGEDIT_MODE_SINGLE : IMGEDIT_MODE_IMAGES ].use_portrait_processor ) {
+                            process_face( img, image.orig_width, image.orig_height, pixels, outw, outh, palette, image.use_individual_settings ? &image.settings : &settings[ IMGEDIT_MODE_IMAGES ] );
+                        } else {
+                            process_image( img, image.orig_width, image.orig_height, pixels, outw, outh, palette, image.use_individual_settings ? &image.settings : &settings[ IMGEDIT_MODE_IMAGES ], resolution_scale );
+                        }
                     } else {
-                        process_image( img, image.orig_width, image.orig_height, pixels, outw, outh, palette, image.use_individual_settings ? &image.settings : &settings[ IMGEDIT_MODE_IMAGES ], resolution_scale );
-                    }
-                } else {
-                    if( settings[ single_face >= -0 ? IMGEDIT_MODE_SINGLE :IMGEDIT_MODE_FACES ].use_portrait_processor ) {
-                        process_face( img, image.orig_width, image.orig_height, pixels, outw, outh, palette, image.use_individual_settings ? &image.settings : &settings[ IMGEDIT_MODE_FACES ] );
-                    } else {
-                        process_image( img, image.orig_width, image.orig_height, pixels, outw, outh, palette, image.use_individual_settings ? &image.settings : &settings[ IMGEDIT_MODE_FACES ], resolution_scale );
-                    }
-                }
-
-                if( selected_palette == 1 ) {
-                    dither_rgb9( img, outw, outh, settings[ single_image >= 0 || single_face >= 0 ? IMGEDIT_MODE_SINGLE : is_image ? IMGEDIT_MODE_IMAGES : IMGEDIT_MODE_FACES ].bayer_dither );
-                }
-
-                image.processed = (uint32_t*) malloc( sizeof( uint32_t ) * outw * outh ); 
-                if( palette ) {
-                    for( int y = 0; y < outh; ++y ) {
-                        for( int x = 0; x < outw; ++x ) {
-                            uint32_t c = img[ x + outw * y ] & 0xff000000;
-                            c = c | ( palette->colortable[ pixels[ x + outw * y ] ] & 0x00ffffff );
-                            image.processed[ x + outw * y ] = c;
+                        if( settings[ single_face >= -0 ? IMGEDIT_MODE_SINGLE :IMGEDIT_MODE_FACES ].use_portrait_processor ) {
+                            process_face( img, image.orig_width, image.orig_height, pixels, outw, outh, palette, image.use_individual_settings ? &image.settings : &settings[ IMGEDIT_MODE_FACES ] );
+                        } else {
+                            process_image( img, image.orig_width, image.orig_height, pixels, outw, outh, palette, image.use_individual_settings ? &image.settings : &settings[ IMGEDIT_MODE_FACES ], resolution_scale );
                         }
                     }
-                } else {
-                    for( int y = 0; y < outh; ++y ) {
-                        for( int x = 0; x < outw; ++x ) {
-                            image.processed[ x + outw * y ] = img[ x + outw * y ];
+
+                    if( selected_palette == 1 ) {
+                        dither_rgb9( img, outw, outh, settings[ single_image >= 0 || single_face >= 0 ? IMGEDIT_MODE_SINGLE : is_image ? IMGEDIT_MODE_IMAGES : IMGEDIT_MODE_FACES ].bayer_dither );
+                    }
+
+                    image.processed = (uint32_t*) malloc( sizeof( uint32_t ) * outw * outh ); 
+                    if( palette ) {
+                        for( int y = 0; y < outh; ++y ) {
+                            for( int x = 0; x < outw; ++x ) {
+                                uint32_t c = img[ x + outw * y ] & 0xff000000;
+                                c = c | ( palette->colortable[ pixels[ x + outw * y ] ] & 0x00ffffff );
+                                image.processed[ x + outw * y ] = c;
+                            }
+                        }
+                    } else {
+                        for( int y = 0; y < outh; ++y ) {
+                            for( int x = 0; x < outw; ++x ) {
+                                image.processed[ x + outw * y ] = img[ x + outw * y ];
+                            }
                         }
                     }
+                    free( img );
+                    free( pixels );
                 }
-                free( img );
-                free( pixels );
             }
         } else {
             thread_timer_wait( &timer, 1000000000 );
