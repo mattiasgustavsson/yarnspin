@@ -565,6 +565,10 @@ int app_proc( app_t* app, void* user_data ) {
     #ifdef _WIN32
         bool update_icon( const char* exe_file, const char* image_filename );
     #endif
+
+    #ifndef _WIN32 
+        #include <sys/stat.h>
+    #endif
 #endif
 
 #ifdef _WIN32
