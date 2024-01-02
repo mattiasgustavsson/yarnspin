@@ -1103,6 +1103,9 @@ int main( int argc, char** argv ) {
                 buffer_destroy( data );
                 buffer_save(runtime, package_filename );
                 buffer_destroy( runtime );
+                #ifndef _WIN32 
+                    chmod( package_filename, strtol("0775",0,8) );
+                #endif
             return EXIT_SUCCESS;
             }
         }
