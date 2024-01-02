@@ -94,6 +94,12 @@ jobs:
           chmod a+x yarnspin
           clang -o runtime  -O2 -DYARNSPIN_RUNTIME_ONLY source/yarnspin.c /usr/local/lib/libGLEW.a `sdl2-config --static-libs --cflags` -framework OpenGL -lpthread 
           chmod a+x runtime
+          echo 'clang "$@"' > wasm/clang
+          chmod a+x wasm/clang
+          echo 'wasm-ld "$@"' > wasm/wasm-ld
+          chmod a+x wasm/wasm-ld
+          echo 'wasm-opt "$@"' > wasm/wasm-opt
+          chmod a+x wasm/wasm-opt
           node wasm/wajicup.js source/yarnspin.c runtime.wasm
           node wasm/wajicup.js -template build/template.html runtime.wasm runtime.html -no_minify
           mv runtime build
