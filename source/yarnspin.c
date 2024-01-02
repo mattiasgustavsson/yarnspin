@@ -602,7 +602,7 @@ void wasm_write_w64( buffer_t* out, int x ) {
 
 buffer_t* wasm_encode_w64( buffer_t* inbuf ) {
     buffer_t* res = buffer_create();
-    uint8_t* buf = buffer_data(inbuf);
+    uint8_t* buf = (uint8_t*)buffer_data(inbuf);
     int buflen = buffer_size(inbuf);
     int i = 0;
     int n = 0;  
@@ -644,11 +644,11 @@ buffer_t* DecodeW64( cstr_t str ) {
         if (i < slen) n = n | ((uint32_t)(wasm_map_w64(str[i++])) << 12);
         if (i < slen) n = n | ((uint32_t)(wasm_map_w64(str[i++])) << 18);
         uint8_t v = n >> 0;
-        buffer_write_char(a, &v, 1);
+        buffer_write_u8(a, &v, 1);
         v = n >> 8;
-        buffer_write_char(a, &v, 1);
+        buffer_write_u8(a, &v, 1);
         v = n >> 16;
-        buffer_write_char(a, &v, 1);
+        buffer_write_u8(a, &v, 1);
     }
     buffer_resize(a, slen / 4 * 3 - (r < 3 && r));
     return a;
@@ -672,20 +672,20 @@ cstr_t process_html(cstr_t runtime) {
             buffer_write_u8(outbuf, &zero, 1);
             wasm_write_leb(outbuf, payloadLen);
             wasm_write_leb(outbuf, cstr_len(name));
-            buffer_write_u8(outbuf, name, cstr_len(name));
-            buffer_write_u8(outbuf, buffer_data(datbuf), buffer_size(datbuf));
+            buffer_write_u8(outbuf, (uint8_t*)name, cstr_len(name));
+            buffer_write_u8(outbuf, (uint8_t*)buffer_data(datbuf), buffer_size(datbuf));
             buffer_destroy(datbuf);
 
             buffer_t* w64buf = wasm_encode_w64(outbuf);
             buffer_destroy(outbuf);
 
             buffer_t* final = buffer_create();
-            buffer_write_u8(final, runtime, wasm_start);
-            buffer_write_u8(final, buffer_data( w64buf ), buffer_size( w64buf ) );
+            buffer_write_u8(final, (uint8_t*)runtime, wasm_start);
+            buffer_write_u8(final, (uint8_t*)buffer_data( w64buf ), buffer_size( w64buf ) );
             buffer_destroy(w64buf);
 
-            buffer_write_u8(final, runtime + wasm_end, cstr_len( runtime ) - wasm_end );
-            cstr_t html = cstr_n(buffer_data(final), buffer_size(final));
+            buffer_write_u8(final, (uint8_t*)runtime + wasm_end, cstr_len( runtime ) - wasm_end );
+            cstr_t html = cstr_n((char*)buffer_data(final), buffer_size(final));
             buffer_destroy(final);
             return html;
         }
@@ -1099,7 +1099,7 @@ int main( int argc, char** argv ) {
                     printf( "Failed to load yarnspin.dat\n" );
                     return EXIT_FAILURE;
                 }
-                buffer_write_u8( runtime, buffer_data( data ), buffer_size( data ) );
+                buffer_write_u8( runtime, (uint8_t*)buffer_data( data ), buffer_size( data ) );
                 buffer_destroy( data );
                 buffer_save(runtime, package_filename );
                 buffer_destroy( runtime );
