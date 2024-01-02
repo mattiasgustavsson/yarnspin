@@ -58,11 +58,11 @@ jobs:
           cl source\yarnspin.c build\yarnspin.res /nologo /O2 /Ob2 /Oi /Ot /Oy /MT /GL /GF /D "NDEBUG" /Fe:yarnspin.exe /link /INCREMENTAL:NO /OPT:REF /OPT:ICF /LTCG /SUBSYSTEM:CONSOLE 
           cl source\yarnspin.c build\yarnspin.res /nologo /O2 /Ob2 /Oi /Ot /Oy /MT /GL /GF /D "NDEBUG" /D "YARNSPIN_RUNTIME_ONLY" /Fe:runtime.exe /link /INCREMENTAL:NO /OPT:REF /OPT:ICF /LTCG /SUBSYSTEM:WINDOWS
           wasm\node wasm\wajicup.js source/yarnspin.c runtime.wasm
-          copy wasm\node.exe build
-          copy wasm\wajicup.js build
+          wasm\node wasm\wajicup.js -template build/template.html runtime.wasm runtime.html -no_minify
           move runtime.exe build
           move runtime.wasm build
-          7z a yarnspin-win.zip yarnspin.exe yarnspin.pdf faces fonts images palettes scripts sound build\runtime.exe build\runtime.wasm build\wajicup.js build\node.exe build\template.html build\yarnspin_icon.png
+          move runtime.html build
+          7z a yarnspin-win.zip yarnspin.exe yarnspin.pdf faces fonts images palettes scripts sound build\runtime.exe build\runtime.wasm build\runtime.html build\template.html build\yarnspin_icon.png
       - name: upload artifacts
         uses: softprops/action-gh-release@v1
         with:
@@ -99,11 +99,11 @@ jobs:
           wasm-ld -strip-all -gc-sections --no-entry -allow-undefined -export=__wasm_call_ctors -export=main -export=__original_main -export=__main_argc_argv -export=__main_void -export=malloc ./wasm/system/system.bc runtime.o -o runtime.wasm  
           wasm-opt --asyncify runtime.wasm -o runtime.wasm
           wasm-opt --legalize-js-interface --low-memory-unused --converge -Os runtime.wasm -o runtime.wasm
+          node wasm/wajicup.js -template build/template.html runtime.wasm runtime.html -no_minify
           mv runtime build
           mv runtime.wasm build
-          cp wasm/wajicup.js build
-          cp /usr/local/bin/node build
-          tar -czvf yarnspin-mac.tar.gz yarnspin yarnspin.pdf faces fonts images palettes scripts sound build/runtime build/runtime.wasm build/wajicup.js build/node build/template.html build/yarnspin_icon.png
+          mv runtime.html build
+          tar -czvf yarnspin-mac.tar.gz yarnspin yarnspin.pdf faces fonts images palettes scripts sound build/runtime build/runtime.wasm build/runtime.html build/template.html build/yarnspin_icon.png
       - name: upload artifacts
         uses: softprops/action-gh-release@v1
         with:
@@ -153,11 +153,11 @@ jobs:
           wasm-ld -strip-all -gc-sections --no-entry -allow-undefined -export=__wasm_call_ctors -export=main -export=__original_main -export=__main_argc_argv -export=__main_void -export=malloc ./wasm/system/system.bc runtime.o -o runtime.wasm
           wasm-opt --asyncify runtime.wasm -o runtime.wasm
           wasm-opt --legalize-js-interface --low-memory-unused --converge -Os runtime.wasm -o runtime.wasm
+          node wasm/wajicup.js -template build/template.html runtime.wasm runtime.html -no_minify
           mv runtime build
           mv runtime.wasm build
-          cp wasm/wajicup.js build
-          cp /usr/local/bin/node build
-          tar -czvf yarnspin-linux.tar.gz yarnspin yarnspin.pdf faces fonts images palettes scripts sound build/runtime build/runtime.wasm build/wajicup.js build/node build/template.html build/yarnspin_icon.png
+          mv runtime.html build
+          tar -czvf yarnspin-linux.tar.gz yarnspin yarnspin.pdf faces fonts images palettes scripts sound build/runtime build/runtime.wasm build/runtime.html build/template.html build/yarnspin_icon.png
       - name: upload artifacts
         uses: softprops/action-gh-release@v1
         with:

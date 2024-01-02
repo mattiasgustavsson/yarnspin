@@ -95,7 +95,7 @@ jobs:
           fileName: "dos-like-wasm-build-env-win.zip"
       - name: install dependencies
         run: 7z x dos-like-wasm-build-env-win.zip
-      - name: build sound
+      - name: build yarnspin
         run: |          
             wasm\node wasm\wajicup.js source/yarnspin.c yarnspin.html
   build-wasm-macos:

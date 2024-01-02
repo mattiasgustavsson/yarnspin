@@ -81,6 +81,7 @@
     #include "libs/sysfont.h"
 #endif
 
+
 // Version number stored in the file .cache\VERSION, read at start of program
 int g_cache_version = 0;
 
@@ -576,6 +577,127 @@ void* base64dec( char const* data, size_t input_length, size_t* out_size );
 
 STBIWDEF unsigned char *stbi_write_png_to_mem(const unsigned char *pixels, int stride_bytes, int x, int y, int n, int *out_len);
 
+
+
+#ifndef YARNSPIN_RUNTIME_ONLY
+
+
+size_t wasm_length_leb( size_t n ) {
+    return ( n < ( 1 << 7 ) ? 1 : ( n < ( 1 << 14 ) ? 2 : ( n < ( 1 << 21 ) ? 3 : ( n < ( 1 << 28 ) ? 4 : 5 ) ) ) );
+}
+
+
+void wasm_write_leb( buffer_t* out, size_t n ) {
+    do {
+        uint8_t v = ( n > 127 ? n & 127 | 128 : n );
+        buffer_write_u8( out, &v, 1 );
+    } while (n >>= 7);
+}
+
+
+void wasm_write_w64( buffer_t* out, int x ) {
+    uint8_t v = x < (92 - 58) ? x + 58 : x + 58 + 1;
+    buffer_write_u8( out, &v, 1 );
+}
+
+buffer_t* wasm_encode_w64( buffer_t* inbuf ) {
+    buffer_t* res = buffer_create();
+    uint8_t* buf = buffer_data(inbuf);
+    int buflen = buffer_size(inbuf);
+    int i = 0;
+    int n = 0;  
+    while( i < buflen ) {  
+        n = 0 | ( (uint32_t)(buf[i++] ) <<  0 );
+        n = n | ( (uint32_t)(buf[i++] ) <<  8 );
+        n = n | ( (uint32_t)(buf[i++] ) << 16 );
+        wasm_write_w64( res, (  n      ) & 63 );
+        wasm_write_w64( res, ( n >>  6 ) & 63 );
+        wasm_write_w64( res, ( n >> 12 ) & 63 );
+        wasm_write_w64( res, ( n >> 18 ) & 63 );
+    }
+
+    if( buflen % 3 ) {
+        buffer_position_set(res, buffer_position(res) - 1);
+        char t[2] ={ '\0', '\0' };
+        t[0] = '0' + ( 3 - (buflen % 3) );
+        buffer_write_char(res, t, 1);
+    }
+
+    return res;
+}
+
+int wasm_map_w64( int y ) {
+    return (y < 92 ? y - 58 : y - 59);
+}
+
+buffer_t* DecodeW64( cstr_t str ) {
+    buffer_t* a = buffer_create();
+    int slen = cstr_len(str);
+    int r = str[slen - 1] == '1' ? 1 : str[slen - 1] == '2' ? 2 : 0;
+    int i = 0;
+    int o = 0;
+    int n;
+    while (i < slen)
+    {
+        n = ((uint32_t)(wasm_map_w64(str[i++])) << 0);
+        if( i < slen ) n = n | ((uint32_t)(wasm_map_w64(str[i++])) << 6);
+        if (i < slen) n = n | ((uint32_t)(wasm_map_w64(str[i++])) << 12);
+        if (i < slen) n = n | ((uint32_t)(wasm_map_w64(str[i++])) << 18);
+        uint8_t v = n >> 0;
+        buffer_write_char(a, &v, 1);
+        v = n >> 8;
+        buffer_write_char(a, &v, 1);
+        v = n >> 16;
+        buffer_write_char(a, &v, 1);
+    }
+    buffer_resize(a, slen / 4 * 3 - (r < 3 && r));
+    return a;
+}
+
+
+cstr_t process_html(cstr_t runtime) {
+    cstr_t search_str = cstr("var wasm = DecodeW64(\"");
+    int wasm_start = cstr_find(runtime, search_str, 0);
+    if (wasm_start >= 0) {
+        wasm_start += cstr_len(search_str);
+        int wasm_end = cstr_find(runtime, "\");", wasm_start);
+        if (wasm_end >= 0) {
+            cstr_t wasm = cstr_mid(runtime, wasm_start, wasm_end - wasm_start);
+            buffer_t* outbuf = DecodeW64(wasm);
+
+            buffer_t* datbuf = buffer_load("yarnspin.dat");
+            char const* name = "|yarnspin.dat";
+            int payloadLen = (wasm_length_leb(cstr_len(name)) + cstr_len(name) + buffer_size(datbuf));
+            uint8_t zero = 0;
+            buffer_write_u8(outbuf, &zero, 1);
+            wasm_write_leb(outbuf, payloadLen);
+            wasm_write_leb(outbuf, cstr_len(name));
+            buffer_write_u8(outbuf, name, cstr_len(name));
+            buffer_write_u8(outbuf, buffer_data(datbuf), buffer_size(datbuf));
+            buffer_destroy(datbuf);
+
+            buffer_t* w64buf = wasm_encode_w64(outbuf);
+            buffer_destroy(outbuf);
+
+            buffer_t* final = buffer_create();
+            buffer_write_u8(final, runtime, wasm_start);
+            buffer_write_u8(final, buffer_data( w64buf ), buffer_size( w64buf ) );
+            buffer_destroy(w64buf);
+
+            buffer_write_u8(final, runtime + wasm_end, cstr_len( runtime ) - wasm_end );
+            cstr_t html = cstr_n(buffer_data(final), buffer_size(final));
+            buffer_destroy(final);
+            return html;
+        }
+    }
+
+    return NULL;
+}
+
+
+#endif
+
+
 int main( int argc, char** argv ) {
     (void) argc, (void ) argv;
 
@@ -917,62 +1039,70 @@ int main( int argc, char** argv ) {
                 if( iconios_file ) {
                     free( iconios_file );
                 }
-                file_t* template_file = file_load( "build/template.html", FILE_MODE_TEXT, NULL );
-                cstr_t template_str = cstr( template_file->data );
-                file_destroy( template_file );
-                template_str = cstr_replace( template_str, "{{{title}}}", yarn.globals.title );
-                template_str = cstr_replace( template_str, "{{{favicon}}}", icon_base64 ? icon_base64 : "" );
-                template_str = cstr_replace( template_str, "{{{iosicon}}}", iconios_base64 ? iconios_base64 : "" );
+
+                file_t* runtime_file = file_load("build/runtime.html", FILE_MODE_TEXT, NULL);
+                if( !runtime_file ) {
+                    printf( "Failed to load build/runtime.html" );
+                    if( icon_base64 ) {
+                        free( icon_base64 );
+                    }
+                    if( iconios_base64 ) {
+                        free( iconios_base64 );
+                    }
+                    memmgr_clear( &g_memmgr );
+                    return EXIT_FAILURE;
+                }
+                cstr_t runtime = cstr_n( runtime_file->data, runtime_file->size );
+                file_destroy( runtime_file );
+                cstr_t html_str = process_html( runtime );
+                if( !html_str ) {
+                    printf( "Packaging failed" );
+                    if( icon_base64 ) {
+                        free( icon_base64 );
+                    }
+                    if( iconios_base64 ) {
+                        free( iconios_base64 );
+                    }
+                    memmgr_clear( &g_memmgr );
+                    return EXIT_FAILURE;
+                }
+                html_str = cstr_replace( html_str, "{{{title}}}", yarn.globals.title );
+                html_str = cstr_replace( html_str, "{{{favicon}}}", icon_base64 ? icon_base64 : "" );
+                html_str = cstr_replace( html_str, "{{{iosicon}}}", iconios_base64 ? iconios_base64 : "" );
+                file_save_data(html_str, cstr_len(html_str), package_filename, FILE_MODE_TEXT);
                 if( icon_base64 ) {
                     free( icon_base64 );
                 }
                 if( iconios_base64 ) {
                     free( iconios_base64 );
                 }
-                file_save_data( template_str, strlen( template_str ), "temp_template.html", FILE_MODE_TEXT );
-                #ifdef _WIN32 
-                    cstr_t command = cstr_cat( "build\\node build\\wajicup.js -embed yarnspin.dat yarnspin.dat -template temp_template.html build/runtime.wasm ", package_filename );
-                #else 
-                    cstr_t command = cstr_cat( "build/node build/wajicup.js -embed yarnspin.dat yarnspin.dat -template build/template.html build/runtime.wasm ", package_filename );
-                #endif
-                int result = system( command );
-                if( result != EXIT_SUCCESS ) {
-                    printf( "Packaging failed.\n" );
-                    memmgr_clear( &g_memmgr );
-                    return EXIT_FAILURE;
-                }
-                delete_file( "temp_template.html" );
                 memmgr_clear( &g_memmgr );
                 return EXIT_SUCCESS;
             } else {
                 #ifdef _WIN32 
-                    int result = system( "copy /y build\\runtime.exe temp.exe" );
-                    if( result != EXIT_SUCCESS ) {
-                        printf( "Failed to copy build\\runtime.exe.\n" );
+                    buffer_t* runtime = buffer_load( "build\\runtime.exe" );
+                    if( !runtime ) {
+                        printf( "Failed to load build\\runtime.exe\n" );
                         return EXIT_FAILURE;
                     }
-                    char const* icon_filename = file_exists( "images\\icon.png" ) ? "images\\icon.png" : "build\\yarnspin_icon.png";
-                    if( !update_icon( "temp.exe", icon_filename ) ) {
-                        delete_file( "temp.exe" );
-                        printf( "Failed to apply icon\n" );
-                        return EXIT_FAILURE;
-                    }
-                    cstr_t command = cstr_cat( "copy /y /b temp.exe + yarnspin.dat ", package_filename );
-                    result = system( command );
-                    if( result != EXIT_SUCCESS ) {
-                        delete_file( "temp.exe" );
-                        printf( "Packaging failed.\n" );
-                       return EXIT_FAILURE;
-                    }                    
-                    delete_file( "temp.exe" );
-                #else 
-                    cstr_t command = cstr_cat( "cat build/runtime yarnspin.dat > ", package_filename );
-                    int result = system( command );
-                    if( result != EXIT_SUCCESS ) {
-                        printf( "Packaging failed.\n" );
+                #else
+                    buffer_t* runtime = buffer_load( "build/runtime" );
+                    if( !runtime ) {
+                        printf( "Failed to load build/runtime\n" );
                         return EXIT_FAILURE;
                     }
                 #endif
+                buffer_position_set( runtime, buffer_size( runtime ) );
+                buffer_t* data = buffer_load( "yarnspin.dat" );
+                if( !data ) {
+                    buffer_destroy( runtime );
+                    printf( "Failed to load yarnspin.dat\n" );
+                    return EXIT_FAILURE;
+                }
+                buffer_write_u8( runtime, buffer_data( data ), buffer_size( data ) );
+                buffer_destroy( data );
+                buffer_save(runtime, package_filename );
+                buffer_destroy( runtime );
             return EXIT_SUCCESS;
             }
         }
