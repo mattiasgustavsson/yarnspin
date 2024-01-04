@@ -13,7 +13,7 @@ del yarnspin.res
 del yarnspin.obj
 if EXIST ..\wasm\node.exe (
 	..\wasm\node ..\wasm\wajicup.js ../source/yarnspin.c runtime.wasm
-    ..\wasm\node ..\wasm\wajicup.js -template template.html runtime.wasm runtime.html -no_minify
+	..\wasm\node ..\wasm\wajicup.js -template template.html runtime.wasm runtime.html -no_minify
 	popd
 	goto :eof
 )

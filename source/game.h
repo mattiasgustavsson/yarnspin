@@ -551,32 +551,24 @@ bool was_key_pressed( game_t* game, int key ) {
 }
 
 
-gamestate_t boot_init( game_t* game );
+void boot_init( game_t* game );
 gamestate_t boot_update( game_t* game );
-gamestate_t screen_init( game_t* game );
+void screen_init( game_t* game );
 gamestate_t screen_update( game_t* game );
-gamestate_t location_init( game_t* game );
+void location_init( game_t* game );
 gamestate_t location_update( game_t* game );
-gamestate_t dialog_init( game_t* game );
+void dialog_init( game_t* game );
 gamestate_t dialog_update( game_t* game );
-gamestate_t exit_init( game_t* game );
+void exit_init( game_t* game );
 gamestate_t exit_update( game_t* game );
-gamestate_t terminate_init( game_t* game );
+void terminate_init( game_t* game );
 gamestate_t terminate_update( game_t* game );
 
 void ingame_menu_update( game_t* game );
 void exit_dialog_update( game_t* game );
 
 void enter_menu( game_t* game ) {
-    if( game->render->screen ) {
-        memcpy( game->render->screenshot, game->render->screen, sizeof( uint8_t ) * game->render->screen_width * game->render->screen_height );
-    } else {
-        glFlush();
-
-        GLint viewport[ 4 ];
-        glGetIntegerv( GL_VIEWPORT, viewport );
-        glReadPixels( viewport[ 0 ], viewport[ 1 ], viewport[ 2 ], viewport[ 3 ], GL_RGBA, GL_UNSIGNED_BYTE, game->render->screenshot_rgb );
-    }
+    grab_screenshot( game->render );
     game->ingame_menu = true;
     audiosys_pause( game->audiosys );
     if( game->render->screen ) {
@@ -626,12 +618,14 @@ void game_update( game_t* game, float delta_time ) {
 	}
 
     if( game->exit_dialog ) {
+        draw_screenshot( game->render );
         exit_dialog_update( game );
         return;
     }
 
     bool menu_requested = false;
     if( game->ingame_menu ) {
+        draw_screenshot( game->render );
         ingame_menu_update( game );
         if( !game->ingame_menu && game->new_state != GAMESTATE_TERMINATE) {
             audiosys_resume( game->audiosys );
@@ -656,27 +650,26 @@ void game_update( game_t* game, float delta_time ) {
             dialog_update( game );
         }
         game->current_state = game->new_state;
-        gamestate_t new_state = GAMESTATE_NO_CHANGE;
         switch( game->current_state ) {
             case GAMESTATE_NO_CHANGE:
                 break;
             case GAMESTATE_BOOT:
-                new_state = boot_init( game );
+                boot_init( game );
                 break;
             case GAMESTATE_SCREEN:
-                new_state = screen_init( game );
+                screen_init( game );
                 break;
             case GAMESTATE_LOCATION:
-                new_state = location_init( game );
+                location_init( game );
                 break;
             case GAMESTATE_DIALOG:
-                new_state = dialog_init( game );
+                dialog_init( game );
                 break;
             case GAMESTATE_EXIT:
-                new_state = exit_init( game );
+                exit_init( game );
                 break;
             case GAMESTATE_TERMINATE:
-                new_state = terminate_init( game );
+                terminate_init( game );
                 break;
         }
         if( game->restart_requested ) {
@@ -687,7 +680,8 @@ void game_update( game_t* game, float delta_time ) {
             game_quickload( game );
             return;
         }
-        game->new_state = new_state;
+        game->new_state = GAMESTATE_NO_CHANGE;
+        draw_screenshot( game->render );
         return;
     }
 
@@ -695,6 +689,7 @@ void game_update( game_t* game, float delta_time ) {
         game->transition_counter++;
     }
     if( game->transition_counter < 0 ) {
+        draw_screenshot( game->render );
         return;
     }
 
@@ -721,6 +716,9 @@ void game_update( game_t* game, float delta_time ) {
             new_state = terminate_update( game );
             break;
     }
+    if( new_state != GAMESTATE_NO_CHANGE ) {
+        grab_screenshot( game->render );
+    }
     if( menu_requested ) {
         enter_menu( game );
         return;
@@ -735,15 +733,7 @@ void game_update( game_t* game, float delta_time ) {
     }
     game->new_state = new_state;
     if( game->exit_requested ) {
-        if( game->render->screen ) {
-            memcpy( game->render->screenshot, game->render->screen, sizeof( uint8_t ) * game->render->screen_width * game->render->screen_height );
-        } else {
-            glFlush();
-
-            GLint viewport[ 4 ];
-            glGetIntegerv( GL_VIEWPORT, viewport );
-            glReadPixels( viewport[ 0 ], viewport[ 1 ], viewport[ 2 ], viewport[ 3 ], GL_RGBA, GL_UNSIGNED_BYTE, game->render->screenshot_rgb );
-        }
+        grab_screenshot( game->render );
         game->new_state = GAMESTATE_EXIT;
         game->disable_transition = true;
         game->exit_requested = false;
@@ -1692,9 +1682,8 @@ void exit_dialog_update( game_t* game ) {
 
 
 // boot
-gamestate_t boot_init( game_t* game ) {
+void boot_init( game_t* game ) {
     cls( game->render );
-    return GAMESTATE_NO_CHANGE;
 }
 
 
@@ -1724,7 +1713,7 @@ gamestate_t boot_update( game_t* game ) {
 
 
 // screen
-gamestate_t screen_init( game_t* game ) {
+void screen_init( game_t* game ) {
     stack_entry_t entry;
     entry.type = STACK_ENTRY_SCREEN;
     entry.index = game->state.current_screen;
@@ -1742,24 +1731,29 @@ gamestate_t screen_init( game_t* game ) {
 
     // act:
     do_actions( game, screen->act );
-    return GAMESTATE_NO_CHANGE;
 }
 
 
 gamestate_t screen_update( game_t* game ) {
-    cls( game->render );
 
     yarn_t* yarn = game->yarn;
 
     if( game->state.current_screen < 0 && game->state.current_dialog >= 0 ) {
+        draw_screenshot( game->render );
         return GAMESTATE_DIALOG;
     }
 
     if( game->state.current_screen < 0 && game->state.current_location >= 0 ) {
+        draw_screenshot( game->render );
         return GAMESTATE_LOCATION;
     }
 
-    if( game->state.current_screen < 0  ) return GAMESTATE_TERMINATE;
+    if( game->state.current_screen < 0  ) {
+        draw_screenshot( game->render );
+        return GAMESTATE_TERMINATE;
+    }
+
+    cls( game->render );
 
     yarn_screen_t* screen = &yarn->screens->items[ game->state.current_screen ];
 
@@ -1773,7 +1767,18 @@ gamestate_t screen_update( game_t* game ) {
     }
     menu_icon( game->render, 309, 1, menu_hover ? game->render->color_background : game->render->color_opt );    
 
+    // scr:
+    for( int i = 0; i < screen->scr->count; ++i ) {
+        if( test_cond( game, &screen->scr->items[ i ].cond ) )  {
+            game->state.current_image = screen->scr->items[ i ].scr_index;
+        }
+    }
+    if( game->state.current_image >= 0 ) {
+        draw( game->render, game->state.current_image, 0, 0 );
+    }
+
     if( game->queued_dialog >= 0 && ( ( was_key_pressed( game, APP_KEY_LBUTTON ) && !menu_hover ) || was_key_pressed( game, APP_KEY_SPACE ) ) ) {
+        grab_screenshot( game->render );
         game->state.current_screen = -1;
         if( game->state.current_dialog >= 0 ) {
             game->state.current_dialog = game->queued_dialog;
@@ -1784,6 +1789,7 @@ gamestate_t screen_update( game_t* game ) {
             return GAMESTATE_DIALOG;
         }
     } else if( game->queued_location >= 0 && ( ( was_key_pressed( game, APP_KEY_LBUTTON ) && !menu_hover ) || was_key_pressed( game, APP_KEY_SPACE ) ) ) {
+        grab_screenshot( game->render );
         game->state.current_screen = -1;
         if( game->state.current_location >= 0 ) {
             game->state.current_location = game->queued_location;
@@ -1794,22 +1800,13 @@ gamestate_t screen_update( game_t* game ) {
             return GAMESTATE_LOCATION;
         }
     } else if( game->queued_screen >= 0 && ( was_key_pressed( game, APP_KEY_LBUTTON ) || was_key_pressed( game, APP_KEY_SPACE ) ) ) {
+        grab_screenshot( game->render );
         game->state.current_screen = game->queued_screen;
         game->state.current_location = -1;
         game->state.current_dialog = -1;
         return GAMESTATE_SCREEN;
     }
 
-
-    // scr:
-    for( int i = 0; i < screen->scr->count; ++i ) {
-        if( test_cond( game, &screen->scr->items[ i ].cond ) )  {
-            game->state.current_image = screen->scr->items[ i ].scr_index;
-        }
-    }
-    if( game->state.current_image >= 0 ) {
-        draw( game->render, game->state.current_image, 0, 0 );
-    }
 
     if( menu_hover && was_key_pressed( game, APP_KEY_LBUTTON ) ) {
         enter_menu( game );
@@ -1822,7 +1819,7 @@ gamestate_t screen_update( game_t* game ) {
 
 
 // location
-gamestate_t location_init( game_t* game ) {    
+void location_init( game_t* game ) {    
     stack_entry_t entry;
     entry.type = STACK_ENTRY_LOCATION;
     entry.index = game->state.current_location;
@@ -1841,8 +1838,6 @@ gamestate_t location_init( game_t* game ) {
 
     // act:
     do_actions( game, location->act );
-
-    return GAMESTATE_NO_CHANGE;
 }
 
 
@@ -1855,7 +1850,8 @@ gamestate_t location_update( game_t* game ) {
         return GAMESTATE_DIALOG;
     }
 
-    if( game->state.current_location < 0  ) return GAMESTATE_TERMINATE;
+    if( game->state.current_location < 0  ) 
+        return GAMESTATE_TERMINATE;
 
     yarn_location_t* location = &yarn->locations->items[ game->state.current_location ];
 
@@ -1887,34 +1883,6 @@ gamestate_t location_update( game_t* game ) {
         }
     }
 
-    if( game->yarn->globals.location_print_speed == 0 || game->limit >= strlen( txt ) ) {
-        if( game->queued_dialog >= 0 && ( ( was_key_pressed( game, APP_KEY_LBUTTON ) && !menu_hover ) || was_key_pressed( game, APP_KEY_SPACE ) ) ) {
-            game->state.current_location = -1;
-            if( game->state.current_dialog >= 0 ) {
-                game->state.current_dialog = game->queued_dialog;
-                game->disable_transition = true;
-                return GAMESTATE_DIALOG;
-            } else {
-                game->state.current_dialog = game->queued_dialog;
-                return GAMESTATE_DIALOG;
-            }
-        } else if( game->queued_screen >= 0 && ( ( was_key_pressed( game, APP_KEY_LBUTTON ) && !menu_hover ) || was_key_pressed( game, APP_KEY_SPACE ) ) ) {
-            game->state.current_location = -1;
-            if( game->state.current_screen >= 0 ) {
-                game->state.current_screen = game->queued_screen;
-                game->disable_transition = true;
-                return GAMESTATE_SCREEN;
-            } else {
-                game->state.current_screen = game->queued_screen;
-                return GAMESTATE_SCREEN;
-            }
-        } else if( game->queued_location >= 0 && ( ( was_key_pressed( game, APP_KEY_LBUTTON ) && !menu_hover ) || was_key_pressed( game, APP_KEY_SPACE ) ) ) {
-            game->state.current_location = game->queued_location;
-            game->state.current_dialog = -1;
-            game->state.current_screen = -1;
-            return GAMESTATE_LOCATION;
-        }
-    }
 
     // img:
     for( int i = 0; i < location->img->count; ++i ) {
@@ -2092,6 +2060,35 @@ gamestate_t location_update( game_t* game ) {
         center_wrap( game->render,  game->render->font_chr, yarn->globals.alone_text, 32 + hmargin, ypos, game->render->color_disabled, 56 );
     }
 
+    if( game->yarn->globals.location_print_speed == 0 || game->limit >= strlen( txt ) ) {
+        if( game->queued_dialog >= 0 && ( ( was_key_pressed( game, APP_KEY_LBUTTON ) && !menu_hover ) || was_key_pressed( game, APP_KEY_SPACE ) ) ) {
+            game->state.current_location = -1;
+            if( game->state.current_dialog >= 0 ) {
+                game->state.current_dialog = game->queued_dialog;
+                game->disable_transition = true;
+                return GAMESTATE_DIALOG;
+            } else {
+                game->state.current_dialog = game->queued_dialog;
+                return GAMESTATE_DIALOG;
+            }
+        } else if( game->queued_screen >= 0 && ( ( was_key_pressed( game, APP_KEY_LBUTTON ) && !menu_hover ) || was_key_pressed( game, APP_KEY_SPACE ) ) ) {
+            game->state.current_location = -1;
+            if( game->state.current_screen >= 0 ) {
+                game->state.current_screen = game->queued_screen;
+                game->disable_transition = true;
+                return GAMESTATE_SCREEN;
+            } else {
+                game->state.current_screen = game->queued_screen;
+                return GAMESTATE_SCREEN;
+            }
+        } else if( game->queued_location >= 0 && ( ( was_key_pressed( game, APP_KEY_LBUTTON ) && !menu_hover ) || was_key_pressed( game, APP_KEY_SPACE ) ) ) {
+            game->state.current_location = game->queued_location;
+            game->state.current_dialog = -1;
+            game->state.current_screen = -1;
+            return GAMESTATE_LOCATION;
+        }
+    }
+
     if( menu_hover && was_key_pressed( game, APP_KEY_LBUTTON ) ) {
         enter_menu( game );
         return GAMESTATE_NO_CHANGE;
@@ -2169,7 +2166,7 @@ gamestate_t location_update( game_t* game ) {
 
 
 // dialog
-gamestate_t dialog_init( game_t* game ) {
+void dialog_init( game_t* game ) {
     stack_entry_t entry;
     entry.type = STACK_ENTRY_DIALOG;
     entry.index = game->state.current_dialog;
@@ -2211,8 +2208,6 @@ gamestate_t dialog_init( game_t* game ) {
         game->dialog.enable_options = 1;
         game->limit = 0.0f;
     }
-
-    return GAMESTATE_NO_CHANGE;
 }
 
 
@@ -2458,9 +2453,8 @@ gamestate_t dialog_update( game_t* game ) {
 }
 
 
-gamestate_t exit_init( game_t* game ) {
+void exit_init( game_t* game ) {
     draw_screenshot( game->render );
-    return GAMESTATE_NO_CHANGE;
 }
 
 
@@ -2473,10 +2467,9 @@ gamestate_t exit_update( game_t* game ) {
 }
 
 
-gamestate_t terminate_init( game_t* game ) {
+void terminate_init( game_t* game ) {
     (void) game;
     draw_screenshot( game->render ); 
-    return GAMESTATE_NO_CHANGE;
 }
 
 

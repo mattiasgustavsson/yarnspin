@@ -56,7 +56,9 @@ bool render_init( render_t* render, yarn_t* yarn, uint8_t* screen, int width, in
     render->screen_width = width;
     render->screen_height = height;
     render->screenshot = render->screen ? (uint8_t*) manage_alloc( malloc( width * height * sizeof( uint8_t ) ) ) : NULL;
+    if( render->screenshot ) memset( render->screenshot, 0, width * height * sizeof( uint8_t ) );
     render->screenshot_rgb = !render->screen ? (uint32_t*) manage_alloc( malloc( width * height * sizeof( uint32_t ) ) ) : NULL;
+    if( render->screenshot_rgb ) memset( render->screenshot_rgb, 0, width * height * sizeof( uint32_t ) );
     render->background_index = -1;
 
     render->font_txt = yarn->assets.font_txt;
@@ -592,7 +594,7 @@ void cls( render_t* render ) {
     if( render->screen ) {
         memset( render->screen, render->color_background, (size_t) render->screen_width * render->screen_height );
     } else {
-        uint32_t color = render->color_background;
+        uint32_t color = render->color_background | 0xff000000;
         float a = ( ( color >> 24 ) & 0xff ) / 255.0f;
         float r = ( ( color >> 16 ) & 0xff ) / 255.0f;
         float g = ( ( color >> 8  ) & 0xff ) / 255.0f;
@@ -613,6 +615,13 @@ void render_new_frame( render_t* render, int hborder, int vborder ) {
         glBindTexture( GL_TEXTURE_2D, 0 );
         glFramebufferTexture2D( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, render->frametexture, 0 );
         glViewport( hborder, vborder, render->screen_width, render->screen_height);
+        uint32_t color = render->color_background | 0xff000000;
+        float a = ( ( color >> 24 ) & 0xff ) / 255.0f;
+        float r = ( ( color >> 16 ) & 0xff ) / 255.0f;
+        float g = ( ( color >> 8  ) & 0xff ) / 255.0f;
+        float b = ( ( color       ) & 0xff ) / 255.0f;
+        glClearColor( r, g, b, a );
+        glClear( GL_COLOR_BUFFER_BIT );        
         glEnable( GL_BLEND );
         glBlendFuncSeparate( GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE );
     }
@@ -640,7 +649,7 @@ void render_present( render_t* render, int width, int height, uint32_t fade ) {
     glBindFramebuffer( GL_FRAMEBUFFER, 0 );
 
     glViewport(0, 0, width, height);
-    glClearColor( 0.0f, 0.0f,0.0f, 0.0f );
+    glClearColor( 0.0f, 0.0f,0.0f, 1.0f );
     glClear( GL_COLOR_BUFFER_BIT );
 
     float view_width = (float)width;
@@ -677,7 +686,7 @@ void render_present( render_t* render, int width, int height, uint32_t fade ) {
     float ba = ( ( render->yarn->globals.color_background >> 24 ) & 0xff ) / 255.0f;
     float br = ( ( render->yarn->globals.color_background >> 16 ) & 0xff ) / 255.0f;
     float bg = ( ( render->yarn->globals.color_background >> 8  ) & 0xff ) / 255.0f;
-    float bb = ( ( render->yarn->globals.color_background       ) & 0xff ) / 255.0f;
+    float bb = ( ( render->yarn->globals.color_background | 0xff000000 ) & 0xff ) / 255.0f;
     glClearColor( br, bg, bb, ba );
     glClear( GL_COLOR_BUFFER_BIT );
     glDisable( GL_SCISSOR_TEST );
@@ -840,6 +849,20 @@ void draw_flip( render_t* render, int bitmap_index, int x, int y ) {
         glBindTexture( GL_TEXTURE_2D, 0 );
     }
 }
+
+
+void grab_screenshot( render_t* render ) {
+    if( render->screen ) {
+        memcpy( render->screenshot, render->screen, sizeof( uint8_t ) * render->screen_width * render->screen_height );
+    } else {
+        glFlush();
+        glFinish();
+        GLint viewport[ 4 ];
+        glGetIntegerv( GL_VIEWPORT, viewport );
+        glReadPixels( viewport[ 0 ], viewport[ 1 ], viewport[ 2 ], viewport[ 3 ], GL_RGBA, GL_UNSIGNED_BYTE, render->screenshot_rgb );
+    }
+}
+
 
 void draw_screenshot( render_t* render ) {
     if( render->screen ) {

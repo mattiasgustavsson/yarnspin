@@ -329,14 +329,7 @@ int app_proc( app_t* app, void* user_data ) {
     APP_U64 time = 0;
     while( !game.exit_flag ) {
         bool exit_requested = app_yield( app ) == APP_STATE_EXIT_REQUESTED;
-        if( exit_requested ) {
-            if( game.exit_dialog ) {
-                game.exit_flag = true;
-            } else {
-                game.exit_dialog = true;
-                app_cancel_exit( app );
-            }
-        }
+
         frametimer_update( frametimer );
         input_update( &input, screen_width, screen_height, crtemu_lite, crtemu_pc, crtemu_tv );
         
@@ -359,6 +352,15 @@ int app_proc( app_t* app, void* user_data ) {
         game_update( &game, frametimer_delta_time( frametimer ) );
         thread_mutex_unlock( &g_sound_mutex );
 
+        if( exit_requested ) {
+            if( game.exit_dialog ) {
+                game.exit_flag = true;
+            } else {
+                grab_screenshot( game.render );
+                game.exit_dialog = true;
+                app_cancel_exit( app );
+            }
+        }
 
         if( game.yarn->is_debug ) {
             char const* dbgstr = "debug";
@@ -611,9 +613,9 @@ buffer_t* wasm_encode_w64( buffer_t* inbuf ) {
     int i = 0;
     int n = 0;  
     while( i < buflen ) {  
-        n = 0 | ( (uint32_t)(buf[i++] ) <<  0 );
-        n = n | ( (uint32_t)(buf[i++] ) <<  8 );
-        n = n | ( (uint32_t)(buf[i++] ) << 16 );
+        if( i < buflen ) n = 0 | ( (uint32_t)(buf[i++] ) <<  0 );
+        if( i < buflen ) n = n | ( (uint32_t)(buf[i++] ) <<  8 );
+        if( i < buflen ) n = n | ( (uint32_t)(buf[i++] ) << 16 );
         wasm_write_w64( res, (  n      ) & 63 );
         wasm_write_w64( res, ( n >>  6 ) & 63 );
         wasm_write_w64( res, ( n >> 12 ) & 63 );
@@ -622,11 +624,14 @@ buffer_t* wasm_encode_w64( buffer_t* inbuf ) {
 
     if( buflen % 3 ) {
         buffer_position_set(res, buffer_position(res) - 1);
+        buffer_resize( res, buffer_position(res) );
         char t[2] ={ '\0', '\0' };
         t[0] = '0' + ( 3 - (buflen % 3) );
         buffer_write_char(res, t, 1);
     }
 
+    char z = '\0';
+    buffer_write_char( res, &z, 1 );
     return res;
 }
 
@@ -634,7 +639,7 @@ int wasm_map_w64( int y ) {
     return (y < 92 ? y - 58 : y - 59);
 }
 
-buffer_t* DecodeW64( cstr_t str ) {
+buffer_t* wasm_decode_w64( cstr_t str ) {
     buffer_t* a = buffer_create();
     int slen = cstr_len(str);
     int r = str[slen - 1] == '1' ? 1 : str[slen - 1] == '2' ? 2 : 0;
@@ -654,9 +659,31 @@ buffer_t* DecodeW64( cstr_t str ) {
         v = n >> 16;
         buffer_write_u8(a, &v, 1);
     }
-    buffer_resize(a, slen / 4 * 3 - (r < 3 && r));
+    buffer_resize(a, slen / 4 * 3 - r);
     return a;
 }
+
+/*
+void test_enc_dec( void ) {
+    for( int i = 0; i < 1024; ++i ) {
+        buffer_t* src = buffer_create();
+        for( int j = 0; j < i; ++j ) {
+            uint8_t v = rand() & 0xff;
+            buffer_write_u8( src, &v, 1 );
+        }
+        buffer_t* enc = wasm_encode_w64( src );       
+        buffer_t* dec = wasm_decode_w64( (char*)buffer_data( enc ) );   
+        int sz = buffer_size( src ) == buffer_size( dec );
+        int res = memcmp( buffer_data( dec ), buffer_data( src ), buffer_size( src ) );
+        if( !sz || res ) {
+            printf( "Fail\n" );
+        }
+        buffer_destroy( src );
+        buffer_destroy( enc );
+        buffer_destroy( dec );
+    }
+}
+*/
 
 
 cstr_t process_html(cstr_t runtime) {
@@ -667,7 +694,9 @@ cstr_t process_html(cstr_t runtime) {
         int wasm_end = cstr_find(runtime, "\");", wasm_start);
         if (wasm_end >= 0) {
             cstr_t wasm = cstr_mid(runtime, wasm_start, wasm_end - wasm_start);
-            buffer_t* outbuf = DecodeW64(wasm);
+            buffer_t* outbuf = wasm_decode_w64(wasm);
+            buffer_t* test = wasm_encode_w64(outbuf);
+            file_save_data( buffer_data(test), buffer_size(test),"test.w64",FILE_MODE_BINARY);
 
             buffer_t* datbuf = buffer_load("yarnspin.dat");
             char const* name = "|yarnspin.dat";
@@ -685,7 +714,7 @@ cstr_t process_html(cstr_t runtime) {
 
             buffer_t* final = buffer_create();
             buffer_write_u8(final, (uint8_t*)runtime, wasm_start);
-            buffer_write_u8(final, (uint8_t*)buffer_data( w64buf ), buffer_size( w64buf ) );
+            buffer_write_u8(final, (uint8_t*)buffer_data( w64buf ), buffer_size( w64buf ) - 1 );
             buffer_destroy(w64buf);
 
             buffer_write_u8(final, (uint8_t*)runtime + wasm_end, cstr_len( runtime ) - wasm_end );
