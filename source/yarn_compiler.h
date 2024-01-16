@@ -653,6 +653,64 @@ bool compile_action( array_param(string)* data_param, yarn_act_t* compiled_actio
 }
 
 
+bool compile_auto( array_param(string)* data_param, yarn_act_t* compiled_action, string filename, int line_number, yarn_t* yarn, compiler_context_t* context ) {
+    array(string)* data = ARRAY_CAST( data_param );
+    if( data->count != 2 ) {
+        printf( "%s(%d): invalid declaration 'auto: %s'\n", filename, line_number, concat_data( data ) );
+        return false;
+    }
+    string_id command = data->items[ 0 ];
+    if( find_screen_index( command, context ) >= 0 ) {
+        compiled_action->type = ACTION_TYPE_AUTO_SCREEN;
+        int screen_index = find_screen_index( command, context );
+        if( screen_index >= 0 ) {
+            compiled_action->param_screen_index = screen_index;
+        } else {
+            printf( "%s(%d): screen '%s' was not declared\n", filename, line_number, command );
+            return false;
+        }
+    } else if( find_location_index( command, context ) >= 0 ) {
+        compiled_action->type = ACTION_TYPE_AUTO_LOCATION;
+        int location_index = find_location_index( command, context );
+        if( location_index >= 0 ) {
+            compiled_action->param_location_index = location_index;
+        } else {
+            printf( "%s(%d): location '%s' was not declared\n", filename, line_number, command );
+            return false;
+        }
+    } else if( find_dialog_index( command, context ) >= 0 ) {
+        compiled_action->type = ACTION_TYPE_AUTO_DIALOG;
+        int dialog_index = find_dialog_index( command, context );
+        if( dialog_index >= 0 ) {
+            compiled_action->param_dialog_index = dialog_index;
+        } else {
+            printf( "%s(%d): dialog '%s' was not declared\n", filename, line_number, command );
+            return false;
+        }
+    }
+
+    string_id time = data->items[ 1 ];
+    if( compiled_action->type != ACTION_TYPE_NONE ) {
+        float time_min = 0.0f;
+        float time_max = 0.0f;
+        if( !extract_time_range( time, &time_min, &time_max ) ) {
+            printf( "%s(%d): time interval can not be 0 seconds or less: 'auto: %s'\n", filename, line_number, concat_data( data ) );
+            return false;
+        }
+
+        if( time_max < time_min || ( time_max <= 0.0f && time_min <= 0.0f ) ) {
+            printf( "%s(%d): time interval can not be 0 seconds or less: 'auto: %s'\n", filename, line_number, concat_data( data ) );
+            return false;
+        }
+
+        compiled_action->time_min = time_min;
+        compiled_action->time_max = time_max;
+    }
+
+    return true;
+}
+
+
 bool compile_cond( array_param(string)* data_param, yarn_cond_or_t* compiled_cond, string filename, int line_number, yarn_t* yarn ) {
     array(string)* data = ARRAY_CAST( data_param );
     for( int i = 0; i < data->count; ++i ) {
@@ -828,6 +886,10 @@ bool compile_screen( parser_section_t* section, yarn_t* yarn, compiler_context_t
             yarn_act_t* action = array_add( screen->act, empty_act() );
             if( cond ) { action->cond = *cond; cond = 0; }
             no_error = no_error && compile_action( decl->data, action, decl->filename, decl->line_number, yarn, context );
+        } else if( CMP( decl->keyword, "auto"  ) ) {
+            yarn_act_t* action = array_add( screen->act, empty_act() );
+            if( cond ) { action->cond = *cond; cond = 0; }
+            no_error = no_error && compile_auto( decl->data, action, decl->filename, decl->line_number, yarn, context );
         } else if( CMP( decl->keyword, "?" ) ) {
             if( !cond ) {
                 cond_inst = *empty_cond();

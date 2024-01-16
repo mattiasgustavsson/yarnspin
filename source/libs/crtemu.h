@@ -728,7 +728,7 @@ bool crtemu_shaders_pc( crtemu_t* crtemu ) {
         "    col += vec3(ghs*(1.0-0.114))*pow(clamp(vec3(3.0)*b,vec3(0.0),vec3(1.0)),vec3(2.0))*vec3(i);\n"
         "\n"
         "    /* Level adjustment (curves) */\n"
-        "    col *= vec3(1.0,1.1,1.0);\n"
+        "    col *= vec3(0.95,0.95,0.95);\n"
         "    col = clamp(col*1.3 + 0.75*col*col + 1.25*col*col*col*col*col,vec3(0.0),vec3(10.0));\n"
         "\n"
         "    /* Vignette */\n"

@@ -62,7 +62,7 @@ jobs:
           move runtime.exe build
           move runtime.wasm build
           move runtime.html build
-          7z a yarnspin-win.zip yarnspin.exe yarnspin.pdf faces fonts images palettes scripts sound build\runtime.exe build\runtime.wasm build\runtime.html build\template.html build\yarnspin_icon.png
+          7z a yarnspin-win.zip yarnspin.exe yarnspin.pdf display faces fonts images palettes scripts sound build\runtime.exe build\runtime.wasm build\runtime.html build\template.html build\yarnspin_icon.png
       - name: upload artifacts
         uses: softprops/action-gh-release@v1
         with:
@@ -115,7 +115,7 @@ jobs:
           mv runtime build
           mv runtime.wasm build
           mv runtime.html build
-          tar -czvf yarnspin-mac.tar.gz yarnspin yarnspin.pdf faces fonts images palettes scripts sound build/runtime build/runtime.wasm build/runtime.html build/template.html build/yarnspin_icon.png
+          tar -czvf yarnspin-mac.tar.gz yarnspin yarnspin.pdf display faces fonts images palettes scripts sound build/runtime build/runtime.wasm build/runtime.html build/template.html build/yarnspin_icon.png
       - name: upload artifacts
         uses: softprops/action-gh-release@v1
         with:
@@ -172,7 +172,7 @@ jobs:
           mv runtime build
           mv runtime.wasm build
           mv runtime.html build
-          tar -czvf yarnspin-linux.tar.gz yarnspin yarnspin.pdf faces fonts images palettes scripts sound build/runtime build/runtime.wasm build/runtime.html build/template.html build/yarnspin_icon.png
+          tar -czvf yarnspin-linux.tar.gz yarnspin yarnspin.pdf display faces fonts images palettes scripts sound build/runtime build/runtime.wasm build/runtime.html build/template.html build/yarnspin_icon.png
       - name: upload artifacts
         uses: softprops/action-gh-release@v1
         with:

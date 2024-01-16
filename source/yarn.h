@@ -132,6 +132,9 @@ typedef enum yarn_action_type_t {
     ACTION_TYPE_GOTO_SCREEN,
     ACTION_TYPE_GOTO_LOCATION,
     ACTION_TYPE_GOTO_DIALOG,
+    ACTION_TYPE_AUTO_SCREEN,
+    ACTION_TYPE_AUTO_LOCATION,
+    ACTION_TYPE_AUTO_DIALOG,
     ACTION_TYPE_EXIT,
     ACTION_TYPE_RETURN,
     ACTION_TYPE_RESTART,
@@ -156,6 +159,8 @@ typedef struct yarn_act_t {
     int param_flag_index;
     int param_item_index;
     int param_char_index;
+    float time_min;
+    float time_max;
 } yarn_act_t;
 
 
@@ -169,6 +174,8 @@ yarn_act_t* empty_act( void ) {
     act.param_flag_index = -1;
     act.param_item_index = -1;
     act.param_char_index = -1;
+    act.time_min = 0.0f;
+    act.time_max = 0.0f;
     return &act;
 }
 
@@ -183,6 +190,8 @@ void save_act( buffer_t* out, yarn_act_t* act ) {
     buffer_write_i32( out, &act->param_flag_index, 1 );
     buffer_write_i32( out, &act->param_item_index, 1 );
     buffer_write_i32( out, &act->param_char_index, 1 );
+    buffer_write_float( out, &act->time_min, 1 );
+    buffer_write_float( out, &act->time_max, 1 );
 }
 
 
@@ -195,6 +204,8 @@ void load_act( buffer_t* in, yarn_act_t* act ) {
     act->param_flag_index = read_int( in );
     act->param_item_index = read_int( in );
     act->param_char_index = read_int( in );
+    act->time_min = read_float( in );
+    act->time_max = read_float( in );
 }
 
 

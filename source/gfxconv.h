@@ -1550,10 +1550,10 @@ qoi_data_t* convert_rgb( string image_filename, int width, int height, int bpp, 
         }
 
         if( bpp == 8 ) {
-            dither_rgb8( (uint32_t*) img, outw, outh, false, resolution_scale );
+            dither_rgb8( (uint32_t*) img, outw, outh, have_settings ? settings.bayer_dither : false, resolution_scale );
         }
         if( bpp == 9 ) {
-            dither_rgb9( (uint32_t*) img, outw, outh, false );
+            dither_rgb9( (uint32_t*) img, outw, outh, have_settings ? settings.bayer_dither : false );
         }
 
         create_path( processed_filename, 0 );
