@@ -225,9 +225,6 @@ typedef struct game_t {
     int queued_screen;
     int queued_location;
     int queued_dialog;
-    int timer_screen;
-    int timer_location;
-    int timer_dialog;
     float timer_value;
     float limit;
     struct {
@@ -449,9 +446,6 @@ void game_restart( game_t* game ) {
     game->queued_screen = -1;
     game->queued_location = -1;
     game->queued_dialog = -1;
-    game->timer_screen = -1;
-    game->timer_location = -1;
-    game->timer_dialog = -1;
     game->timer_value = 0.0f;
     game->restart_requested = false;    
     game->quickload_requested = false;
@@ -933,21 +927,21 @@ void do_actions( game_t* game, array_param(yarn_act_t)* act_param ) {
                 game->queued_dialog = action->param_dialog_index;
             } break;
             case ACTION_TYPE_AUTO_SCREEN: {
-                game->timer_screen = action->param_screen_index;
-                game->timer_dialog = -1;
-                game->timer_location = -1;
+                game->queued_screen = action->param_screen_index;
+                game->queued_dialog = -1;
+                game->queued_location = -1;
                 game->timer_value = action->time_min + ( action->time_max - action->time_min ) * rnd_pcg_nextf( game->rnd );
             } break;
             case ACTION_TYPE_AUTO_LOCATION: {
-                game->timer_screen = -1;
-                game->timer_dialog = -1;
-                game->timer_location = action->param_location_index;
+                game->queued_screen = -1;
+                game->queued_dialog = -1;
+                game->queued_location = action->param_location_index;
                 game->timer_value = action->time_min + ( action->time_max - action->time_min ) * rnd_pcg_nextf( game->rnd );
             } break;
             case ACTION_TYPE_AUTO_DIALOG: {
-                game->timer_screen = -1;
-                game->timer_location = -1;
-                game->timer_dialog = action->param_dialog_index;
+                game->queued_screen = -1;
+                game->queued_location = -1;
+                game->queued_dialog = action->param_dialog_index;
                 game->timer_value = action->time_min + ( action->time_max - action->time_min ) * rnd_pcg_nextf( game->rnd );
             } break;
             case ACTION_TYPE_EXIT: {
@@ -1748,9 +1742,6 @@ void screen_init( game_t* game ) {
     game->queued_screen = -1;
     game->queued_location = -1;
     game->queued_dialog = -1;
-    game->timer_screen = -1;
-    game->timer_location = -1;
-    game->timer_dialog = -1;
     game->timer_value = 0.0f;
 
     yarn_t* yarn = game->yarn;
@@ -1838,34 +1829,34 @@ gamestate_t screen_update( game_t* game ) {
     }
 
 
-    if( ( game->timer_dialog >= 0 || game->timer_location >=0 || game->timer_screen >= 0 ) && game->timer_value > 0.0f ) {
+    if( ( game->queued_dialog >= 0 || game->queued_location >=0 || game->queued_screen >= 0 ) && game->timer_value > 0.0f ) {
         game->timer_value -= 1.0f / 60.0f;
         if( game->timer_value <= 0.0f ) {
-            if( game->timer_dialog >= 0 ) {
+            if( game->queued_dialog >= 0 ) {
                 grab_screenshot( game->render );
                 game->state.current_screen = -1;
                 if( game->state.current_dialog >= 0 ) {
-                    game->state.current_dialog = game->timer_dialog;
+                    game->state.current_dialog = game->queued_dialog;
                     game->disable_transition = true;
                     return GAMESTATE_DIALOG;
                 } else {
-                    game->state.current_dialog = game->timer_dialog;
+                    game->state.current_dialog = game->queued_dialog;
                     return GAMESTATE_DIALOG;
                 }
-            } else if( game->timer_location >= 0 ) {
+            } else if( game->queued_location >= 0 ) {
                 grab_screenshot( game->render );
                 game->state.current_screen = -1;
                 if( game->state.current_location >= 0 ) {
-                    game->state.current_location = game->timer_location;
+                    game->state.current_location = game->queued_location;
                     game->disable_transition = true;
                     return GAMESTATE_LOCATION;
                 } else {
-                    game->state.current_location = game->timer_location;
+                    game->state.current_location = game->queued_location;
                     return GAMESTATE_LOCATION;
                 }
-            } else if( game->timer_screen >= 0 ) {
+            } else if( game->queued_screen >= 0 ) {
                 grab_screenshot( game->render );
-                game->state.current_screen = game->timer_screen;
+                game->state.current_screen = game->queued_screen;
                 game->state.current_location = -1;
                 game->state.current_dialog = -1;
                 return GAMESTATE_SCREEN;
@@ -1894,9 +1885,6 @@ void location_init( game_t* game ) {
     game->queued_screen = -1;
     game->queued_location = -1;
     game->queued_dialog = -1;
-    game->timer_screen = -1;
-    game->timer_location = -1;
-    game->timer_dialog = -1;
     game->timer_value = 0.0f;
     game->limit = -30.0f;
 
@@ -2245,9 +2233,6 @@ void dialog_init( game_t* game ) {
     game->queued_screen = -1;
     game->queued_location = -1;
     game->queued_dialog = -1;
-    game->timer_screen = -1;
-    game->timer_location = -1;
-    game->timer_dialog = -1;
     game->timer_value = 0.0f;
     game->limit = -30.0f;
 
