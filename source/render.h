@@ -869,7 +869,7 @@ void draw_screenshot( render_t* render ) {
         memcpy( render->screen, render->screenshot, sizeof( uint8_t ) * render->screen_width * render->screen_height );
     } else {
         glActiveTexture( GL_TEXTURE0 );
-        glBindTexture( GL_TEXTURE_2D, render->savegame_tex[ 0 ] );
+        glBindTexture( GL_TEXTURE_2D, render->savegame_tex[ 9 ] );
         glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, render->screen_width, render->screen_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, render->screenshot_rgb );
         glBindTexture( GL_TEXTURE_2D, 0 );
         float width = render->screen_width;
@@ -897,7 +897,7 @@ void draw_screenshot( render_t* render ) {
         float b = ( ( color       ) & 0xff ) / 255.0f;
         glUseProgram( render->shader );
         glActiveTexture( GL_TEXTURE0 );
-        glBindTexture( GL_TEXTURE_2D, render->savegame_tex[ 0 ] );
+        glBindTexture( GL_TEXTURE_2D, render->savegame_tex[ 9 ] );
         glUniform1i( glGetUniformLocation( render->shader, "tex0" ), 0 );
         glUniform4f( glGetUniformLocation( render->shader, "col" ), r, g, b, a );
         glDrawArrays( GL_TRIANGLE_FAN, 0, 4 );
