@@ -745,7 +745,7 @@ bool compile_audio( yarn_audio_t* audio, parser_declaration_t* decl, yarn_t* yar
         string_id str = cstr_trim( decl->data->items[ i ] );               
         if( CMP( str, "restart" ) ) {
             if( audio->type == YARN_AUDIO_TYPE_SOUND ) {
-                printf( "%s(%d): 'start' can not be specified for 'snd:'\n", decl->filename, decl->line_number );
+                printf( "%s(%d): 'restart' can not be specified for 'snd:'\n", decl->filename, decl->line_number );
                 no_error = false;
             }
             audio->restart = true;

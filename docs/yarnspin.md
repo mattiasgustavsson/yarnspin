@@ -4,8 +4,16 @@
 # User Handbook
 
 ---
+## Contents
 
-## 1.Introduction
+ - [1. Introduction](#1-introduction) 
+ - [2. Getting Started](#2-getting-started)  
+ - [3. Scripting Reference](#3-scripting-reference)  
+
+---
+
+
+## 1. Introduction
 
 Welcome to the world of *Yarnspin*, a friendly and approachable game engine designed to help you create your very own choose-your-own-adventure story games! Drawing inspiration from home computer game development tools from the 1980s and 1990s, Yarnspin aims to provide an accessible and enjoyable experience, whether you're a seasoned developer or just starting out. In this introductory chapter, we'll cover the essential information you need to get started with Yarnspin, including system requirements, how to make the most of this manual, and what you'll find in the Yarnspin package. So, let's dive in!
 
@@ -204,57 +212,49 @@ This code defines an action called "end_conversation" that ends the conversation
 
 Now that you've created your simple Yarnspin game script, save the "my_first_yarn.txt" file and run the Yarnspin compiler to generate the "yarnspin.dat" file. To play your game, simply launch the Yarnspin player.
 
-Congratulations! You've just created your very first Yarnspin game. As you become more comfortable with the Yarnspin scripting language, you can start to add more locations, dialogs, characters, and interactions to
+Congratulations! You've just created your very first Yarnspin game. As you become more comfortable with the Yarnspin scripting language, you can start to add more locations, dialogs, characters, and interactions.
 
 
-## 3. Unwinding the sample Yarn
+## 3. Scripting Reference
 
-### Overview
+When you run `yarnspin.exe` it will compile all the scripts and assets into a single compressed `yarnspin.dat` file. You could just take `yarnspin.exe` and `yarnspin.dat`, and that is the complete game ready for distribution. If there is no `scripts` folder in the same location as `yarnspin.exe`, it won't attempt compilation. However, a better way of packaging your final game for distribution is to use the `--package` or `-p` commandline option. You can run the command:
 
-### start.txt
+```
+yarnspin -p mygame.exe
+```
 
-### locations.txt
+and this will create a file called `mygame.exe` which is a fully self contained executable containing both code and data, in a compressed format, so all you need to share is this one fil.
 
-### carol.txt
+To package the game for running in a web browser, you simply do:
 
-### john.txt
+```
+yarnspin -p mygame.html
+```
 
-### alice.txt
+and it will generate a single, fully self contained HTML file that contains all the code and data for your game.
 
+### Compilation
 
-## 4. Spinning a Yarn
+When compiling a yarn (by running yarnspin.exe) it will load all files, regardless of extension, in the `scripts` folder and try to compile them. It doesn't matter what you put in different files, all files will be loaded and processed in one go. A script file can contain many `sections`, where a section is declared by putting three equal signs before and (optionally) after its name - and names must be unique across all files. Like this:
 
-### Planning
-
-### Story
-
-### Scripting
-
-### Art
-
-### Sound
-
-### Package and release
-
-
-## 5. Scripting Reference
-
-When you run `yarnspin.exe` it will compile all the scripts and assets into a single compressed `yarnspin.dat` file. You can then distribute `yarnspin.exe` and `yarnspin.dat`, and that is the complete game ready for distribution. If there is no `scripts` folder in the same location as `yarnspin.exe`, it won't attempt compilation.
-
-When compiling a yarn, it will load all files, regardless of extension, in the `scripts` folder and try to compile them. It doesn't matter what you put in different files, all files will be loaded and processed in one go. A script file can contain many `sections`, where a section is declared by putting three equal signs before and after its name - and names must be unique across all files. Like this:
 ```
 === my_section ===
 ```
+pr like this:
+
+```
+=== my_section
+```
+
 Everything that comes before the first section in a file is read as a `global`, see below.
 
-Sections comes in three flavours: location, dialog and character, but they are all declared that same way.
+Sections comes in four flavours: location, dialog, screen, and character, but they are all declared that same way.
 
 Note: as you read this documentation, make sure you have played through the tutorial game, which illustrates the concepts described here. It probably also helps to revisit it and look at its scripts as you read through the docs.
 
 The tutorial game can be played here:
 
-https://mattiasgustavsson.com/wasm/yarnspin
-    
+https://yarnspin.dev    
 
 ### Location sections
 
@@ -309,9 +309,38 @@ or
 act: drop Some item
 ```
 
+which will make the item appear in the list of items the player is carrying, on the right hand side of the screen.
+
+The `act` statement can also be used to attach or detach characters
+
+```
+act: attach some_character
+```
+
+or
+
+```
+act: detach some_character
+```
+
+and this works similar to items, but makes the character show up in the character list on the left hand side of the screen. Normally, this list is populated by the `chr` declarations, but doing it with attach/detach is a way to have a character name always show up, regardless of whether they can be interacted with at the current location or not. Think of it as giving the player a companion who tags along.
+
+An `act` declaration can also specify one of the following command:
+
+`exit` This exits the game, so only use after the player has completed the game. 
+
+`restart` Starts the game over from the beginning
+
+`return` Returns to the section we came from before getting to this section
+
+`quicksave` Saves the current state of the game in the single quicksave slot. The idea is that you specify quicksave before a potentially fatal encounter, and if things go wrong, you can give the player an option to try from before things went wrong.
+
+`quickload` Used in conjunction with quicksave to restore the state that was saved, for when the player opts to do a retry.
+
 After the img/txt/act declarations, a location section can have `use`, `chr` and `opt` declarations
 
 `chr` declarations adds a character to the character list, and if the player clicks on it, we go to the section specified in its corresponding `act` statement. A `chr` declaration is always followed by an `act` statement with a section name.
+
 ```
 chr: some_character
 act: talk_to_character
@@ -326,6 +355,7 @@ act: section_describing_what_happens
 If the player does not currently have the item in his inventory, the use declaration is ignored.
 
 `opt` adds an option at the bottom of the screen, and also has a corresponding `act` declaration specifying a section to go to
+
 ```
 opt: I want to go to the other section
 act: my_other_section
@@ -369,6 +399,22 @@ Just as for location sections, these can have conditions, and the `act` statemen
 
 A section is determined to be a dialog section if it contains any of the declarations listed for dialog sections, and no other types of declarations.
 
+### Screen sections
+
+A screen section can not use the `img`, `txt`, `use` or `chr` declarations, but it can use the `act` declaration as described for the location sections, including conditions. 
+
+Screen sections have two declarations unique to screens: the `scr` and the `auto` declarations. `scr` works just like the `img` declaration for locations, with the difference that the image it specifies will be displayed covering the full resolution of the screen. 
+
+The `auto` declaration takes two parts, a section name followed by a time span, separated by a comma (see the section about time spans for details about those). The image for the screen will be displayed until the user clicks or press a key, or until the specified time has elapsed. 
+
+```
+=== logo_section ===
+scr: logo.png
+auto: intro_section, 5s
+```
+
+Is is also possible to use the normal `act` declaration instead of `auto`, to not have a time span at all, and instead require user input before proceeding.
+
 ### Character sections
 
 Character sections are much simpler, and you can not jump to a character section with an `act` statement. A character section defines the name and appearance for a character only.
@@ -385,6 +431,83 @@ When a character is added to a location using the `chr` statement, the `short` n
 
 When a dialog is playing, the longer `name` is displayed above the portrait picture defined as `face`. All portrait images must be in the `faces` folder. There are 1000 auto generated portrait images included, but you can of course make your own as well.
 
+### Music and sound effects
+
+All sections apart from character sections (so, locations, dialogs and screens) can use the music and sound declarations to control audio playback.
+
+There are three different kind of things that can be played, and they work slightly differently. They are music, ambience, and sound effects. For music and ambience, you can only play one of each at a time. If a music track is already playing, and you start playing another one, the previous song will be stopped and the new started (you can optionally specify to crossfade between the two). The same goes for the ambience track, which is intended for playing a looping ambience sound for a scene - only one will play at a time. But of course, you can have both music and ambience playing at the same time. Sound effects are limited to 16 different ones playing simultaneously. But if a specific sound is already playing, then playing it again will not play a second instance of it.
+
+Playing a music file is done like this:
+
+```
+mus: mymusic.ogg
+```
+
+And this will play the Ogg/Vorbis encoded file `mymusic.ogg` as a looping sound on the dedicated music channel.
+
+Playing an ambient loop is done in the same way, but using the `amb` declaration:
+
+```
+amb: myambience.ogg
+```
+
+The sound files can be in any of the following formats: ogg, wav, flac or mp3. All sounds are converted into 22050 Hz, 16 bit mono, and internally compressed with the QOA (quite ok audio) format, which is a lossy compression resulting in high quality sound.
+
+Both the `mus` and the `amb` declaration can have optionally have on or more modifiers, separated by a comma `,`
+
+The modifiers are: 
+
+`restart` Make the track start from the beginning. The default behavior is that if the specified sound is already playing, it will just keep playing.
+
+`random` Starts the sound from a random position. Particularly useful for ambient sound loops, so they don't always have to start from the beginning every time you enter a scene.
+
+`noloop` Makes the sound play through once, and then stop. The default for music and ambience is that the sound loops
+
+In addition to the modifiers, it is also possible to specify a time range or a volume range. A time range is either a number of seconds, for example `5s` or a pair of them separated by dash `2s-7.3s`. For music and ambience tracks, this controls the cross-fade duration. The first examples cross-fades between whatever track is currently playing and the new track over five seconds, and the second picks a random value between two and 7.3 seconds, and cross-fades over that amount of time.
+
+A volume range is either a single volume value, for example `60%` or a range like `30%-150%`. The first example sets the volume of the track to 60% of the maximum, while the second picks a random value between 30 and 150, and sets the volume to this. Take care when specifying volume values above 100% as this can lead to sound samples being clipped, which doesn't sound so nice. 
+
+An example using all of the above could look like this:
+
+```
+mus: mymusic.mp3,restart,random,noloop,30%,5s-8s
+```
+
+Note that the order of the declaration elements do not matter.
+
+All of the above modifiers as well as volume and time ranges, require that you also specify a name of the sound file to play. You can also make a `mus` or `amb` declaration, without a filename specified, and instead specify `stop` which simply ends the currently playing sound, if any. Stop can also have a time range, which in this case will be used as the fadeout time for the track.
+
+```
+mus: stop,3s-6s 
+```
+
+When it comes to sound effects, they work similar to music and ambience, but you use the `snd:` declaration instead. Sound effects are non-looping by default, but you  can use the modifier `loop` to make it looping. In addition to the loop modifier, `snd` declarations can also specify a volume range, to control playback volume in the same way as for ambience and music. 
+
+A couple of examples of sound playback could look like this:
+
+```
+snd: mysound.mp3,loop,110%
+```
+
+```
+snd: othersound.wav
+```
+
+When using `stop` with `snd` declarations, it can be used on its own like this:
+
+```
+snd: stop
+```
+
+Which stops all currently playing sound effects, or together with a filename like this:
+
+```
+snd: stop,othersound.wav
+```
+
+which stops only the sound effect `othersound.wav`, if it is playing.
+
+Both of the options can have a time range, which will be used as fadeout time when stopping the sound or sounds.
 
 ### Globals
 
@@ -432,13 +555,7 @@ This points to an image file in the `palettes` folder, which will be processed a
 ```
 display_filters
 ```
-Yarnspin has two different CRT emulation filters, emulating the look of either an old TV or an old PC monitor. This global allows you to specify which one to use, like `display_filters: tv` or `display_filters: pc`. You can turn the filter off as well, for crisp pixels: `display_filters: none`. It is also possible to specify a list of filters, in which case the player will be able to cycle through them, in the order specified, by pressing F9 in the game. Declaring multiple filters looks like this: `display_filters: tv, pc, none`.
-
-
-```
-logo
-```
-Specifies one or more image files, as a comma separated list, to display at the start of the game, before jumpin to the first section. Images needs to be in the `images` folder, and will be displayed in order, waiting for player input to dismiss each one.
+Yarnspin has two different CRT emulation filters, emulating the look of either an old TV or an old PC monitor. This global allows you to specify which one to use, like `display_filters: tv` or `display_filters: pc`. You can turn the filter off as well, for crisp pixels: `display_filters: none`. It is also possible to specify a list of filters, in which case the player will be able to cycle through them, in the order specified, by pressing F9 in the game. Declaring multiple filters looks like this: `display_filters: tv, pc, lite, none`.
 
 
 ```
@@ -491,21 +608,4 @@ Yarnspin has a built-in editor to make basic adjustment to your images and portr
   yarnspin --images
 ```
 
-
-## 6. Additional Resources
-
-### Story structure
-
-### Art tutorials
-
-### Poser
-
-### AI
-
-### Sound
-
-### Music
-
-### Yarnspin source code
-
-### Other game development tools
+### 
