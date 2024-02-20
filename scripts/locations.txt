@@ -30,7 +30,7 @@ act: end_sure
 act: set visited_another_room
 
 img: office.jpg
-txt: A location consists of an image (like the one with the nice window above), a description text (you are reading it) and three different types of interactions: Characters, Items and Options.
+txt: A location consists of an image (like the one with the nice desk above), a description text (you are reading it) and three different types of interactions: Characters, Items and Options.
 
 opt: Characters. What's that about?
 act: about_characters
@@ -53,7 +53,7 @@ act: about_locations
 
 === about_items ===
 
-txt: So, to the right of the picture, there is some space. It might be empty right now, or it might have one or two items listed there - it depends on if you have talked to John or Carol yet, and if you received something from them. In any case, I'll give you something to hold while we talk about it - but I'll take it back when you leave here.
+txt: So, to the right of the picture, there is some space. It might have a text which reads "You have nothing.", or it might have one or two items listed there - it depends on if you have talked to John or Carol yet, and if you received something from them. In any case, I'll give you something to hold while we talk about it - but I'll take it back when you leave here.
 act: about_items2
 
 

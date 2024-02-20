@@ -11,7 +11,6 @@ act: set have_talked_to_john
 
 john: Did I hear someone say Art? That happens to be my specialty.
 john: I know a lot of people feel that they don't have any artistic talent. I don't believe that for a moment! Anyone can learn to draw, you just need to practice it.
-john: But while you are building up your confidence in your own drawing skill, I will tell you about some of the alternatives that Yarnspin offer.
 
 act: john_options
 
@@ -26,11 +25,11 @@ act: john_options
 
 john: So what can I tell you about next?
 
-say: What, I don't have to draw the images myself?
+say: But what if I don't want to draw pictures myself?
 act: sourcing_images
 
-say: And what about characters? Pictures of people?
-act: sourcing_faces
+say: Can I use AI to make images for my game?
+act: sourcing_images_ai
 
 say: Ok, I have my images - now what?
 act: get_note_from_john
@@ -54,19 +53,21 @@ act: art_department
 
 === sourcing_images ===
 
-john: Not necessarily! There are plenty of images available that are free to use for your games. But remember, not every image you find is ok to use - you must have the proper permission. And if you use a photo of a person, you need permission from both the photographer and the person in the photo.
+john: Well, you don't absolutely have to use images, it is perfectly fine to make a text-only game as well.
+john: You could also use photographs, ones you take yourself or ones that you download - there are plenty of images available that are free to use for your games. But remember, not every image you find is ok to use - you must have the proper permission. And if you use a photo of a person, you need permission from both the photographer and the person in the photo.
 act: sourcing_images2
 
 
 === sourcing_images2 ===
 
-john: So if you want to find pictures to use for locations, I recommend www.pixabay.com. All pictures there are public domain, and you can use them freely. But note that you can't use pictures of people, without their specific permission. So Yarnspin gives you another option for this.
+john: So if you want to find pictures to use for locations, I recommend looking at places like www.pixabay.com (all pictures there are public domain), www.opengameart.org or commons.wikimedia.org. But note that you can't use photos of people, without their specific permission. 
 act: john_options
 
 
-=== sourcing_faces ===
+=== sourcing_images_ai ===
 
-john: Yarnspin actually includes a whole bunch of character pictures, ready for you to use. I should know, I'm one of them. And so is Alice and Carol, who you can also talk to. Yarnspin comes with one thousand computer generated characters of many different types. If you don't want to draw your own, that is.
+john: While it is definitely possible to use AI image generators to make pictures for your game, it is important to be aware of the various issues with generative AI. 
+john: There are both legal and ethical issues with using AI (and with how AI training data is acquired) and these things change at a very fast pace.
+john: Before considering the use of AI images, it is a good idea to learn about those issues, and form an opinion about if and how you feel comfortable using AI. 
 act: john_options
-
 

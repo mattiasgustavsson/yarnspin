@@ -223,7 +223,7 @@ When you run `yarnspin.exe` it will compile all the scripts and assets into a si
 yarnspin -p mygame.exe
 ```
 
-and this will create a file called `mygame.exe` which is a fully self contained executable containing both code and data, in a compressed format, so all you need to share is this one fil.
+and this will create a file called `mygame.exe` which is a fully self contained executable containing both code and data, in a compressed format, so all you need to share is this one file.
 
 To package the game for running in a web browser, you simply do:
 
@@ -529,6 +529,13 @@ Your name, as the author of the yarn
 
 
 ```
+version
+```
+
+A string identifying the version number of the game, like 1.0 or similar. This is important for savegames. If you release a new version of your game, where you have changed locations and flags, any savegames saved with an older version will no longer work, so it is recommended to change the version string for every release.
+
+
+```
 start
 ```
 Specifies which section the game starts in. Must be a defined dialog or location section.
@@ -553,6 +560,27 @@ This points to an image file in the `palettes` folder, which will be processed a
 
 
 ```
+resolution
+```
+
+The original version of Yarnspin only ran in 320x240 resolution, but now you have a choice of five different resolutions: `retro` 320x240, `low` 400x300, `medium` 480x360. `high` 640x480 and `full` 1440x1080. The default is `retro`
+
+
+```
+colormode
+```
+
+By default, Yarnspin runs in `palette` colormode, meaning it will use the palette specified (see the global named `palette` above). Alternatively, you can use colormode `rgb` which uses full 24 bit RGB color, or the colormode `rgb9` which will use 9-bit RGB color, or 3 bits for each of the R, G and B components. This is a useful option for low resolution games where you want a retro feel with distinct dithering, but you don't want to use a specific palette.
+
+
+```
+screenmode
+```
+
+Controls if the game starts in `fullscreen` or `window` mode. Note that the player can change these settings, and that those changes are saved/loaded, so this only really controls the initial mode for the game. Also, you can override it using commandline options.
+
+
+```
 display_filters
 ```
 Yarnspin has two different CRT emulation filters, emulating the look of either an old TV or an old PC monitor. This global allows you to specify which one to use, like `display_filters: tv` or `display_filters: pc`. You can turn the filter off as well, for crisp pixels: `display_filters: none`. It is also possible to specify a list of filters, in which case the player will be able to cycle through them, in the order specified, by pressing F9 in the game. Declaring multiple filters looks like this: `display_filters: tv, pc, lite, none`.
@@ -565,15 +593,23 @@ On the left of the screen is a list of characters present at the current locatio
 
 
 ```
-font_description
-font_options
-font_characters
-font_items
+nothing_text
+```
+
+This is just like `alone_text` but for the items list on the right hand side of the screen. The default is `You have nothing.`
+
+
+```
+font_txt
+font_opt
+font_dialog
+font_say
+font_response
+font_chr
+font_use
 font_name
 ```
-These globals specify font files to use for the various text areas in the game. Font files must all be stored in the `fonts` folder, and must be .ttf files containing pixel fonts. A selection of fonts have been included. If these globals are not specified, the default fonts will be used.
-
-
+These globals specify font files to use for the various text areas in the game. Font files must all be stored in the `fonts` folder, and must be .ttf files. A selection of fonts have been included. If these globals are not specified, the default fonts will be used. Note that the default font and size differs between resolutions. To specify a font size, you just do: `font_txt: arial.ttf,20`. If no font size is specified, a default will be used
 
 ```
 background_location
@@ -587,25 +623,304 @@ background_dialog
 Specifies an image file (present in the `images` folder) to use as a background when the game is displaying a dialog section. 
 
 
+```
+location_print_speed
+```
+
+Controls the speed, in characters per second, at which location text is printed. If set to zero, all of the text will be displayed instantly. The default is 0.
+
+
+```
+dialog_print_speed
+```
+
+Controls the speed, in characters per second, at which dialog text is printed. If set to zero, all of the text will be displayed instantly. The default is 80.
 
 ```
 color_background
 color_disabled
 color_txt
 color_opt
+color_dialog
+color_say
+color_response
 color_chr
 color_use
 color_name
-color_facebg
 ```
-These globals controls the text display color for the various text areas in the game. They specify the index in the palette (0 to 255) of the color to use for each text. If not specified, defaults will be calculated and used.
-
-### Adjusting images
-
-Yarnspin has a built-in editor to make basic adjustment to your images and portraits, and preview how they will look after processing, as well as try them out with different palettes. You can run the image editor by launching yarnspin with the commandline parameters `-i` or `--images`, like this:
+These globals controls the text display color for the various text areas in the game. If running in palette colormode, they specify the index in the palette (0 to 255) of the color to use for each text, like `color_txt: 12`. If running in colormode rgb or rgb9, they specify a hexadecimal RGB color value, like `color_opt: #ff8030`.  If not specified, defaults will be used.
 
 ```
-  yarnspin --images
+hmargin_txt
+vmargin_txt
+hmargin_opt
+vmargin_opt
+hmargin_dialog
+vmargin_dialog
+hmargin_say
+vmargin_say
+hmargin_response
+vmargin_response
+hmargin_chr
+vmargin_chr
+hmargin_use
+vmargin_use
+hmargin_name
+vmargin_name
 ```
 
-### 
+Even though the various elements in Yarnspin can not have their size/position precisely specified, it is possible to control some aspects of them using horizontal and vertical margins. The elements are still anchored to different points, and some have fixed witdth or height, in which case the margins works more like a positional offset than a margin. If you want to modify the position of an element, just play around with these globals and see what happens. It is very likely that a future version of Yarnspin will get an entirely different system for this, allowing for more precise size/position control. Note that the margins are given as number of pixels in a 320x240 resolution, but then scaled for the resolution actually running.
+
+```
+debug_start
+debug_set_flags 
+debug_get_items
+debug_attach_chars
+```
+
+During development of a yarn, you will be running your game a lot of times, testing out various parts of it. If you start yarnspin with the `--debug` or `-d` command line argument, these debug globals will take affect, and you can use them to specify a different start section as well as setting flags, items and companion characters that you want present from the get go. You could of course use savegames to start from a specific state as well, but savegames might break when you make changes to your game scripts, so these debug globals are offered as an alternative.
+
+### Commandline options
+
+When running yarnspin.exe from a commandline, you can specify the following flags to control its behavior and execution
+
+```
+--images
+```
+
+```
+ -i
+```
+
+Yarnspin has a built-in editor to make basic adjustment to your images and portraits, and preview how they will look after processing, as well as try them out with different palettes. This option launched the image editor instead of running your game.
+
+```
+--run 
+```
+
+```
+-r
+```
+
+Run the game without recompiling any data. The default behavior of yarnspin is to compile and run, but if you just want to run the last build again without having to recompile, you can use this option.
+
+```
+--debug 
+```
+
+```
+-d
+```
+
+Recompiles  and runs the game, but without compressing the data, resulting in a much faster build time, but also in a larger file not suitable for release. Builds done with the debug flag have the word `debug` written in the lower right corner when running. Only when running in debug mode will the debug globals take effect.
+
+```
+--compile 
+```
+
+```
+-c
+```
+
+Compiles the game, but does not run it. The default behavior of yarnspin is to compile and run the game.
+
+```
+--nosound 
+```
+
+```
+-n
+```
+
+Disable audio playback
+
+```
+--window 
+```
+
+```
+-w
+```
+
+Start the game in window mode instead of fullscreen. Overrides user settings and the screenmode global.
+
+```
+--fullscreen 
+```
+
+```
+-f
+```
+
+Start the game in fullscreen mode instead of window. Overrides user settings and the screenmode global.
+
+```
+--package 
+```
+
+```
+-p
+```
+
+Used to package your final game for distribution. You can run the command:
+
+```
+yarnspin -p mygame.exe
+```
+
+and this will create a file called `mygame.exe` which is a fully self contained executable containing both code and data, in a compressed format, so all you need to share is this one file.
+
+To package the game for running in a web browser, you simply do:
+
+```
+yarnspin -p mygame.html
+```
+
+and it will generate a single, fully self contained HTML file that contains all the code and data for your game.
+
+
+
+## License
+
+The majority of the code are under the following license. Exceptions below.
+
+```
+This software is available under 2 licenses - you may choose the one you 
+
+
+ALTERNATIVE A - MIT License
+
+Copyright (c) 2022 Mattias Gustavsson
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of the Software, and to permit persons to whom the Software is furnished to do
+so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+ALTERNATIVE B - Public Domain (www.unlicense.org)
+
+This is free and unencumbered software released into the public domain.
+
+Anyone is free to copy, modify, publish, use, compile, sell, or distribute this
+software, either in source code form or as a compiled binary, for any purpose,
+commercial or non-commercial, and by any means.
+
+In jurisdictions that recognize copyright laws, the author or authors of this
+software dedicate any and all copyright interest in the software to the public
+domain. We make this dedication for the benefit of the public at large and to
+the detriment of our heirs and successors. We intend this dedication to be an
+overt act of relinquishment in perpetuity of all present and future rights to
+this software under copyright law.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+Yarnspin makes use of the QOI and QOA image and audio formats, which are
+released under the following license:
+
+```
+MIT License
+
+Copyright (c) 2022-2023 Dominic Szablewski
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+Yarnspin makes use of the ya_get_opt library released under this license:
+
+```
+Copyright 2015 Kubo Takehiro <kubo@jiubao.org>
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+   1. Redistributions of source code must retain the above copyright notice, 
+      this list of conditions and the following disclaimer.
+
+   2. Redistributions in binary form must reproduce the above copyright 
+      notice, this list of conditions and the following disclaimer in the 
+      documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE AUTHORS ''AS IS'' AND ANY EXPRESS OR IMPLIED
+WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF 
+MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO 
+EVENT SHALL <COPYRIGHT HOLDER> OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, 
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, 
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY 
+OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, 
+EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+The views and conclusions contained in the software and documentation are 
+those of the authors and should not be interpreted as representing official 
+policies, either expressed or implied, of the authors.
+```
+
+As part of its asset conditioning, Yarnspin makes use of libsamplerate to 
+process sound files. This code is however not present at runtime. This lib is
+released under the following license:
+
+```
+Copyright (c) 2012-2016, Erik de Castro Lopo <erikd@mega-nerd.com>
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+1. Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+

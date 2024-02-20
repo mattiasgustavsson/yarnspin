@@ -3,10 +3,16 @@
 title: Yarnspin Example Game
 version: 1.0
 author: Mattias Gustavsson
-start: logo
+start: splash
 resolution: full
 colormode: rgb
 
+
+=== splash ===
+
+snd: yarnspin.ogg
+scr: made_with_yarnspin.jpg
+auto: logo, 5s
 
 === logo ===
 
@@ -39,7 +45,7 @@ act: your_desk
 img: made_with_yarnspin.jpg
 txt: Thank you for stopping by. To find out more about how to tell stories with Yarnspin, please check out the documentation - the file is called "yarnspin.pdf", or visit the Yarnspin website:
 txt:
-txt: mattiasgustavsson.com/yarnspin
+txt: www.yarnspin.dev
 
 act: exit
 // the keyword "exit" is a special command, which ends the game
