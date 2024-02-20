@@ -9,7 +9,7 @@
  - [1. Introduction](#1-introduction) 
  - [2. Getting Started](#2-getting-started)  
  - [3. Scripting Reference](#3-scripting-reference)  
-
+ - [4. Scripting Reference](#4-license)  
 ---
 
 
@@ -780,7 +780,7 @@ and it will generate a single, fully self contained HTML file that contains all 
 
 
 
-## License
+## 4. License
 
 The majority of the code are under the following license. Exceptions below.
 
