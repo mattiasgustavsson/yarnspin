@@ -15,3 +15,5 @@ wasm
 x64
 build/wajicup.js
 docs/yarnspin.html
+*.swo
+*.swp

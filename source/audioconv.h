@@ -23,7 +23,7 @@ qoa_data_t* convert_audio( string audio_filename ) {
         if( !short_samples ) {
             uint32_t wav_channels = 0;
             uint32_t wav_sample_rate = 0;
-            uint64_t wav_sample_count = 0;
+            drwav_uint64 wav_sample_count = 0;
             short_samples = drwav_open_file_and_read_pcm_frames_s16( audio_filename, &wav_channels, &wav_sample_rate, &wav_sample_count, NULL );
             channels = (int) wav_channels;
             sample_rate = (int) wav_sample_rate;
@@ -40,7 +40,7 @@ qoa_data_t* convert_audio( string audio_filename ) {
         if( !short_samples ) {
             uint32_t flac_channels = 0;
             uint32_t flac_sample_rate = 0;
-            uint64_t flac_sample_count = 0;
+            drwav_uint64 flac_sample_count = 0;
             short_samples = drflac_open_file_and_read_pcm_frames_s16( audio_filename, &flac_channels, &flac_sample_rate, &flac_sample_count, NULL );
             channels = (int) flac_channels;
             sample_rate = (int) flac_sample_rate;
@@ -57,7 +57,7 @@ qoa_data_t* convert_audio( string audio_filename ) {
         if( !short_samples ) {
             uint32_t mp3_channels = 0;
             uint32_t mp3_sample_rate = 0;
-            uint64_t mp3_sample_count = 0;
+            drwav_uint64 mp3_sample_count = 0;
             drmp3_config mp3_config = { 0, 0 };
             short_samples = drmp3_open_file_and_read_pcm_frames_s16( audio_filename, &mp3_config, &mp3_sample_count, NULL );
             channels = (int) mp3_config.channels;
