@@ -47,7 +47,6 @@ jobs:
         run: brew install sdl2 glew
       - name: build yarnspin
         run: |
-          clang source/main.c `sdl2-config --libs --cflags` -lGLEW -framework OpenGL -lpthread -I$(brew --prefix glew)/include
           clang -o yarnspin -O2 source/yarnspin.c `sdl2-config --libs --cflags` -lGLEW -framework OpenGL -lpthread -I$(brew --prefix glew)/include
           clang -o runtime  -O2 -DYARNSPIN_RUNTIME_ONLY source/yarnspin.c `sdl2-config --libs --cflags` -lGLEW -framework OpenGL -lpthread -I$(brew --prefix glew)/include
   build-macos-cpp:
@@ -75,6 +74,7 @@ jobs:
           sudo apt-get install -qq llvm 
           sudo apt-get install -qq lld 
           sudo apt-get install -qq binaryen
+          sudo apt-get install -qq libxext-dev 
           tar -xzvf SDL2-2.28.1.tar.gz
       - name: build yarnspin
         run: |
