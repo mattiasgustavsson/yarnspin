@@ -131,14 +131,15 @@ jobs:
       - name: install dependencies 
         run: | 
           sudo apt-get update 
-          sudo apt-get install -qq clang-17
-          sudo apt-get install -qq llvm-17 
-          sudo apt-get install -qq lld-17 
+          sudo apt-get install -qq clang-13
+          sudo apt-get install -qq llvm-13 
+          sudo apt-get install -qq lld-13 
           sudo apt-get install -qq binaryen
           7z -y x dos-like-wasm-build-env-win.zip 
       - name: build yarnspin 
         run: | 
-          clang-17 -cc1 -triple wasm32 -emit-obj -fcolor-diagnostics -Iwasm/ -D__WAJIC__ -isystem./wasm/system/include/libcxx -isystem./wasm/system/lib/libcxx/include -isystem./wasm/system/include/compat -isystem./wasm/system/include -isystem./wasm/system/include/libc -isystem./wasm/system/lib/libc/musl/include -isystem./wasm/system/lib/libc/musl/arch/emscripten -isystem./wasm/system/lib/libc/musl/arch/generic -mconstructor-aliases -fvisibility=hidden -fno-threadsafe-statics -fno-common -fgnuc-version=4.2.1 -D__EMSCRIPTEN__ -D_LIBCPP_ABI_VERSION=2 -D_POSIX_C_SOURCE -DNDEBUG -Os -x c -std=c99 -o runtime.o source/yarnspin.c
-          wasm-ld-17 -strip-all -gc-sections --no-entry -allow-undefined -export=__wasm_call_ctors -export=main -export=__original_main -export=__main_argc_argv -export=__main_void -export=malloc ./wasm/system/system.bc runtime.o -o runtime.wasm
+          clang-13 -cc1 -triple wasm32 -emit-obj -fcolor-diagnostics -Iwasm/ -D__WAJIC__ -isystem./wasm/system/include/libcxx -isystem./wasm/system/lib/libcxx/include -isystem./wasm/system/include/compat -isystem./wasm/system/include -isystem./wasm/system/include/libc -isystem./wasm/system/lib/libc/musl/include -isystem./wasm/system/lib/libc/musl/arch/emscripten -isystem./wasm/system/lib/libc/musl/arch/generic -mconstructor-aliases -fvisibility=hidden -fno-threadsafe-statics -fno-common -fgnuc-version=4.2.1 -D__EMSCRIPTEN__ -D_LIBCPP_ABI_VERSION=2 -D_POSIX_C_SOURCE -DNDEBUG -Os -x c -std=c99 -o runtime.o source/yarnspin.c
+          wasm-ld-13 -strip-all -gc-sections --no-entry -allow-undefined -export=__wasm_call_ctors -export=main -export=__original_main -export=__main_argc_argv -export=__main_void -export=malloc ./wasm/system/system.bc runtime.o -o runtime.wasm
+          clang-13 --version
           wasm-opt --asyncify runtime.wasm -o runtime.wasm
           wasm-opt --legalize-js-interface --low-memory-unused --converge -Os runtime.wasm -o runtime.wasm
