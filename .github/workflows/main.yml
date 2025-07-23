@@ -114,9 +114,9 @@ jobs:
           7z -y x dos-like-wasm-build-env-win.zip 
       - name: build yarnspin 
         run: | 
-          export PATH="/usr/local/opt/llvm/bin:$PATH"
-          clang-15 -cc1 -triple wasm32 -emit-obj -fcolor-diagnostics -Iwasm/ -D__WAJIC__ -isystem./wasm/system/include/libcxx -isystem./wasm/system/lib/libcxx/include -isystem./wasm/system/include/compat -isystem./wasm/system/include -isystem./wasm/system/include/libc -isystem./wasm/system/lib/libc/musl/include -isystem./wasm/system/lib/libc/musl/arch/emscripten -isystem./wasm/system/lib/libc/musl/arch/generic -mconstructor-aliases -fvisibility hidden -fno-threadsafe-statics -fno-common -fgnuc-version=4.2.1 -D__EMSCRIPTEN__ -D_LIBCPP_ABI_VERSION=2 -D_POSIX_C_SOURCE -DNDEBUG -Os -x c -std=c99 -o runtime.o source/yarnspin.c
-          wasm-ld-15 -strip-all -gc-sections --no-entry -allow-undefined -export=__wasm_call_ctors -export=main -export=__original_main -export=__main_argc_argv -export=__main_void -export=malloc ./wasm/system/system.bc runtime.o -o runtime.wasm  
+          export PATH="/opt/homebrew/opt/llvm@15/bin:$PATH"
+          clang -cc1 -triple wasm32 -emit-obj -fcolor-diagnostics -Iwasm/ -D__WAJIC__ -isystem./wasm/system/include/libcxx -isystem./wasm/system/lib/libcxx/include -isystem./wasm/system/include/compat -isystem./wasm/system/include -isystem./wasm/system/include/libc -isystem./wasm/system/lib/libc/musl/include -isystem./wasm/system/lib/libc/musl/arch/emscripten -isystem./wasm/system/lib/libc/musl/arch/generic -mconstructor-aliases -fvisibility hidden -fno-threadsafe-statics -fno-common -fgnuc-version=4.2.1 -D__EMSCRIPTEN__ -D_LIBCPP_ABI_VERSION=2 -D_POSIX_C_SOURCE -DNDEBUG -Os -x c -std=c99 -o runtime.o source/yarnspin.c
+          wasm-ld -strip-all -gc-sections --no-entry -allow-undefined -export=__wasm_call_ctors -export=main -export=__original_main -export=__main_argc_argv -export=__main_void -export=malloc ./wasm/system/system.bc runtime.o -o runtime.wasm  
           wasm-opt --asyncify runtime.wasm -o runtime.wasm
           wasm-opt --legalize-js-interface --low-memory-unused --converge -Os runtime.wasm -o runtime.wasm
   build-wasm-linux:
