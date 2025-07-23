@@ -110,7 +110,7 @@ jobs:
           fileName: "dos-like-wasm-build-env-win.zip" 
       - name: install dependencies 
         run: | 
-          brew install clang-15 llvm-15 lld-15 binaryen
+          brew install llvm@15 binaryen
           7z -y x dos-like-wasm-build-env-win.zip 
       - name: build yarnspin 
         run: | 
