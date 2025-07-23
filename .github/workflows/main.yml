@@ -4,7 +4,7 @@ on: [push, pull_request, workflow_dispatch]
 
 jobs:
   build-windows-msvc:
-    runs-on: windows-2019 
+    runs-on: windows-latest 
     steps: 
       - uses: actions/checkout@v1 
         # this runs vcvarsall for us, so we get the MSVC toolchain in PATH. 
@@ -17,7 +17,7 @@ jobs:
           cl source\yarnspin.c build\yarnspin.res /nologo /O2 /Ob2 /Oi /Ot /Oy /MT /GL /GF /D "NDEBUG" /Fe:yarnspin.exe /link /INCREMENTAL:NO /OPT:REF /OPT:ICF /LTCG /SUBSYSTEM:CONSOLE 
           cl source\yarnspin.c build\yarnspin.res /nologo /O2 /Ob2 /Oi /Ot /Oy /MT /GL /GF /D "NDEBUG" /D "YARNSPIN_RUNTIME_ONLY" /Fe:runtime.exe /link /INCREMENTAL:NO /OPT:REF /OPT:ICF /LTCG /SUBSYSTEM:WINDOWS
   build-windows-msvc-cpp:
-    runs-on: windows-2019
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v1
         # this runs vcvarsall for us, so we get the MSVC toolchain in PATH.
@@ -26,10 +26,10 @@ jobs:
         run: |
           cl /Tp source/yarnspin.c
   build-windows-tcc:
-    runs-on: windows-2019
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v1
-      - uses: robinraju/release-downloader@v1.2
+      - uses: robinraju/release-downloader@v1
         with:
           repository: "mattiasgustavsson/tcc-build"
           tag: "tcc64"
@@ -85,10 +85,10 @@ jobs:
           gcc -o yarnspin -O2 source/yarnspin.c /usr/lib/x86_64-linux-gnu/libGLEW.a `$PWD/SDL2-2.28.1/sdl2/bin/sdl2-config --cflags` $PWD/SDL2-2.28.1/sdl2/lib/libSDL2.a -lGL -lm -lpthread 
           gcc -o runtime -O2 -DYARNSPIN_RUNTIME_ONLY source/yarnspin.c  /usr/lib/x86_64-linux-gnu/libGLEW.a `$PWD/SDL2-2.28.1/sdl2/bin/sdl2-config --cflags` $PWD/SDL2-2.28.1/sdl2/lib/libSDL2.a -lGL -lm -lpthread 
   build-wasm:
-    runs-on: windows-2019
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v1
-      - uses: robinraju/release-downloader@v1.2
+      - uses: robinraju/release-downloader@v1
         with:
           repository: "mattiasgustavsson/dos-like"
           tag: "wasm-env"
