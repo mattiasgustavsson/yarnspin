@@ -1,6 +1,16 @@
-// Single header version of Igor Pavlov's LzmaLib. Public domain.
-// #define LZMA_IMPLEMENTATION in one source file for implementation
-
+/*
+ * This is a modified version of of Igor Pavlov's LzmaLib. Basically, I 
+ * merged it into a single-file header-only library, made a few changes
+ * to make the code compile in both C and C++. The original code is 
+ * public domain, and I place my version into the public domain as well.
+ *
+ *                                                  /Mattias Gustavsson
+ * Do this:
+ *		#define LZMA_IMPLEMENTATION
+ * before including this file in *one* C/C++ file to get the implementation
+ *
+ */
+ 
 #ifndef LZMA_H
 #define LZMA_H
 
@@ -664,17 +674,17 @@ SRes LzmaDecode(Byte *dest, size_t *destLen, const Byte *src, size_t *srcLen,
 //#include "LzmaEnc.h"
 //#include "LzmaLib.h"
 
-typedef struct WrappedProgress
+struct WrappedProgress
 {
  ICompressProgress intProgress;
  int (*extProgress)( size_t inSize, size_t outSize, void* userData );
  void* userData;
-} WrappedProgress;
+};
 
 
 SRes compressProgress(const ICompressProgress *p, UInt64 inSize, UInt64 outSize)
 {
-    WrappedProgress* progress = (WrappedProgress*) p;
+    struct WrappedProgress* progress = (struct WrappedProgress*) p;
     if( progress->extProgress( (size_t) inSize, (size_t) outSize, progress->userData ) == 0 )
         return SZ_OK;
     else
@@ -703,7 +713,7 @@ int LzmaCompress(unsigned char *dest, size_t *destLen, const unsigned char *src,
   props.pb = pb;
   props.fb = fb;
 
-  WrappedProgress wrappedProgress;
+  struct WrappedProgress wrappedProgress;
   wrappedProgress.intProgress.Progress = compressProgress;
   wrappedProgress.extProgress = progress;
   wrappedProgress.userData = userData;
@@ -1013,7 +1023,7 @@ const ISzAlloc g_BigAlloc = { SzBigAlloc, SzBigFree };
 #define MY_ALIGN_PTR_UP_PLUS(p, align) MY_ALIGN_PTR_DOWN(((char *)(p) + (align) + ADJUST_ALLOC_SIZE), align)
 
 
-#if defined(_POSIX_C_SOURCE) && (_POSIX_C_SOURCE >= 200112L) && !defined(_WIN32)
+#if ( defined( _POSIX_C_SOURCE ) && _POSIX_C_SOURCE >= 200112L) && !defined(_WIN32)
   #define USE_posix_memalign
 #endif
 
@@ -6016,7 +6026,10 @@ static void SkipMatchesSpec(UInt32 lenLimit, UInt32 curMatch, UInt32 pos, const 
   }
 }
 
+#ifdef MOVE_POS
 #undef MOVE_POS
+#endif
+
 #define MOVE_POS \
   ++p->cyclicBufferPos; \
   p->buffer++; \
@@ -6576,6 +6589,6 @@ void MatchFinder_CreateVTable(CMatchFinder *p, IMatchFinder *vTable)
 
 
 
-
+#undef Align
 
 #endif /* LZMA_IMPLEMENTATION */
