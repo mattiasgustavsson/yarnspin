@@ -414,7 +414,7 @@ int imgedit_process_thread( void* user_data ) {
             thread_mutex_lock( &imgedit->mutex );            
             imgedit->converting_palette = false;
             if( imgedit->palette ) {
-                paldither_palette_destroy( imgedit->palette, NULL );
+                paldither_palette_destroy( imgedit->palette );
             }
             imgedit->palette = new_palette;
             imgedit->palette_size = palette_size;
@@ -1620,7 +1620,7 @@ int imgedit_proc( app_t* app, void* user_data ) {
 
     array_destroy( imgedit.images );
     array_destroy( imgedit.faces );
-    paldither_palette_destroy( imgedit.palette, NULL );
+    paldither_palette_destroy( imgedit.palette );
     free( imgedit.screen );
     memmgr_clear( &g_memmgr );
     return run_again ? -1 : EXIT_SUCCESS;

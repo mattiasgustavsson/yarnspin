@@ -135,7 +135,7 @@ void palrle_deleter( void* context, void* ptr ) { (void) context; palrle_free( (
 #define manage_palrle( instance ) ARRAY_CAST( memmgr_add( &g_memmgr, instance, NULL, palrle_deleter ) )
 
 #ifndef YARNSPIN_RUNTIME_ONLY
-    void paldither_deleter( void* context, void* ptr ) { (void) context; paldither_palette_destroy( (paldither_palette_t*) ptr, NULL ); }
+    void paldither_deleter( void* context, void* ptr ) { (void) context; paldither_palette_destroy( (paldither_palette_t*) ptr ); }
     #define manage_paldither( instance ) ARRAY_CAST( memmgr_add( &g_memmgr, instance, NULL, paldither_deleter ) )
 #endif
 
