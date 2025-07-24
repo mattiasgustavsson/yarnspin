@@ -833,7 +833,7 @@ int main( int argc, char** argv ) {
             threads_init();
             int result = -1;
             while( result < 0 ) {
-                result = app_run( imgedit_proc, NULL, NULL, NULL, NULL );
+                result = app_run( imgedit_proc, NULL, NULL, NULL );
             } 
             return result;
         }
@@ -1156,7 +1156,7 @@ int main( int argc, char** argv ) {
         yarn.globals.screenmode = YARN_SCREENMODE_FULLSCREEN;
     }
 
-    return app_run( app_proc, &yarn, NULL, NULL, NULL );
+    return app_run( app_proc, &yarn, NULL, NULL );
 }
 
 
