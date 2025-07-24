@@ -1475,7 +1475,7 @@ void atari_st( uint32_t* pixels, int width, int height ) {
         for( int x = 0; x < width; ++x ) {
             pixels[ x + y * width ] = paldither->colortable[ output[ x + ( y & 3 ) * width ] ];
         }
-        paldither_palette_destroy( paldither, NULL );
+        paldither_palette_destroy( paldither );
     }
 }
 

@@ -135,7 +135,7 @@ void palrle_deleter( void* context, void* ptr ) { (void) context; palrle_free( (
 #define manage_palrle( instance ) ARRAY_CAST( memmgr_add( &g_memmgr, instance, NULL, palrle_deleter ) )
 
 #ifndef YARNSPIN_RUNTIME_ONLY
-    void paldither_deleter( void* context, void* ptr ) { (void) context; paldither_palette_destroy( (paldither_palette_t*) ptr, NULL ); }
+    void paldither_deleter( void* context, void* ptr ) { (void) context; paldither_palette_destroy( (paldither_palette_t*) ptr ); }
     #define manage_paldither( instance ) ARRAY_CAST( memmgr_add( &g_memmgr, instance, NULL, paldither_deleter ) )
 #endif
 
@@ -833,7 +833,7 @@ int main( int argc, char** argv ) {
             threads_init();
             int result = -1;
             while( result < 0 ) {
-                result = app_run( imgedit_proc, NULL, NULL, NULL, NULL );
+                result = app_run( imgedit_proc, NULL, NULL, NULL );
             } 
             return result;
         }
@@ -1156,7 +1156,7 @@ int main( int argc, char** argv ) {
         yarn.globals.screenmode = YARN_SCREENMODE_FULLSCREEN;
     }
 
-    return app_run( app_proc, &yarn, NULL, NULL, NULL );
+    return app_run( app_proc, &yarn, NULL, NULL );
 }
 
 
@@ -1168,7 +1168,7 @@ int main( int argc, char** argv ) {
 #else
     #define APP_SDL
 #endif
-#define APP_LOG( ctx, level, message )
+#define APP_LOG( ctx, message )
 #include "libs/app.h"
 
 #define ARRAY_IMPLEMENTATION
@@ -1655,7 +1655,7 @@ void* base64dec( char const* data, size_t input_length, size_t* out_size ) {
 
     return decoded_data;
 
-};
+}
 
 
 #ifndef _WIN32
