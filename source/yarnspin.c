@@ -1655,7 +1655,7 @@ void* base64dec( char const* data, size_t input_length, size_t* out_size ) {
 
     return decoded_data;
 
-};
+}
 
 
 #ifndef _WIN32
