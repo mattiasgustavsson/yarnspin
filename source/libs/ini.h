@@ -76,13 +76,13 @@ Examples
         data[ size ] = '\0';
         fclose( fp );
 
-        ini_t* ini = ini_load( data );
+        ini_t* ini = ini_load( data, NULL );
         free( data );
-        int second_index = ini_find_property( ini, INI_GLOBAL_SECTION, "SecondSetting" );
+        int second_index = ini_find_property( ini, INI_GLOBAL_SECTION, "SecondSetting", 0 );
         char const* second = ini_property_value( ini, INI_GLOBAL_SECTION, second_index );
         printf( "%s=%s\n", "SecondSetting", second );
-        int section = ini_find_section( ini, "MySection" );
-        int third_index = ini_find_property( ini, section, "ThirdSetting" );
+        int section = ini_find_section( ini, "MySection", 0 );
+        int third_index = ini_find_property( ini, section, "ThirdSetting", 0 );
         char const* third = ini_property_value( ini, section, third_index );
         printf( "%s=%s\n", "ThirdSetting", third );
         ini_destroy( ini );
@@ -102,11 +102,11 @@ Examples
 
     int main()
         {       
-        ini_t* ini = ini_create();
-        ini_property_add( ini, INI_GLOBAL_SECTION, "FirstSetting", "Test" );
-        ini_property_add( ini, INI_GLOBAL_SECTION, "SecondSetting", "2" );
-        int section = ini_section_add( ini, "MySection" );
-        ini_property_add( ini, section, "ThirdSetting", "Three" );
+        ini_t* ini = ini_create( NULL );
+        ini_property_add( ini, INI_GLOBAL_SECTION, "FirstSetting", 0, "Test", 0 );
+        ini_property_add( ini, INI_GLOBAL_SECTION, "SecondSetting", 0, "2", 0 );
+        int section = ini_section_add( ini, "MySection", 0 );
+        ini_property_add( ini, section, "ThirdSetting", 0, "Three", 0 );
 
         int size = ini_save( ini, NULL, 0 ); // Find the size needed
         char* data = (char*) malloc( size );
@@ -114,7 +114,7 @@ Examples
         ini_destroy( ini );
 
         FILE* fp = fopen( "test.ini", "w" );
-        fwrite( data, 1, size, fp );
+        fwrite( data, 1, size - 1, fp );
         fclose( fp );
         free( data );
 
@@ -557,10 +557,13 @@ ini_t* ini_load( char const* data, void* memctx )
                     start2 = ptr;
                     while( *ptr && *ptr != '\n' )
                         ++ptr;
-                    while( *(--ptr) <= ' ' ) 
+                    while( ptr >= start2 && *(--ptr) <= ' ' ) 
                         (void)ptr;
                     ptr++;
-                    ini_property_add( ini, s, start, l, start2, (int)( ptr - start2) );
+                    if( ptr == start2 )
+                        ini_property_add( ini, s, start, l, "", 1 );
+                    else
+                        ini_property_add( ini, s, start, l, start2, (int)( ptr - start2 ) );
                     }
                 }
             }
@@ -739,7 +742,7 @@ int ini_find_section( ini_t const* ini, char const* name, int name_length )
             {
             char const* const other = 
                 ini->sections[ i ].name_large ? ini->sections[ i ].name_large : ini->sections[ i ].name;
-            if( INI_STRNICMP( name, other, (size_t)name_length ) == 0 )
+            if( strlen( other ) == name_length && INI_STRNICMP( name, other, (size_t)name_length ) == 0 )
                 return i;
             }
         }
@@ -757,13 +760,13 @@ int ini_find_property( ini_t const* ini, int section, char const* name, int name
         {
         if( name_length <= 0 ) name_length = (int) INI_STRLEN( name );
         c = 0;
-        for( i = 0; i < ini->property_capacity; ++i )
+        for( i = 0; i < ini->property_count; ++i )
             {
             if( ini->properties[ i ].section == section )
                 {
                 char const* const other = 
                     ini->properties[ i ].name_large ? ini->properties[ i ].name_large : ini->properties[ i ].name;
-                if( INI_STRNICMP( name, other, (size_t) name_length ) == 0 )
+                if( strlen( other ) == name_length && INI_STRNICMP( name, other, (size_t) name_length ) == 0 )
                     return c;
                 ++c;
                 }
@@ -792,7 +795,7 @@ int ini_section_add( ini_t* ini, char const* name, int length )
             }
 
         ini->sections[ ini->section_count ].name_large = 0;
-        if( length + 1 >= sizeof( ini->sections[ 0 ].name ) )
+        if( (size_t) length + 1 >= sizeof( ini->sections[ 0 ].name ) )
             {
             ini->sections[ ini->section_count ].name_large = (char*) INI_MALLOC( ini->memctx, (size_t) length + 1 );
             INI_MEMCPY( ini->sections[ ini->section_count ].name_large, name, (size_t) length );
@@ -834,7 +837,7 @@ void ini_property_add( ini_t* ini, int section, char const* name, int name_lengt
         ini->properties[ ini->property_count ].name_large = 0;
         ini->properties[ ini->property_count ].value_large = 0;
 
-        if( name_length + 1 >= sizeof( ini->properties[ 0 ].name ) )
+        if( (size_t) name_length + 1 >= sizeof( ini->properties[ 0 ].name ) )
             {
             ini->properties[ ini->property_count ].name_large = (char*) INI_MALLOC( ini->memctx, (size_t) name_length + 1 );
             INI_MEMCPY( ini->properties[ ini->property_count ].name_large, name, (size_t) name_length );
@@ -846,7 +849,7 @@ void ini_property_add( ini_t* ini, int section, char const* name, int name_lengt
             ini->properties[ ini->property_count ].name[ name_length ] = '\0';
             }
 
-        if( value_length + 1 >= sizeof( ini->properties[ 0 ].value ) )
+        if( (size_t) value_length + 1 >= sizeof( ini->properties[ 0 ].value ) )
             {
             ini->properties[ ini->property_count ].value_large = (char*) INI_MALLOC( ini->memctx, (size_t) value_length + 1 );
             INI_MEMCPY( ini->properties[ ini->property_count ].value_large, value, (size_t) value_length );
@@ -917,7 +920,7 @@ void ini_section_name_set( ini_t* ini, int section, char const* name, int length
         if( ini->sections[ section ].name_large ) INI_FREE( ini->memctx, ini->sections[ section ].name_large );
         ini->sections[ section ].name_large = 0;
         
-        if( length + 1 >= sizeof( ini->sections[ 0 ].name ) )
+        if( (size_t) length + 1 >= sizeof( ini->sections[ 0 ].name ) )
             {
             ini->sections[ section ].name_large = (char*) INI_MALLOC( ini->memctx, (size_t) length + 1 );
             INI_MEMCPY( ini->sections[ section ].name_large, name, (size_t) length );
@@ -945,7 +948,7 @@ void ini_property_name_set( ini_t* ini, int section, int property, char const* n
             if( ini->properties[ p ].name_large ) INI_FREE( ini->memctx, ini->properties[ p ].name_large );
             ini->properties[ ini->property_count ].name_large = 0;
 
-            if( length + 1 >= sizeof( ini->properties[ 0 ].name ) )
+            if( (size_t) length + 1 >= sizeof( ini->properties[ 0 ].name ) )
                 {
                 ini->properties[ p ].name_large = (char*) INI_MALLOC( ini->memctx, (size_t) length + 1 );
                 INI_MEMCPY( ini->properties[ p ].name_large, name, (size_t) length );
@@ -974,7 +977,7 @@ void ini_property_value_set( ini_t* ini, int section, int property, char const* 
             if( ini->properties[ p ].value_large ) INI_FREE( ini->memctx, ini->properties[ p ].value_large );
             ini->properties[ ini->property_count ].value_large = 0;
 
-            if( length + 1 >= sizeof( ini->properties[ 0 ].value ) )
+            if( (size_t) length + 1 >= sizeof( ini->properties[ 0 ].value ) )
                 {
                 ini->properties[ p ].value_large = (char*) INI_MALLOC( ini->memctx, (size_t) length + 1 );
                 INI_MEMCPY( ini->properties[ p ].value_large, value, (size_t) length );
