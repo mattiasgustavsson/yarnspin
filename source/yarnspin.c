@@ -1168,7 +1168,7 @@ int main( int argc, char** argv ) {
 #else
     #define APP_SDL
 #endif
-#define APP_LOG( ctx, level, message )
+#define APP_LOG( ctx, message )
 #include "libs/app.h"
 
 #define ARRAY_IMPLEMENTATION
