@@ -28,9 +28,6 @@ john: So what can I tell you about next?
 say: But what if I don't want to draw pictures myself?
 act: sourcing_images
 
-say: Can I use AI to make images for my game?
-act: sourcing_images_ai
-
 say: Ok, I have my images - now what?
 act: get_note_from_john
 
@@ -61,13 +58,5 @@ act: sourcing_images2
 === sourcing_images2 ===
 
 john: So if you want to find pictures to use for locations, I recommend looking at places like www.pixabay.com (all pictures there are public domain), www.opengameart.org or commons.wikimedia.org. But note that you can't use photos of people, without their specific permission. 
-act: john_options
-
-
-=== sourcing_images_ai ===
-
-john: While it is definitely possible to use AI image generators to make pictures for your game, it is important to be aware of the various issues with generative AI. 
-john: There are both legal and ethical issues with using AI (and with how AI training data is acquired) and these things change at a very fast pace.
-john: Before considering the use of AI images, it is a good idea to learn about those issues, and form an opinion about if and how you feel comfortable using AI. 
 act: john_options
 

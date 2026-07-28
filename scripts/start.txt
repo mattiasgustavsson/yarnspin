@@ -1,11 +1,12 @@
 // introduction game - this line is a comment, and will not be executed
 
 title: Yarnspin Example Game
-version: 1.0
+version: 1.1
 author: Mattias Gustavsson
 start: splash
-resolution: full
-colormode: rgb
+resolution: low
+colormode: rgb9
+display_filters: lite,tv,pc,none
 
 
 === splash ===

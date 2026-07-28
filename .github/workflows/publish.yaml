@@ -6,6 +6,7 @@ on:
     
 permissions:
   contents: write
+  actions: write
  
 jobs: 
   build-docs: 
@@ -34,7 +35,7 @@ jobs:
           path: ./yarnspin.pdf
   publish-windows: 
     needs: build-docs
-    runs-on: windows-2019 
+    runs-on: windows-latest 
     steps: 
       - uses: actions/checkout@v1 
         # this runs vcvarsall for us, so we get the MSVC toolchain in PATH. 
@@ -108,9 +109,9 @@ jobs:
           7z -y x dos-like-wasm-build-env-win.zip 
       - name: build yarnspin 
         run: | 
-          clang -o yarnspin -O2 source/yarnspin.c /usr/local/lib/libGLEW.a `sdl2-config --static-libs --cflags` -framework OpenGL -lpthread 
+          clang -o yarnspin -O2 source/yarnspin.c `sdl2-config --libs --cflags` -lGLEW -framework OpenGL -lpthread -I$(brew --prefix glew)/include
           chmod a+x yarnspin
-          clang -o runtime  -O2 -DYARNSPIN_RUNTIME_ONLY source/yarnspin.c /usr/local/lib/libGLEW.a `sdl2-config --static-libs --cflags` -framework OpenGL -lpthread 
+          clang -o runtime  -O2 -DYARNSPIN_RUNTIME_ONLY source/yarnspin.c `sdl2-config --libs --cflags` -lGLEW -framework OpenGL -lpthread -I$(brew --prefix glew)/include
           chmod a+x runtime
           mv runtime build
           mv runtime.wasm build
@@ -156,6 +157,7 @@ jobs:
           sudo apt-get install -qq llvm 
           sudo apt-get install -qq lld 
           sudo apt-get install -qq binaryen
+          sudo apt-get install -qq libxext-dev
           7z -y x dos-like-wasm-build-env-win.zip 
           tar -xzvf SDL2-2.28.1.tar.gz
       - name: build yarnspin 
@@ -183,12 +185,9 @@ jobs:
     needs: [publish-windows,publish-macos,publish-linux]
     runs-on: ubuntu-latest
     steps: 
-      - uses: geekyeggo/delete-artifact@v2
+      - uses: geekyeggo/delete-artifact@v5
         with:
-          name: yarnspin.pdf
-      - uses: geekyeggo/delete-artifact@v2
-        with:
-          name: runtime.html
-      - uses: geekyeggo/delete-artifact@v2
-        with:
-          name: runtime.wasm
+          name: |
+            yarnspin.pdf
+            runtime.html
+            runtime.wasm

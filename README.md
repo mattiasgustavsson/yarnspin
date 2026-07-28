@@ -4,11 +4,9 @@
 
 **Yarnspin** is a simple story-telling engine, with its own built-in scripting language and graphics processing, turning hi-res photos into palettized low-res pixels.
 
-There is a custom script language, which allows you to define dialogs with options, and set up locations with descriptions and images. It comes with a thousand portrait images included, and you can of course add your own.
+There is a custom script language, which allows you to define dialogs with options, and set up locations with descriptions and images.
 
 Yarnspin games runs on Windows, Mac, Linux, and in browsers using web assembly.
-
-The documentation is pretty thin at the moment - there's just this readme, which is very much work-in-progress and likely incomplete - but it comes with an example "game" which is also a tutorial explaining the key concepts. There is also a small game made with Yarnspin, called No Sunshine, and it is open source and available here https://github.com/mattiasgustavsson/no_sunshine
 
 
 ## Documentation

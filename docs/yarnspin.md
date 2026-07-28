@@ -4,12 +4,14 @@
 # User Handbook
 
 ---
+
 ## Contents
 
  - [1. Introduction](#1-introduction) 
- - [2. Getting Started](#2-getting-started)  
- - [3. Scripting Reference](#3-scripting-reference)  
- - [4. License](#4-license)  
+ - [2. Getting Started](#2-getting-started)
+ - [3. Scripting Reference](#3-scripting-reference)
+ - [4. License](#4-license)
+
 ---
 
 
