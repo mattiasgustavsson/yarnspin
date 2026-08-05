@@ -1368,7 +1368,7 @@ void load_assets( buffer_t* in, yarn_assets_t* assets, yarn_colormode_t colormod
             qoi_data_t* qoi = (qoi_data_t*)manage_alloc( malloc( sizeof( qoi_data_t ) + ( size - 1 ) ) );
             qoi->size = size;
             buffer_read_u8( in, qoi->data, size );
-            array_add( assets->bitmaps, (qoi_data_t*)&qoi );
+            array_add( assets->bitmaps, (qoi_data_t**)&qoi );
         }
     }
 
@@ -1720,7 +1720,7 @@ buffer_t* yarn_compile( char const* path ) {
         } else {
             int bpp = yarn.globals.colormode == YARN_COLORMODE_RGB9 ? 9 : 24;
             qoi_data_t* qoi = (qoi_data_t*)manage_alloc( convert_rgb( scr_name, width, height, bpp, resolution_scale, jpeg ) );
-            array_add( yarn.assets.bitmaps, (palrle_data_t*)&qoi );
+            array_add( yarn.assets.bitmaps, (palrle_data_t**)&qoi );
             if( !qoi ) {
                 printf( "Failed to load image: %s\n", scr_name );
                 no_error = false;
@@ -1741,7 +1741,7 @@ buffer_t* yarn_compile( char const* path ) {
         } else {
             int bpp = yarn.globals.colormode == YARN_COLORMODE_RGB9 ? 9 : 24;
             qoi_data_t* qoi = (qoi_data_t*)manage_alloc( convert_rgb( image_name, width, height, bpp, resolution_scale, jpeg ) );
-            array_add( yarn.assets.bitmaps, (palrle_data_t*)&qoi );
+            array_add( yarn.assets.bitmaps, (palrle_data_t**)&qoi );
             if( !qoi ) {
                 printf( "Failed to load image: %s\n", image_name );
                 no_error = false;
@@ -1764,7 +1764,7 @@ buffer_t* yarn_compile( char const* path ) {
         } else {
             int bpp = yarn.globals.colormode == YARN_COLORMODE_RGB9 ? 9 : 24;
             qoi_data_t* qoi = (qoi_data_t*)manage_alloc( convert_rgb( face_name, width, height, bpp, resolution_scale, jpeg ) );
-            array_add( yarn.assets.bitmaps, (palrle_data_t*)&qoi );
+            array_add( yarn.assets.bitmaps, (palrle_data_t**)&qoi );
             if( !qoi ) {
                 printf( "Failed to load image: %s\n", face_name );
                 no_error = false;

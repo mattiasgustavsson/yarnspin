@@ -3,7 +3,7 @@
           Licensing information can be found at the end of the file.
 ------------------------------------------------------------------------------
 
-cstr.h - v0.9 - String interning library for C/C++.
+cstr.h - v1.1 - String interning and manipulation library for C/C++.
 
 Do this:
     #define CSTR_IMPLEMENTATION
@@ -40,11 +40,14 @@ before you include this file in *one* C/C++ file to create the implementation.
 #endif
 
 
+typedef struct cstr_restore_point_t cstr_restore_point_t;
+typedef struct cstr_tokenizer_t { void* internal; } cstr_tokenizer_t;
+
+
 #ifndef CSTR_NO_GLOBAL_API
 
 void cstr_reset( void );
 
-struct cstr_restore_point_t;
 struct cstr_restore_point_t* cstr_restore_point( void );
 void cstr_rollback( struct cstr_restore_point_t* restore_point );
 
@@ -92,11 +95,10 @@ int cstr_compare( char const* a, char const* b );
 int cstr_compare_nocase( char const* a, char const* b );
 
 int cstr_find( char const* str, char const* find, int start );
-int cstr_rfind( char const* str, char const* find, int start );
+int cstr_rfind( char const* str, char const* find, int end );
 
 CSTR_U32 cstr_hash( char const* str );
 
-struct cstr_tokenizer_t { void* internal; };
 struct cstr_tokenizer_t cstr_tokenizer( char const* str );
 char const* cstr_tokenize( struct cstr_tokenizer_t* tokenizer, char const* separators );
 
@@ -107,7 +109,7 @@ char* cstr_temp_buffer( size_t capacity );
 
 #ifdef CSTR_INSTANCE_API
 
-struct cstri_t;
+typedef struct cstri_t cstri_t;
 struct cstri_t* cstri_create( void* memctx );
 void cstri_destroy( struct cstri_t* cstri );
 
@@ -160,7 +162,7 @@ int cstri_compare( struct cstri_t* cstri, char const* a, char const* b );
 int cstri_compare_nocase( struct cstri_t* cstri, char const* a, char const* b );
 
 int cstri_find( struct cstri_t* cstri, char const* str, char const* find, int start );
-int cstri_rfind( struct cstri_t* cstri, char const* str, char const* find, int start );
+int cstri_rfind( struct cstri_t* cstri, char const* str, char const* find, int end );
 
 CSTR_U32 cstri_hash( struct cstri_t* cstri, char const* str );
 
@@ -217,6 +219,7 @@ cstr.h
     #include <stdarg.h>
     #define CSTR_VA_START va_start
     #define CSTR_VA_END va_end
+    #define CSTR_VA_COPY va_copy
 #endif
 
 #ifndef CSTR_ASSERT
@@ -286,7 +289,7 @@ cstr.h
         #define _CRT_NONSTDC_NO_DEPRECATE
         #define _CRT_SECURE_NO_WARNINGS
         #include <string.h>
-        #define CSTR_STRNICMP( s1, s2, len ) ( strnicmp( (s1), (s2), (len) ) )
+        #define CSTR_STRNICMP( s1, s2, len ) ( _strnicmp( (s1), (s2), (len) ) )
     #else
         #include <strings.h>
         #define CSTR_STRNICMP( s1, s2, len ) ( strncasecmp( (s1), (s2), (len) ) )
@@ -346,7 +349,8 @@ static CSTR_U32 internal_cstr_hash( char const* str, CSTR_SIZE_T length ) {
     CSTR_U32 m = 0x5bd1e995u;
     CSTR_U32 h = 0x31313137u;
     while( length >= 4 ) {
-        CSTR_U32 k = *(CSTR_U32 *)str;
+        CSTR_U32 k;
+        CSTR_MEMCPY( &k, str, sizeof( CSTR_U32 ) );
         k *= m;
         k ^= k >> 24;
         k *= m;
@@ -434,7 +438,7 @@ static char const* internal_cstr_insert( struct cstri_t* cstri, char const* str,
         for( size_t i = 0; i < old_capacity; ++i ) {
             if( old_table[ i ].string ) {
                 CSTR_U32 entry_hash = old_table[ i ].hash;
-                size_t new_slot = ( entry_hash & cstri->hash_table_capacity - 1 );
+                size_t new_slot = ( entry_hash & ( cstri->hash_table_capacity - 1 ) );
                 while( cstri->hash_table[ new_slot ].string ) {
                     new_slot = ( new_slot + 1 ) & ( cstri->hash_table_capacity - 1 );
                 }
@@ -506,7 +510,7 @@ struct cstri_t* cstri_create( void* memctx ) {
     cstri->blocks_count = 0;
     cstri->blocks_capacity = 16;
     cstri->blocks = (struct cstr_block_t*) CSTR_MALLOC( memctx, cstri->blocks_capacity * sizeof( *cstri->blocks ) );
-    cstri->hash_table_count = 1024;
+    cstri->hash_table_count = 0;
     cstri->hash_table_capacity = 1024;
     cstri->hash_table = (struct cstr_slot_t*) CSTR_MALLOC( memctx, cstri->hash_table_capacity * sizeof( *cstri->hash_table ) );
     CSTR_MEMSET( cstri->hash_table, 0, cstri->hash_table_capacity * sizeof( *cstri->hash_table ) );
@@ -637,7 +641,10 @@ char const* cstri_vformat( struct cstri_t* cstri, char const* format, CSTR_VA_LI
     if( !format ) {
         return internal_cstr_insert( cstri, "", 0 );
     }
-    int size = CSTR_VSNPRINTF( cstri->temp_buffer, cstri->temp_capacity, format, args );
+    CSTR_VA_LIST_T args_copy;
+    CSTR_VA_COPY( args_copy, args );
+    int size = CSTR_VSNPRINTF( cstri->temp_buffer, cstri->temp_capacity, format, args_copy );
+    CSTR_VA_END( args_copy );
     if( size < 0 ) {
         return NULL;
     }
@@ -767,52 +774,158 @@ char const* cstri_lower( struct cstri_t* cstri, char const* str ) {
     return internal_cstr_insert( cstri, temp, len );
 }
 
-#pragma warning( push )
-#pragma warning( disable: 4100 )
 
 char const* cstri_lpad( struct cstri_t* cstri, char const* str, char padding, CSTR_SIZE_T total_max_length ) {
-    return NULL; // todo
+    CSTR_SIZE_T len = cstri_len( cstri, str );
+    if( len >= total_max_length ) {
+        return internal_cstr_insert( cstri, str, len );
+    }
+    CSTR_SIZE_T pad_len = total_max_length - len;
+    char* temp = internal_cstr_temp_buffer( cstri, total_max_length );
+    CSTR_MEMSET( temp, padding, pad_len );
+    if( len > 0 ) {
+        CSTR_MEMCPY( temp + pad_len, str, len );
+    }
+    return internal_cstr_insert( cstri, temp, total_max_length );
 }
 
 
 char const* cstri_rpad( struct cstri_t* cstri, char const* str, char padding, CSTR_SIZE_T total_max_length ) {
-    return NULL; // todo
+    CSTR_SIZE_T len = cstri_len( cstri, str );
+    if( len >= total_max_length ) {
+        return internal_cstr_insert( cstri, str, len );
+    }
+    CSTR_SIZE_T pad_len = total_max_length - len;
+    char* temp = internal_cstr_temp_buffer( cstri, total_max_length );
+    if( len > 0 ) {
+        CSTR_MEMCPY( temp, str, len );
+    }
+    CSTR_MEMSET( temp + len, padding, pad_len );
+    return internal_cstr_insert( cstri, temp, total_max_length );
 }
 
 
 char const* cstri_join( struct cstri_t* cstri, char const* a, char const* b, char const* separator ) {
-    return NULL; // todo
+    CSTR_SIZE_T len_sep = cstri_len( cstri, separator );
+    if( len_sep == 0 ) {
+        return cstri_cat( cstri, a, b );
+    }
+    CSTR_SIZE_T len_a = cstri_len( cstri, a );
+    CSTR_SIZE_T len_b = cstri_len( cstri, b );
+    if( len_a == 0 || len_b == 0 ) {
+        return cstri_cat( cstri, a, b );
+    }
+    if( len_a >= len_sep && CSTR_MEMCMP( a + len_a - len_sep, separator, len_sep ) == 0 ) {
+        return cstri_cat( cstri, a, b );
+    }
+    if( len_b >= len_sep && CSTR_MEMCMP( b, separator, len_sep ) == 0 ) {
+        return cstri_cat( cstri, a, b );
+    }
+    CSTR_SIZE_T len = len_a + len_sep + len_b;
+    char* temp = internal_cstr_temp_buffer( cstri, len );
+    CSTR_MEMCPY( temp, a, len_a );
+    CSTR_MEMCPY( temp + len_a, separator, len_sep );
+    CSTR_MEMCPY( temp + len_a + len_sep, b, len_b );
+    return internal_cstr_insert( cstri, temp, len );
 }
 
-
-int cstri_find( struct cstri_t* cstri, char const* str, char const* find, int start );
-
-
 char const* cstri_replace( struct cstri_t* cstri, char const* str, char const* find, char const* replacement ) {
-    size_t repl_len = cstri_len( cstri, replacement );
-    size_t find_len = cstri_len( cstri, find );
-    char const* tmp = str;
-    int pos = cstri_find( cstri, tmp, find, 0 );
-    while( pos >= 0 ) {
-        size_t len = cstri_len( cstri, tmp ) + repl_len;
-        tmp = cstri_cat( cstri, cstri_cat( cstri, cstri_left( cstri, tmp, pos ), replacement ), cstri_mid( cstri, tmp, pos + find_len, 0 ) );
-        pos += repl_len;
-        pos = cstri_find( cstri, tmp, find, pos );        
+    CSTR_SIZE_T len_str = cstri_len( cstri, str );
+    if( len_str == 0 ) {
+        return internal_cstr_insert( cstri, "", 0 );
     }
-    return tmp;
+    CSTR_SIZE_T len_find = cstri_len( cstri, find );
+    if( len_find == 0 ) {
+        return internal_cstr_insert( cstri, str, len_str );
+    }
+    CSTR_SIZE_T len_rep = cstri_len( cstri, replacement );
+    CSTR_SIZE_T count = 0;
+    char const* p = CSTR_STRSTR( str, find );
+    while( p ) {
+        ++count;
+        p += len_find;
+        p = CSTR_STRSTR( p, find );
+    }
+    if( count == 0 ) {
+        return internal_cstr_insert( cstri, str, len_str );
+    }
+    CSTR_SIZE_T new_len = len_str - count * len_find + count * len_rep;
+    char* temp = internal_cstr_temp_buffer( cstri, new_len );
+    char* dst = temp;
+    char const* src = str;
+    p = CSTR_STRSTR( src, find );
+    while( p ) {
+        CSTR_SIZE_T chunk = (CSTR_SIZE_T)( p - src );
+        if( chunk ) {
+            CSTR_MEMCPY( dst, src, chunk );
+            dst += chunk;
+        }
+        if( len_rep ) {
+            CSTR_MEMCPY( dst, replacement, len_rep );
+            dst += len_rep;
+        }
+        src = p + len_find;
+        p = CSTR_STRSTR( src, find );
+    }
+    CSTR_SIZE_T tail = len_str - (CSTR_SIZE_T)( src - str );
+    if( tail ) {
+        CSTR_MEMCPY( dst, src, tail );
+    }
+
+    return internal_cstr_insert( cstri, temp, new_len );
 }
 
 
 char const* cstri_insert( struct cstri_t* cstri, char const* str, int position, char const* insertion ) {
-    return NULL; // todo
+    CSTR_SIZE_T len_str = cstri_len( cstri, str );
+    CSTR_SIZE_T len_ins = cstri_len( cstri, insertion );
+    if( len_ins == 0 ) {
+        return internal_cstr_insert( cstri, str, len_str );
+    }
+    if( position < 0 ) {
+        position = 0;
+    }
+    if( (CSTR_SIZE_T)position > len_str ) {
+        position = (int)len_str;
+    }
+    CSTR_SIZE_T new_len = len_str + len_ins;
+    char* temp = internal_cstr_temp_buffer( cstri, new_len );
+    if( position > 0 ) {
+        CSTR_MEMCPY( temp, str, (CSTR_SIZE_T)position );
+    }
+    CSTR_MEMCPY( temp + position, insertion, len_ins );
+    if( (CSTR_SIZE_T)position < len_str ) {
+        CSTR_MEMCPY( temp + position + len_ins, str + position, len_str - (CSTR_SIZE_T)position );
+    }
+    return internal_cstr_insert( cstri, temp, new_len );
 }
 
 
 char const* cstri_remove( struct cstri_t* cstri, char const* str, int start, int length ) {
-    return NULL; // todo
+    if( start < 0 ) {
+        length += start;
+        start = 0;
+    }
+    CSTR_SIZE_T len_str = cstri_len( cstri, str );
+    if( len_str == 0 || length <= 0 || (CSTR_SIZE_T) start >= len_str ) {
+        return internal_cstr_insert( cstri, str, len_str );
+    }
+    CSTR_SIZE_T head = (CSTR_SIZE_T) start;
+    if( head + (CSTR_SIZE_T) length > len_str ) {
+        length = (int)( len_str - head );
+    }
+    CSTR_SIZE_T new_len = len_str - (CSTR_SIZE_T) length;
+    char* temp = internal_cstr_temp_buffer( cstri, new_len );
+    if( head > 0 ) {
+        CSTR_MEMCPY( temp, str, head );
+    }
+    CSTR_SIZE_T tail = len_str - head - (CSTR_SIZE_T) length;
+    if( tail > 0 ) {
+        CSTR_MEMCPY( temp + head, str + head + length, tail );
+    }
+    return internal_cstr_insert( cstri, temp, new_len );
 }
 
-#pragma warning( pop )
 
 char const* cstri_int( struct cstri_t* cstri, int i ) {
     return cstri_format( cstri, "%d", i );
@@ -888,9 +1001,21 @@ int cstri_find( struct cstri_t* cstri, char const* str, char const* find, int st
 }
 
 
-int cstri_rfind( struct cstri_t* cstri, char const* str, char const* find, int start ) {
-    (void) cstri, (void)str, (void)find, (void)start;
-    // todo
+int cstri_rfind( struct cstri_t* cstri, char const* str, char const* find, int end ) {
+    CSTR_SIZE_T len_str  = cstri_len( cstri, str );
+    CSTR_SIZE_T len_find = cstri_len( cstri, find );
+    if( len_str == 0 || len_find > len_str ) {
+        return -1;
+    }
+    if( len_find == 0 ) {
+        return (CSTR_SIZE_T)end <= len_str ? end : (int)len_str;
+    }
+    CSTR_SIZE_T max_end = len_str - len_find;
+    for( int i = ( end <= 0 || (CSTR_SIZE_T)end > max_end ) ? (int)max_end : end; i >= 0; --i ) {
+        if( CSTR_MEMCMP( str + (CSTR_SIZE_T)i, find, len_find ) == 0 ) {
+            return i;
+        }
+    }
     return -1;
 }
 
@@ -913,7 +1038,7 @@ struct cstr_tokenizer_t cstri_tokenizer( struct cstri_t* cstri, char const* str 
 
 
 char const* cstri_tokenize( struct cstri_t* cstri, struct cstr_tokenizer_t* tokenizer, char const* separators ) {
-    CSTR_SIZE_T sep_len = cstr_len( separators );
+    CSTR_SIZE_T sep_len = cstri_len( cstri, separators );
     char const* pos = (char const*) tokenizer->internal;
 
     // strip leading separators
@@ -1289,10 +1414,10 @@ int cstr_find( char const* str, char const* find, int start ) {
 }
 
 
-int cstr_rfind( char const* str, char const* find, int start ) {
+int cstr_rfind( char const* str, char const* find, int end ) {
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    int ret = cstri_rfind( g_internal_cstr, str, find, start );
+    int ret = cstri_rfind( g_internal_cstr, str, find, end );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
@@ -1301,7 +1426,7 @@ int cstr_rfind( char const* str, char const* find, int start ) {
 CSTR_U32 cstr_hash( char const* str ) {
     CSTR_MUTEX_LOCK();
     if( !g_internal_cstr ) internal_cstr_instance();
-    CSTR_U32 ret = cstri_hash( g_internal_cstr, str );
+    CSTR_U32  ret = cstri_hash( g_internal_cstr, str );
     CSTR_MUTEX_UNLOCK();
     return ret;
 }
@@ -2084,6 +2209,367 @@ void test_cstr_lower( void ) {
 }
 
 
+void test_cstr_lpad( void ) {
+    TESTFW_TEST_BEGIN( "Use cstr_lpad with space padding" );
+    char const* str = cstr_lpad( "Test string", ' ', 16 );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "     Test string" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_lpad with zero padding" );
+    char const* str = cstr_lpad( "1234", '0', 8 );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "00001234" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_lpad with string longer than target length" );
+    char const* str = cstr_lpad( "Test string", '.', 11 );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "Test string" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_lpad with zero target length" );
+    char const* str = cstr_lpad( "Test string", '.', 0 );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "Test string" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_lpad with empty string" );
+    char const* str = cstr_lpad( "", '.', 5 );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "....." ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_lpad with NULL string" );
+    char const* str = cstr_lpad( NULL, '.', 5 );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "....." ) == 0 );
+    TESTFW_TEST_END();
+}
+
+
+void test_cstr_rpad( void ) {
+    TESTFW_TEST_BEGIN( "Use cstr_rpad with space padding" );
+    char const* str = cstr_rpad( "Test string", ' ', 16 );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "Test string     " ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_rpad with zero padding" );
+    char const* str = cstr_rpad( "1234", '0', 8 );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "12340000" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_rpad with string longer than target length" );
+    char const* str = cstr_rpad( "Test string", '.', 5 );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "Test string" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_rpad with zero target length" );
+    char const* str = cstr_rpad( "Test string", '.', 0 );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "Test string" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_rpad with empty string" );
+    char const* str = cstr_rpad( "", '.', 5 );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "....." ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_rpad with NULL string" );
+    char const* str = cstr_rpad( NULL, '.', 5 );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "....." ) == 0 );
+    TESTFW_TEST_END();
+}
+
+
+void test_cstr_join( void ) {
+    TESTFW_TEST_BEGIN( "Use cstr_join with separator insertion" );
+    char const* str = cstr_join( "dir", "file.txt", "/" );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "dir/file.txt" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_join with separator at end of first string" );
+    char const* str = cstr_join( "dir/", "file.txt", "/" );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "dir/file.txt" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_join with separator at start of second string" );
+    char const* str = cstr_join( "dir", "/file.txt", "/" );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "dir/file.txt" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_join with empty first string" );
+    char const* str = cstr_join( "", "file.txt", "/" );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "file.txt" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_join with empty second string" );
+    char const* str = cstr_join( "dir", "", "/" );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "dir" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_join with empty separator" );
+    char const* str = cstr_join( "Test", "String", "" );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "TestString" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_join with NULL first string" );
+    char const* str = cstr_join( NULL, "file.txt", "/" );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "file.txt" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_join with NULL second string" );
+    char const* str = cstr_join( "dir", NULL, "/" );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "dir" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_join with NULL separator" );
+    char const* str = cstr_join( "Test", "String", NULL );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "TestString" ) == 0 );
+    TESTFW_TEST_END();
+}
+
+
+void test_cstr_replace( void ) {
+    TESTFW_TEST_BEGIN( "Use cstr_replace with one occurrence" );
+    char const* str = cstr_replace( "Test string", "string", "value" );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "Test value" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_replace with multiple occurrences" );
+    char const* str = cstr_replace( "One fish two fish", "fish", "cat" );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "One cat two cat" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_replace with no occurrences" );
+    char const* str = cstr_replace( "No match here", "fish", "cat" );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "No match here" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_replace removing content" );
+    char const* str = cstr_replace( "Remove this word", "this ", "" );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "Remove word" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_replace inserting longer replacement" );
+    char const* str = cstr_replace( "Short", "o", "oooooo" );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "Shoooooort" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_replace inserting shorter replacement" );
+    char const* str = cstr_replace( "Banananana", "na", "!" );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "Ba!!!!" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_replace with empty find string" );
+    char const* str = cstr_replace( "Test string", "", "-" );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "Test string" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_replace with NULL find string" );
+    char const* str = cstr_replace( "Test string", NULL, "-" );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "Test string" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_replace with NULL input string" );
+    char const* str = cstr_replace( NULL, "a", "b" );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_replace with NULL replacement string" );
+    char const* str = cstr_replace( "ababa", "b", NULL );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "aaa" ) == 0 );
+    TESTFW_TEST_END();
+}
+
+
+void test_cstr_insert( void ) {
+    TESTFW_TEST_BEGIN( "Use cstr_insert at middle of string" );
+    char const* str = cstr_insert( "Test string", 5, "value " );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "Test value string" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_insert at beginning of string" );
+    char const* str = cstr_insert( "string", 0, "Test " );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "Test string" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_insert at end of string" );
+    char const* str = cstr_insert( "Test", 4, " string" );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "Test string" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_insert with position beyond end of string" );
+    char const* str = cstr_insert( "Test", 100, " string" );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "Test string" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_insert with negative position" );
+    char const* str = cstr_insert( "string", -5, "Test " );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "Test string" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_insert into empty string" );
+    char const* str = cstr_insert( "", 0, "Test string" );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "Test string" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_insert into NULL string" );
+    char const* str = cstr_insert( NULL, 0, "Test string" );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "Test string" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_insert with empty insertion" );
+    char const* str = cstr_insert( "Test string", 4, "" );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "Test string" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_insert with NULL insertion" );
+    char const* str = cstr_insert( "Test string", 4, NULL );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "Test string" ) == 0 );
+    TESTFW_TEST_END();
+}
+
+
+void test_cstr_remove( void ) {
+    TESTFW_TEST_BEGIN( "Use cstr_remove to delete middle part of string" );
+    char const* str = cstr_remove( "Test value string", 5, 6 );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "Test string" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_remove to delete from beginning" );
+    char const* str = cstr_remove( "Test string", 0, 5 );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "string" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_remove to delete at end" );
+    char const* str = cstr_remove( "Test string", 5, 10 );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "Test " ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_remove with length 0" );
+    char const* str = cstr_remove( "Test string", 5, 0 );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "Test string" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_remove with negative start" );
+    char const* str = cstr_remove( "Test string", -2, 3 );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "est string" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_remove with start beyond string length" );
+    char const* str = cstr_remove( "Test string", 100, 5 );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "Test string" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_remove to delete whole string" );
+    char const* str = cstr_remove( "Test string", 0, 100 );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_remove with empty string" );
+    char const* str = cstr_remove( "", 0, 5 );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "" ) == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "Use cstr_remove with NULL string" );
+    char const* str = cstr_remove( NULL, 0, 5 );
+    TESTFW_EXPECTED( cstr_is_interned( str ) );
+    TESTFW_EXPECTED( str != NULL );
+    TESTFW_EXPECTED( strcmp( str, "" ) == 0 );
+    TESTFW_TEST_END();
+}
+
+
 void test_cstr_int( void ) {
     TESTFW_TEST_BEGIN( "Use cstr_int with a positive number" );
     char const* str = cstr_int( 42 );
@@ -2353,7 +2839,132 @@ void test_cstr_compare_nocase( void ) {
 
 
 void test_cstr_find( void ) {
+    TESTFW_TEST_BEGIN( "cstr_find finds first match from start" );
+    int result = cstr_find( "one two one two", "two", 0 );
+    TESTFW_EXPECTED( result == 4 );
+    TESTFW_TEST_END();
 
+    TESTFW_TEST_BEGIN( "cstr_find finds match after offset" );
+    int result = cstr_find( "one two one two", "two", 5 );
+    TESTFW_EXPECTED( result == 12 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "cstr_find finds match at position 0" );
+    int result = cstr_find( "hello world", "hello", 0 );
+    TESTFW_EXPECTED( result == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "cstr_find returns -1 for no match" );
+    int result = cstr_find( "hello", "xyz", 0 );
+    TESTFW_EXPECTED( result == -1 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "cstr_find with NULL string" );
+    int result = cstr_find( NULL, "x", 0 );
+    TESTFW_EXPECTED( result == -1 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "cstr_find with NULL find string" );
+    int result = cstr_find( "x", NULL, 0 );
+    TESTFW_EXPECTED( result == -1 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "cstr_find with empty string input" );
+    int result = cstr_find( "", "x", 0 );
+    TESTFW_EXPECTED( result == -1 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "cstr_find with empty find string" );
+    int result = cstr_find( "x", "", 0 );
+    TESTFW_EXPECTED( result == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "cstr_find clamps start beyond end" );
+    int result = cstr_find( "ababab", "ab", 100 );
+    TESTFW_EXPECTED( result == -1 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "cstr_find from inside first match" );
+    int result = cstr_find( "ababab", "ab", 1 );
+    TESTFW_EXPECTED( result == 2 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "cstr_find loop finds all matches" );
+    int start = 0;
+    int pos = cstr_find( "one two one two", "two", start );
+    TESTFW_EXPECTED( pos == 4 );
+    start = pos + 3;
+    pos = cstr_find( "one two one two", "two", start );
+    TESTFW_EXPECTED( pos == 12 );
+    start = pos + 3;
+    pos = cstr_find( "one two one two", "two", start );
+    TESTFW_EXPECTED( pos == -1 );
+    TESTFW_TEST_END();
+}
+
+
+void test_cstr_rfind( void ) {
+    TESTFW_TEST_BEGIN( "cstr_rfind finds last match from full string" );
+    int result = cstr_rfind( "one two one two", "two", 0 );
+    TESTFW_EXPECTED( result == 12 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "cstr_rfind finds match before limit" );
+    int result = cstr_rfind( "one two one two", "two", 10 );
+    TESTFW_EXPECTED( result == 4 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "cstr_rfind finds match at position 0" );
+    int result = cstr_rfind( "hello world", "hello", 0 );
+    TESTFW_EXPECTED( result == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "cstr_rfind returns -1 for no match" );
+    int result = cstr_rfind( "hello", "xyz", 0 );
+    TESTFW_EXPECTED( result == -1 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "cstr_rfind with NULL string" );
+    int result = cstr_rfind( NULL, "x", 0 );
+    TESTFW_EXPECTED( result == -1 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "cstr_rfind with NULL find string" );
+    int result = cstr_rfind( "x", NULL, 0 );
+    TESTFW_EXPECTED( result == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "cstr_rfind with empty string input" );
+    int result = cstr_rfind( "", "x", 0 );
+    TESTFW_EXPECTED( result == -1 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "cstr_rfind with empty find string" );
+    int result = cstr_rfind( "x", "", 0 );
+    TESTFW_EXPECTED( result == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "cstr_rfind clamps end larger than max" );
+    int result = cstr_rfind( "ababab", "ab", 100 );
+    TESTFW_EXPECTED( result == 4 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "cstr_rfind from inside first match" );
+    int result = cstr_rfind( "ababab", "ab", 1 );
+    TESTFW_EXPECTED( result == 0 );
+    TESTFW_TEST_END();
+
+    TESTFW_TEST_BEGIN( "cstr_rfind loop finds all matches" );
+    int end = 0;
+    int pos = cstr_rfind( "one two one two", "two", end );
+    TESTFW_EXPECTED( pos == 12 );
+    end = pos - 1;
+    pos = cstr_rfind( "one two one two", "two", end );
+    TESTFW_EXPECTED( pos == 4 );
+    end = pos - 1;
+    pos = cstr_rfind( "one two one two", "two", end );
+    TESTFW_EXPECTED( pos == -1 );
+    TESTFW_TEST_END();
 }
 
 
@@ -2463,6 +3074,12 @@ int main( int argc, char** argv ) {
     test_cstr_mid();
     test_cstr_upper();
     test_cstr_lower();
+    test_cstr_lpad();
+    test_cstr_rpad();
+    test_cstr_join();
+    test_cstr_replace();
+    test_cstr_insert();
+    test_cstr_remove();
     test_cstr_int();
     test_cstr_float();
     test_cstr_starts();
@@ -2471,9 +3088,10 @@ int main( int argc, char** argv ) {
     test_cstr_compare();
     test_cstr_compare_nocase();
     test_cstr_find();
+    test_cstr_rfind();
     test_cstr_hash();
     test_cstr_tokenize();
-    //stress_tests();
+    stress_tests();
 
     cstr_reset();
     return TESTFW_SUMMARY();
@@ -2502,6 +3120,7 @@ int main( int argc, char** argv ) {
 
 /*
 revision history:
+    1.1     implemented lpad, rpad, join, replace, insert, remove, rfind
     1.0     first released version
 */
 
